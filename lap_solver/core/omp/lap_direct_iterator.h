@@ -1,0 +1,29 @@
+#pragma once
+
+#include <algorithm>
+#include "lap_worksharing.h"
+#include "../lap_direct_iterator.h"
+
+namespace lap
+{
+	namespace omp
+	{
+		template <class SC, class TC, class CF>
+		class DirectIterator
+		{
+		protected:
+			int dim, dim2;
+			CF &costfunc;
+		public:
+			Worksharing &ws;
+
+		public:
+			DirectIterator(int dim, int dim2, CF &costfunc, Worksharing &ws) : dim(dim), dim2(dim2), costfunc(costfunc), ws(ws) {}
+			~DirectIterator() {}
+
+			void getHitMiss(long long &hit, long long &miss) { hit = miss = 0; }
+
+			__forceinline const TC *getRow(int t, int i) { return costfunc.getRow(t, i); }
+		};
+	}
+}
