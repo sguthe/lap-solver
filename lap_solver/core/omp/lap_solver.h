@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../lap_solver.h"
-#include <condition_variable>
 
 namespace lap
 {
@@ -263,21 +262,20 @@ namespace lap
 							if (i < dim)
 							{
 								auto tt = iterator.getRow(t, i);
+								SC h2;
 								if ((jmin >= start) && (jmin < end))
 								{
-									h2_global = tt[jmin - start] - v[jmin] - min;
+									h2 = h2_global = tt[jmin - start] - v[jmin] - min;
+#pragma omp flush(h2_global)
 								}
 								else
 								{
-									while (h2_global == std::numeric_limits<SC>::infinity())
+#pragma omp flush(h2_global)
+									while ((h2 = h2_global) == std::numeric_limits<SC>::infinity())
 									{
-										//std::this_thread::sleep_for(std::chrono::nanoseconds(1));
-										std::this_thread::yield();
 #pragma omp flush(h2_global)
 									}
 								}
-#pragma omp flush(h2_global)
-								SC h2 = h2_global;
 								for (int j = start; j < end; j++)
 								{
 									int j_local = j - start;

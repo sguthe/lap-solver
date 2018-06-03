@@ -37,7 +37,8 @@ namespace lap
 					cache[t].setSize(entries, dim);
 					lapAlloc(rows[t], entries * size, __FILE__, __LINE__);
 					// first touch
-					memset(rows[t], 0, entries * size * sizeof(TC));
+					//memset(rows[t], 0, entries * size * sizeof(TC));
+					rows[t][0] = TC(0);
 				}
 			}
 

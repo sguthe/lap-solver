@@ -9,7 +9,7 @@ SET(CMAKE_CXX_COMPILER g++)
 SET(CMAKE_C_COMPILER gcc)
 
 # Release Mode
-SET(CMAKE_CXX_FLAGS "-Wall -O3 -Wfatal-errors -fstrict-aliasing -m64 -std=c++11 -fopenmp -ftree-vectorize -flto")
+SET(CMAKE_CXX_FLAGS "-Wall -O3 -Wfatal-errors -fstrict-aliasing -m64 -std=c++11 -fopenmp -flto -march=native")
 
 # Define where your executables should be put
 SET(EXECUTABLE_OUTPUT_PATH ${MyProject_BINARY_DIR})
