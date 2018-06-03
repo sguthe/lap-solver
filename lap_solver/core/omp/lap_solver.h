@@ -271,6 +271,8 @@ namespace lap
 								{
 									while (h2_global == std::numeric_limits<SC>::infinity())
 									{
+										//std::this_thread::sleep_for(std::chrono::nanoseconds(1));
+										std::this_thread::yield();
 #pragma omp flush(h2_global)
 									}
 								}

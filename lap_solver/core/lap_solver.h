@@ -15,14 +15,14 @@ namespace lap
 	class AllocationLogger
 	{
 		std::deque<void *> allocated;
-		std::deque<size_t> size;
+		std::deque<unsigned long long> size;
 		std::deque<char *> alloc_file;
 		std::deque<int> alloc_line;
-		size_t peak;
-		size_t current;
+		unsigned long long peak;
+		unsigned long long current;
 		std::mutex lock;
 	private:
-		std::string commify(size_t n)
+		std::string commify(unsigned long long n)
 		{
 			std::string s;
 			int cnt = 0;
@@ -40,7 +40,7 @@ namespace lap
 		}
 
 	public:
-		AllocationLogger() { peak = current = (size_t)0; }
+		AllocationLogger() { peak = current = (unsigned long long)0; }
 		~AllocationLogger() {}
 		void destroy()
 		{
@@ -64,7 +64,7 @@ namespace lap
 			lapDebug << "Freeing memory at 0x" << std::hex << a << std::dec << std::endl;
 #endif
 			std::lock_guard<std::mutex> guard(lock);
-			for (size_t i = 0; i < allocated.size(); i++)
+			for (unsigned long long i = 0; i < allocated.size(); i++)
 			{
 				if ((void *)a == allocated[i])
 				{
@@ -83,7 +83,7 @@ namespace lap
 		}
 
 		template <class T>
-		void alloc(T a, size_t s, const char *file, const int line)
+		void alloc(T a, unsigned long long s, const char *file, const int line)
 		{
 #ifdef LAP_DEBUG
 			lapDebug << "Allocating " << s * sizeof(T) << " bytes at 0x" << std::hex << a << std::dec << " \"" << file << ":" << line << std::endl;
@@ -102,7 +102,7 @@ namespace lap
 #endif
 
 	template <typename T>
-	void alloc(T * &ptr, size_t width, const char *file, const int line)
+	void alloc(T * &ptr, unsigned long long width, const char *file, const int line)
 	{
 		ptr = new T[width]; // this one is allowed
 #ifndef LAP_QUIET

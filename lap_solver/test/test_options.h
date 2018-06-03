@@ -25,12 +25,15 @@ public:
 	bool run_geometric_disjoint;
 	bool run_geometric_disjoint_cached;
 	std::vector<std::string> images;
+
+	int runs;
 public:
 	Options()
 	{
 		lap_min_tab = lap_max_tab = lap_min_cached = lap_max_cached = 0ll;
 		use_double = use_float = use_single = use_epsilon = use_omp = false;
 		run_random = run_geometric = run_geometric_cached = run_geometric_disjoint = run_geometric_disjoint_cached = false;
+		runs = 1;
 	}
 public:
 	void setDefaultSize()
@@ -134,6 +137,10 @@ public:
 			else if (!strcmp(argv[i], "-img"))
 			{
 				images.push_back(argv[++i]);
+			}
+			else if (!strcmp(argv[i], "-runs"))
+			{
+				runs = atoi(argv[++i]);
 			}
 			else
 			{

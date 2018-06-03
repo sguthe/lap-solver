@@ -52,7 +52,7 @@ namespace lap
 	class CacheLFU;
 
 	// Memory management
-	template <typename T> void alloc(T * &ptr, size_t width, const char *file, const int line);
+	template <typename T> void alloc(T * &ptr, unsigned long long width, const char *file, const int line);
 	template <typename T> void free(T *&ptr);
 
 #ifdef LAP_OPENMP
