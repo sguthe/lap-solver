@@ -49,7 +49,7 @@ namespace lap
 			lapInfo << "Memory leak list:" << std::endl;
 			while (!allocated.empty())
 			{
-				lapInfo << "  leaked " << commify(size.front()) << " bytes at 0x" << std::hex << allocated.front() << std::dec << " (device): " << alloc_file.front() << ":" << alloc_line.front() << std::endl;
+				lapInfo << "  leaked " << commify(size.front()) << " bytes at 0x" << std::hex << allocated.front() << std::dec << ": " << alloc_file.front() << ":" << alloc_line.front() << std::endl;
 				size.pop_front();
 				allocated.pop_front();
 				alloc_file.pop_front();

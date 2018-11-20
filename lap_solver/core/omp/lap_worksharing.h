@@ -22,7 +22,7 @@ namespace lap
 					part[p].first = (int)(multiple * x0);
 					if (p + 1 != max_threads)
 					{
-						long long x1 = (long long)(p + 1) * (long long)size;
+						long long x1 = ((long long)p + 1ll) * (long long)size;
 						x1 /= max_threads;
 						x1 /= multiple;
 						part[p].second = (int)(multiple * x1);
