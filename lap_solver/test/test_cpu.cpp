@@ -169,16 +169,35 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 				}
 
 				C *tab = new C[NN];
-				for (long long i = 0; i < N; i++)
+				if (omp)
 				{
-					for (long long j = 0; j < N; j++)
+#pragma omp parallel for
+					for (long long i = 0; i < N; i++)
 					{
-						C sum(0);
-						for (long long k = 0; k < rank; k++)
+						for (long long j = 0; j < N; j++)
 						{
-							sum += vec[k * N + i] * vec[k * N + j];
+							C sum(0);
+							for (long long k = 0; k < rank; k++)
+							{
+								sum += vec[k * N + i] * vec[k * N + j];
+							}
+							tab[i * N + j] = (sum / C(rank)) + C(1);
 						}
-						tab[i * N + j] = (sum / C(rank)) + C(1);
+					}
+				}
+				else
+				{
+					for (long long i = 0; i < N; i++)
+					{
+						for (long long j = 0; j < N; j++)
+						{
+							C sum(0);
+							for (long long k = 0; k < rank; k++)
+							{
+								sum += vec[k * N + i] * vec[k * N + j];
+							}
+							tab[i * N + j] = (sum / C(rank)) + C(1);
+						}
 					}
 				}
 
@@ -192,7 +211,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 					lap::omp::Worksharing ws(N, 8);
 					lap::omp::TableCost<C> costMatrix(N, N, tab, ws);
 					lap::omp::DirectIterator<C, C, lap::omp::TableCost<C>> iterator(N, N, costMatrix, ws);
-					if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator) / C(10));
+					if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator) / C(100));
 
 					lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -209,7 +228,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 				{
 					lap::TableCost<C> costMatrix(N, N, tab);
 					lap::DirectIterator<C, C, lap::TableCost<C>> iterator(N, N, costMatrix);
-					if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator) / C(10));
+					if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator) / C(100));
 
 					lap::displayTime(start_time, "setup complete", std::cout);
 
