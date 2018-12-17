@@ -158,7 +158,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 
 				auto start_time = std::chrono::high_resolution_clock::now();
 
-				std::uniform_real_distribution<C> distribution(0.0, 1.0);
+				std::uniform_real_distribution<C> distribution(-1.0, 1.0);
 				std::mt19937_64 generator(1234);
 
 				// The following matrix will have at most the seletcted rank.
@@ -178,7 +178,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 						{
 							sum += vec[k * N + i] * vec[k * N + j];
 						}
-						tab[i * N + j] = sum / C(rank);
+						tab[i * N + j] = (sum / C(rank)) + C(1);
 					}
 				}
 
@@ -192,7 +192,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 					lap::omp::Worksharing ws(N, 8);
 					lap::omp::TableCost<C> costMatrix(N, N, tab, ws);
 					lap::omp::DirectIterator<C, C, lap::omp::TableCost<C>> iterator(N, N, costMatrix, ws);
-					if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator) / C(1000.0));
+					if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator) / C(10.0));
 
 					lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -209,7 +209,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 				{
 					lap::TableCost<C> costMatrix(N, N, tab);
 					lap::DirectIterator<C, C, lap::TableCost<C>> iterator(N, N, costMatrix);
-					if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator) / C(1000.0));
+					if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator) / C(10.0));
 
 					lap::displayTime(start_time, "setup complete", std::cout);
 
