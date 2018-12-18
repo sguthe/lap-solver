@@ -636,7 +636,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 						lap::omp::TableCost<C> costMatrix(N1, N2, costFunction, ws);
 						lap::omp::DirectIterator<C, C, decltype(costMatrix)> iterator(N1, N2, costMatrix, ws);
-						if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N1, N2, iterator, (int)(N1 / entries)));
+						if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
 
 						lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -655,7 +655,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 						if (4 * entries < N1)
 						{
 							lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, (int)entries, costFunction, ws);
-							if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N1, N2, iterator, (int)(N1 / entries)));
+							if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
 							lap::displayTime(start_time, "setup complete", std::cout);
 							lap::omp::solve<C>(N1, N2, costFunction, iterator, rowsol);
 
@@ -668,7 +668,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 						else
 						{
 							lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N1, N2, (int)entries, costFunction, ws);
-							if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N1, N2, iterator, (int)(N1 / entries)));
+							if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
 							lap::displayTime(start_time, "setup complete", std::cout);
 							lap::omp::solve<C>(N1, N2, costFunction, iterator, rowsol);
 
@@ -691,7 +691,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 						lap::TableCost<C> costMatrix(N1, N2, costFunction);
 						lap::DirectIterator<C, C, decltype(costMatrix)> iterator(N1, N2, costMatrix);
-						if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N1, N2, iterator, (int)(N1 / entries)));
+						if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
 
 						lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -710,7 +710,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 						if (4 * entries < N1)
 						{
 							lap::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, (int)entries, costFunction);
-							if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N1, N2, iterator, (int)(N1 / entries)));
+							if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
 							lap::displayTime(start_time, "setup complete", std::cout);
 							lap::solve<C>(N1, N2, costFunction, iterator, rowsol);
 
@@ -723,7 +723,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 						else
 						{
 							lap::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N1, N2, (int)entries, costFunction);
-							if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N1, N2, iterator, (int)(N1 / entries)));
+							if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
 							lap::displayTime(start_time, "setup complete", std::cout);
 							lap::solve<C>(N1, N2, costFunction, iterator, rowsol);
 
