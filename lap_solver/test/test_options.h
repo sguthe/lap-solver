@@ -21,6 +21,7 @@ public:
 	bool use_epsilon;
 	bool use_omp;
 
+	bool run_sanity;
 	bool run_random;
 	bool run_random_low_rank;
 	bool run_geometric;
@@ -35,7 +36,7 @@ public:
 	{
 		lap_min_tab = lap_max_tab = lap_min_cached = lap_max_cached = lap_min_rank = lap_max_rank = 0ll;
 		use_double = use_float = use_single = use_epsilon = use_omp = false;
-		run_random = run_geometric = run_geometric_cached = run_geometric_disjoint = run_geometric_disjoint_cached = run_random_low_rank = false;
+		run_sanity = run_random = run_geometric = run_geometric_cached = run_geometric_disjoint = run_geometric_disjoint_cached = run_random_low_rank = false;
 		runs = 1;
 	}
 public:
@@ -116,6 +117,10 @@ public:
 			else if (!strcmp(argv[i], "-epsilon"))
 			{
 				use_epsilon = true;
+			}
+			else if (!strcmp(argv[i], "-sanity"))
+			{
+				run_sanity = true;
 			}
 			else if (!strcmp(argv[i], "-random"))
 			{

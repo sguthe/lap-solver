@@ -216,7 +216,7 @@ namespace lap
 			}
 			epsilon += max_cost - min_cost;
 		}
-		return (epsilon / TC((x_size + step - 1) / step));
+		return (epsilon / TC(10 * (x_size + step - 1) / step));
 	}
 
 #if defined(__GNUC__)
@@ -437,6 +437,7 @@ namespace lap
 
 		SC last_avg = SC(0);
 		bool first = true;
+		bool allow_reset = true;
 
 		memset(v, 0, dim2 * sizeof(SC));
 
@@ -446,15 +447,24 @@ namespace lap
 			unsigned long long count = 0ULL;
 			if (epsilon > SC(0))
 			{
-				if (!first)
+				if (epsilon < SC(2) * epsilon_lower) epsilon = SC(0);
+				else
 				{
-					if (last_avg == SC(0))
+					if (!first)
 					{
-						memset(v, 0, dim2 * sizeof(SC));
-						epsilon *= SC(0.5);
+						if ((allow_reset) && (-last_avg <= SC(0.1) * epsilon))
+						{
+							memset(v, 0, dim2 * sizeof(SC));
+							if (last_avg == SC(0.0)) epsilon *= SC(0.1);
+							else epsilon = -last_avg;
+						}
+						else
+						{
+							epsilon = std::max(SC(0.25) * epsilon, SC(0.5) * (epsilon + last_avg));
+							allow_reset = false;
+						}
+						if (epsilon < epsilon_lower) epsilon = epsilon_lower;
 					}
-					else epsilon = std::max(SC(0), SC(0.5) * (epsilon + last_avg));
-					if (epsilon < epsilon_lower) epsilon = SC(0);
 				}
 			}
 			SC eps = epsilon;
@@ -586,14 +596,14 @@ namespace lap
 			}
 #endif
 			first = false;
-		}
 
 #ifndef LAP_QUIET
-		lapInfo << "  rows evaluated: " << total_rows;
-		if (total_virtual > 0) lapInfo << " virtual rows evaluated: " << total_virtual;
-		lapInfo << std::endl;
-		if ((total_hit != 0) || (total_miss != 0)) lapInfo << "  hit: " << total_hit << " miss: " << total_miss << std::endl;
+			lapInfo << "  rows evaluated: " << total_rows;
+			if (total_virtual > 0) lapInfo << " virtual rows evaluated: " << total_virtual;
+			lapInfo << std::endl;
+			if ((total_hit != 0) || (total_miss != 0)) lapInfo << "  hit: " << total_hit << " miss: " << total_miss << std::endl;
 #endif
+		}
 
 		// free reserved memory.
 		lapFree(pred);
