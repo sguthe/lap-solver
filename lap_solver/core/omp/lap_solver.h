@@ -95,6 +95,7 @@ namespace lap
 
 #ifdef LAP_DEBUG
 			std::vector<SC *> v_list;
+			std::vector<SC> eps_list;
 #endif
 
 			lapAlloc(colactive, dim2, __FILE__, __LINE__);
@@ -425,6 +426,7 @@ namespace lap
 					SC *vv;
 					lapAlloc(vv, dim, __FILE__, __LINE__);
 					v_list.push_back(vv);
+					eps_list.push_back(eps);
 					memcpy(v_list.back(), v, sizeof(SC) * dim2);
 				}
 				else
@@ -443,7 +445,7 @@ namespace lap
 							}
 							dlt /= SC(dim2);
 							dlt2 /= SC(dim2);
-							lapDebug << "iteration = " << l << " mse = " << dlt2 - dlt * dlt << " rsme = " << sqrt(dlt2 - dlt * dlt) << std::endl;
+							lapDebug << "iteration = " << l << " eps/mse = " << eps_list[l] << " " << dlt2 - dlt * dlt << " eps/rmse = " << eps_list[l] << " " << sqrt(dlt2 - dlt * dlt) << std::endl;
 							lapFree(v_list[l]);
 						}
 					}
