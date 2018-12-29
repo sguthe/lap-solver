@@ -301,6 +301,21 @@ void testRandomCached(long long max_tab, long long min_cached, long long max_cac
 				}
 			}
 
+			if (sanity)
+			{
+				bool passed = true;
+				for (long long i = 0; (passed) && (i < N); i++)
+				{
+					passed &= (rowsol[i] == i);
+				}
+				std::stringstream ss;
+				if (passed) ss << "test passed: ";
+				else ss << "test failed: ";
+				C real_cost(0);
+				for (int i = 0; i < N; i++) real_cost += get_cost(i, i);
+				ss << "ground truth cost = " << real_cost;
+				lap::displayTime(start_time, ss.str().c_str(), std::cout);
+			}
 			delete[] rowsol;
 			delete[] vec;
 		}
