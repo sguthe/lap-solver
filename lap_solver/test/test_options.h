@@ -22,8 +22,10 @@ public:
 	bool use_omp;
 
 	bool run_sanity;
+	bool run_sanity_cached;
 	bool run_random;
 	bool run_random_low_rank;
+	bool run_random_low_rank_cached;
 	bool run_geometric;
 	bool run_geometric_cached;
 	bool run_geometric_disjoint;
@@ -36,7 +38,8 @@ public:
 	{
 		lap_min_tab = lap_max_tab = lap_min_cached = lap_max_cached = lap_min_rank = lap_max_rank = 0ll;
 		use_double = use_float = use_single = use_epsilon = use_omp = false;
-		run_sanity = run_random = run_geometric = run_geometric_cached = run_geometric_disjoint = run_geometric_disjoint_cached = run_random_low_rank = false;
+		run_sanity = run_random = run_geometric = run_geometric_disjoint = run_random_low_rank = false;
+		run_sanity_cached = run_geometric_cached = run_geometric_disjoint_cached = run_random_low_rank_cached = false;
 		runs = 1;
 	}
 public:
@@ -51,7 +54,6 @@ public:
 	{
 		setDefaultSize();
 		use_double = true;
-		use_float = false;
 		use_single = true;
 		use_epsilon = true;
 		use_omp = true;
@@ -122,6 +124,10 @@ public:
 			{
 				run_sanity = true;
 			}
+			else if (!strcmp(argv[i], "-sanity_cached"))
+			{
+				run_sanity_cached = true;
+			}
 			else if (!strcmp(argv[i], "-random"))
 			{
 				run_random = true;
@@ -129,6 +135,10 @@ public:
 			else if (!strcmp(argv[i], "-random_low_rank"))
 			{
 				run_random_low_rank = true;
+			}
+			else if (!strcmp(argv[i], "-random_low_rank_cached"))
+			{
+				run_random_low_rank_cached = true;
 			}
 			else if (!strcmp(argv[i], "-geometric"))
 			{
