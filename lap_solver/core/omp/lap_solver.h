@@ -139,8 +139,7 @@ namespace lap
 							}
 							else
 							{
-								//epsilon = std::max(SC(0.25) * epsilon, SC(0.5) * (epsilon + last_avg));
-								epsilon = SC(sqrt(0.1)) * epsilon;
+								epsilon = std::max(SC(0.25) * epsilon, SC(0.5) * (epsilon + last_avg));
 								allow_reset = false;
 							}
 							if (epsilon < epsilon_lower) epsilon = epsilon_lower;

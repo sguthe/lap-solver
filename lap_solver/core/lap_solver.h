@@ -61,8 +61,10 @@ namespace lap
 		void free(T a)
 		{
 #ifdef LAP_DEBUG
+#ifndef LAP_NO_MEM_BEBUG
 #pragma omp critical
 			lapDebug << "Freeing memory at " << std::hex << a << std::dec << std::endl;
+#endif
 #endif
 			std::lock_guard<std::mutex> guard(lock);
 			for (unsigned long long i = 0; i < allocated.size(); i++)
@@ -87,8 +89,10 @@ namespace lap
 		void alloc(T a, unsigned long long s, const char *file, const int line)
 		{
 #ifdef LAP_DEBUG
+#ifndef LAP_NO_MEM_BEBUG
 #pragma omp critical
 			lapDebug << "Allocating " << s * sizeof(T) << " bytes at " << std::hex << a << std::dec << " \"" << file << ":" << line << std::endl;
+#endif
 #endif
 			std::lock_guard<std::mutex> guard(lock);
 			current += s;
