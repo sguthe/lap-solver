@@ -34,8 +34,8 @@ namespace lap
 	// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
 	template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol);
 	template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol);
-	template <class SC, class TC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
-	template <class SC, class TC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
+	template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
+	template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
 	template <class TC, class I> TC guessEpsilon(int x_size, int y_size, I& iterator, int step = 1);
 
 	// Cost functions, including tabulated costs
@@ -61,8 +61,8 @@ namespace lap
 		// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
 		template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol);
 		template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol);
-		template <class SC, class TC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
-		template <class SC, class TC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
+		template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
+		template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
 		template <class TC, class I> TC guessEpsilon(int x_size, int y_size, I& iterator, int step = 1);
 
 		// Cost functions, including tabulated costs

@@ -92,6 +92,7 @@ namespace lap
 			SC *d;
 			int *colsol;
 			SC *v;
+			SC *v_old;
 
 #ifdef LAP_DEBUG
 			std::vector<SC *> v_list;
@@ -103,6 +104,7 @@ namespace lap
 			lapAlloc(d, dim2, __FILE__, __LINE__);
 			lapAlloc(pred, dim2, __FILE__, __LINE__);
 			lapAlloc(v, dim2, __FILE__, __LINE__);
+			lapAlloc(v_old, dim2, __FILE__, __LINE__);
 			lapAlloc(colsol, dim2, __FILE__, __LINE__);
 
 			SC *min_private;
@@ -115,10 +117,12 @@ namespace lap
 			SC epsilon_lower = epsilon / SC(dim2);
 
 			SC last_avg = SC(0);
+			SC last_cost = SC(0);
 			bool first = true;
 			bool allow_reset = true;
 
 			memset(v, 0, dim2 * sizeof(SC));
+			memset(v_old, 0, dim2 * sizeof(SC));
 
 			while (epsilon >= SC(0))
 			{
@@ -133,12 +137,26 @@ namespace lap
 						{
 							if ((allow_reset) && (-last_avg <= SC(0.1) * epsilon))
 							{
+#ifdef LAP_DEBUG
+								lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+#endif
 								memset(v, 0, dim2 * sizeof(SC));
 								if (last_avg == SC(0.0)) epsilon *= SC(0.1);
 								else epsilon = -last_avg;
 							}
 							else
 							{
+								SC cur_cost = omp::cost<SC, CF>(dim, dim2, costfunc, rowsol);
+								if (!allow_reset)
+								{
+									// last_cost is already valid so revert if cost increased
+#ifdef LAP_DEBUG
+									if (cur_cost > last_cost) lapDebug << "cost increased -> reverting v." << std::endl;
+#endif
+									if (cur_cost > last_cost) memcpy(v, v_old, dim2 * sizeof(SC));
+									else memcpy(v_old, v, dim2 * sizeof(SC));
+								} else memcpy(v_old, v, dim2 * sizeof(SC));
+								last_cost = cur_cost;
 								epsilon = std::max(SC(0.25) * epsilon, SC(0.5) * (epsilon + last_avg));
 								allow_reset = false;
 							}
@@ -469,6 +487,7 @@ namespace lap
 			lapFree(colactive);
 			lapFree(colcomplete);
 			lapFree(d);
+			lapFree(v_old);
 			lapFree(v);
 			lapFree(colsol);
 			lapFree(min_private);
@@ -482,7 +501,7 @@ namespace lap
 			lap::omp::solve<SC>(dim, dim, costfunc, iterator, rowsol);
 		}
 
-		template <class SC, class TC, class CF>
+		template <class SC, class CF>
 		SC cost(int dim, int dim2, CF &costfunc, int *rowsol)
 		{
 			SC total = SC(0);
@@ -523,10 +542,10 @@ namespace lap
 			return total;
 		}
 
-		template <class SC, class TC, class CF>
+		template <class SC, class CF>
 		SC cost(int dim, CF &costfunc, int *rowsol)
 		{
-			return lap::omp::cost<SC, TC, CF>(dim, dim, costfunc, rowsol);
+			return lap::omp::cost<SC, CF>(dim, dim, costfunc, rowsol);
 		}
 	}
 }

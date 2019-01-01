@@ -161,7 +161,7 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 
 				{
 					std::stringstream ss;
-					ss << "cost = " << lap::omp::cost<C, C>(N, costMatrix, rowsol);
+					ss << "cost = " << lap::omp::cost<C>(N, costMatrix, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
 #endif
@@ -178,7 +178,7 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 
 				{
 					std::stringstream ss;
-					ss << "cost = " << lap::cost<C, C>(N, costMatrix, rowsol);
+					ss << "cost = " << lap::cost<C>(N, costMatrix, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
 			}
@@ -270,7 +270,7 @@ void testRandomCached(long long max_tab, long long min_cached, long long max_cac
 
 				{
 					std::stringstream ss;
-					ss << "cost = " << lap::omp::cost<C, C>(N, costFunction, rowsol);
+					ss << "cost = " << lap::omp::cost<C>(N, costFunction, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
 #endif
@@ -296,7 +296,7 @@ void testRandomCached(long long max_tab, long long min_cached, long long max_cac
 
 				{
 					std::stringstream ss;
-					ss << "cost = " << lap::cost<C, C>(N, costFunction, rowsol);
+					ss << "cost = " << lap::cost<C>(N, costFunction, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
 			}
@@ -402,7 +402,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 
 					{
 						std::stringstream ss;
-						ss << "cost = " << lap::omp::cost<C, C>(N, costMatrix, rowsol);
+						ss << "cost = " << lap::omp::cost<C>(N, costMatrix, rowsol);
 						lap::displayTime(start_time, ss.str().c_str(), std::cout);
 					}
 #endif
@@ -419,7 +419,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 
 					{
 						std::stringstream ss;
-						ss << "cost = " << lap::cost<C, C>(N, costMatrix, rowsol);
+						ss << "cost = " << lap::cost<C>(N, costMatrix, rowsol);
 						lap::displayTime(start_time, ss.str().c_str(), std::cout);
 					}
 				}
@@ -496,7 +496,7 @@ void testRandomLowRankCached(long long max_tab, long long min_cached, long long 
 
 					{
 						std::stringstream ss;
-						ss << "cost = " << lap::omp::cost<C, C>(N, costFunction, rowsol);
+						ss << "cost = " << lap::omp::cost<C>(N, costFunction, rowsol);
 						lap::displayTime(start_time, ss.str().c_str(), std::cout);
 					}
 #endif
@@ -522,7 +522,7 @@ void testRandomLowRankCached(long long max_tab, long long min_cached, long long 
 
 					{
 						std::stringstream ss;
-						ss << "cost = " << lap::cost<C, C>(N, costFunction, rowsol);
+						ss << "cost = " << lap::cost<C>(N, costFunction, rowsol);
 						lap::displayTime(start_time, ss.str().c_str(), std::cout);
 					}
 				}
@@ -613,7 +613,7 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 
 				{
 					std::stringstream ss;
-					ss << "cost = " << lap::omp::cost<C, C>(N, costMatrix, rowsol);
+					ss << "cost = " << lap::omp::cost<C>(N, costMatrix, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
 #endif
@@ -634,7 +634,7 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 
 				{
 					std::stringstream ss;
-					ss << "cost = " << lap::cost<C, C>(N, costMatrix, rowsol);
+					ss << "cost = " << lap::cost<C>(N, costMatrix, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
 			}
@@ -726,7 +726,7 @@ void testGeometricCached(long long max_tab, long long min_cached, long long max_
 
 				{
 					std::stringstream ss;
-					ss << "cost = " << lap::omp::cost<C, C>(N, costFunction, rowsol);
+					ss << "cost = " << lap::omp::cost<C>(N, costFunction, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
 #endif
@@ -752,7 +752,7 @@ void testGeometricCached(long long max_tab, long long min_cached, long long max_
 
 				{
 					std::stringstream ss;
-					ss << "cost = " << lap::cost<C, C>(N, costFunction, rowsol);
+					ss << "cost = " << lap::cost<C>(N, costFunction, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
 			}
@@ -875,7 +875,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 						{
 							std::stringstream ss;
-							ss << "cost = " << lap::omp::cost<C, C>(N1, N2, costMatrix, rowsol);
+							ss << "cost = " << lap::omp::cost<C>(N1, N2, costMatrix, rowsol);
 							lap::displayTime(start_time, ss.str().c_str(), std::cout);
 						}
 					}
@@ -892,7 +892,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 							{
 								std::stringstream ss;
-								ss << "cost = " << lap::omp::cost<C, C>(N1, N2, costFunction, rowsol);
+								ss << "cost = " << lap::omp::cost<C>(N1, N2, costFunction, rowsol);
 								lap::displayTime(start_time, ss.str().c_str(), std::cout);
 							}
 						}
@@ -905,7 +905,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 							{
 								std::stringstream ss;
-								ss << "cost = " << lap::omp::cost<C, C>(N1, N2, costFunction, rowsol);
+								ss << "cost = " << lap::omp::cost<C>(N1, N2, costFunction, rowsol);
 								lap::displayTime(start_time, ss.str().c_str(), std::cout);
 							}
 						}
@@ -930,7 +930,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 						{
 							std::stringstream ss;
-							ss << "cost = " << lap::cost<C, C>(N1, N2, costMatrix, rowsol);
+							ss << "cost = " << lap::cost<C>(N1, N2, costMatrix, rowsol);
 							lap::displayTime(start_time, ss.str().c_str(), std::cout);
 						}
 					}
@@ -947,7 +947,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 							{
 								std::stringstream ss;
-								ss << "cost = " << lap::cost<C, C>(N1, N2, costFunction, rowsol);
+								ss << "cost = " << lap::cost<C>(N1, N2, costFunction, rowsol);
 								lap::displayTime(start_time, ss.str().c_str(), std::cout);
 							}
 						}
@@ -960,7 +960,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 							{
 								std::stringstream ss;
-								ss << "cost = " << lap::cost<C, C>(N1, N2, costFunction, rowsol);
+								ss << "cost = " << lap::cost<C>(N1, N2, costFunction, rowsol);
 								lap::displayTime(start_time, ss.str().c_str(), std::cout);
 							}
 						}
