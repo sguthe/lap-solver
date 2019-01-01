@@ -49,7 +49,7 @@ namespace lap
 			lapInfo << "Memory leak list:" << std::endl;
 			while (!allocated.empty())
 			{
-				lapInfo << "  leaked " << commify(size.front()) << " bytes at 0x" << std::hex << allocated.front() << std::dec << ": " << alloc_file.front() << ":" << alloc_line.front() << std::endl;
+				lapInfo << "  leaked " << commify(size.front()) << " bytes at " << std::hex << allocated.front() << std::dec << ": " << alloc_file.front() << ":" << alloc_line.front() << std::endl;
 				size.pop_front();
 				allocated.pop_front();
 				alloc_file.pop_front();
@@ -61,7 +61,8 @@ namespace lap
 		void free(T a)
 		{
 #ifdef LAP_DEBUG
-			lapDebug << "Freeing memory at 0x" << std::hex << a << std::dec << std::endl;
+#pragma omp critical
+			lapDebug << "Freeing memory at " << std::hex << a << std::dec << std::endl;
 #endif
 			std::lock_guard<std::mutex> guard(lock);
 			for (unsigned long long i = 0; i < allocated.size(); i++)
@@ -86,7 +87,8 @@ namespace lap
 		void alloc(T a, unsigned long long s, const char *file, const int line)
 		{
 #ifdef LAP_DEBUG
-			lapDebug << "Allocating " << s * sizeof(T) << " bytes at 0x" << std::hex << a << std::dec << " \"" << file << ":" << line << std::endl;
+#pragma omp critical
+			lapDebug << "Allocating " << s * sizeof(T) << " bytes at " << std::hex << a << std::dec << " \"" << file << ":" << line << std::endl;
 #endif
 			std::lock_guard<std::mutex> guard(lock);
 			current += s;
