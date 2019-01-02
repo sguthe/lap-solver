@@ -61,7 +61,7 @@ namespace lap
 		void free(T a)
 		{
 #ifdef LAP_DEBUG
-#ifndef LAP_NO_MEM_BEBUG
+#ifndef LAP_NO_MEM_DEBUG
 #pragma omp critical
 			lapDebug << "Freeing memory at " << std::hex << a << std::dec << std::endl;
 #endif
@@ -89,7 +89,7 @@ namespace lap
 		void alloc(T a, unsigned long long s, const char *file, const int line)
 		{
 #ifdef LAP_DEBUG
-#ifndef LAP_NO_MEM_BEBUG
+#ifndef LAP_NO_MEM_DEBUG
 #pragma omp critical
 			lapDebug << "Allocating " << s * sizeof(T) << " bytes at " << std::hex << a << std::dec << " \"" << file << ":" << line << std::endl;
 #endif
@@ -425,7 +425,9 @@ namespace lap
 		SC *d;
 		int *colsol;
 		SC *v;
+#ifdef LAP_REVERT_V
 		SC *v_old;
+#endif
 
 #ifdef LAP_DEBUG
 		std::vector<SC *> v_list;
@@ -437,7 +439,9 @@ namespace lap
 		lapAlloc(d, dim2, __FILE__, __LINE__);
 		lapAlloc(pred, dim2, __FILE__, __LINE__);
 		lapAlloc(v, dim2, __FILE__, __LINE__);
+#ifdef LAP_REVERT_V
 		lapAlloc(v_old, dim2, __FILE__, __LINE__);
+#endif
 		lapAlloc(colsol, dim2, __FILE__, __LINE__);
 
 		// this is the upper bound
@@ -445,12 +449,16 @@ namespace lap
 		SC epsilon_lower = epsilon / SC(dim2);
 
 		SC last_avg = SC(0);
+#ifdef LAP_REVERT_V
 		SC last_cost = SC(0);
+#endif
 		bool first = true;
 		bool allow_reset = true;
 
 		memset(v, 0, dim2 * sizeof(SC));
+#ifdef LAP_REVERT_V
 		memset(v_old, 0, dim2 * sizeof(SC));
+#endif
 
 		while (epsilon >= SC(0))
 		{
@@ -474,6 +482,7 @@ namespace lap
 						}
 						else
 						{
+#ifdef LAP_REVERT_V
 							SC cur_cost = cost<SC, CF>(dim, dim2, costfunc, rowsol);
 							if (!allow_reset)
 							{
@@ -483,13 +492,15 @@ namespace lap
 #endif
 								if (cur_cost > last_cost) memcpy(v, v_old, dim2 * sizeof(SC));
 								else memcpy(v_old, v, dim2 * sizeof(SC));
+								if (cur_cost > last_cost) epsilon = SC(0);
 							}
 							else memcpy(v_old, v, dim2 * sizeof(SC));
 							last_cost = cur_cost;
+#endif
 							epsilon = std::max(SC(0.25) * epsilon, SC(0.5) * (epsilon + last_avg));
 							allow_reset = false;
 						}
-						if (epsilon < epsilon_lower) epsilon = epsilon_lower;
+						if ((epsilon > SC(0)) && (epsilon < epsilon_lower)) epsilon = epsilon_lower;
 					}
 				}
 			}
@@ -637,7 +648,9 @@ namespace lap
 		lapFree(colactive);
 		lapFree(colcomplete);
 		lapFree(d);
+#ifdef LAP_REVERT_V
 		lapFree(v_old);
+#endif
 		lapFree(v);
 		lapFree(colsol);
 	}

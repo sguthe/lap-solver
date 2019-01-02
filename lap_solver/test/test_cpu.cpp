@@ -3,6 +3,8 @@
 #endif
 #define LAP_QUIET
 //#define LAP_DEBUG
+#define LAP_NO_MEM_DEBUG
+#define LAP_REVERT_V
 #include "../lap.h"
 
 #include <random>
