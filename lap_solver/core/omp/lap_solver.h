@@ -121,9 +121,7 @@ namespace lap
 			SC epsilon_lower = epsilon / SC(dim2);
 
 			SC last_avg = SC(0);
-#ifdef LAP_REVERT_V
 			SC last_cost = SC(0);
-#endif
 			bool first = true;
 			bool allow_reset = true;
 
@@ -166,6 +164,17 @@ namespace lap
 									else memcpy(v_old, v, dim2 * sizeof(SC));
 									if (cur_cost > last_cost) epsilon = SC(0);
 								} else memcpy(v_old, v, dim2 * sizeof(SC));
+								last_cost = cur_cost;
+#else
+								SC cur_cost = omp::cost<SC, CF>(dim, dim2, costfunc, rowsol);
+								if (!allow_reset)
+								{
+									// last_cost is already valid so revert if cost increased
+#ifdef LAP_DEBUG
+									if (cur_cost > last_cost) lapDebug << "cost increased -> forcing epsilon = 0." << std::endl;
+#endif
+									if (cur_cost > last_cost) epsilon = SC(0);
+								}
 								last_cost = cur_cost;
 #endif
 								epsilon = std::max(SC(0.25) * epsilon, SC(0.5) * (epsilon + last_avg));
