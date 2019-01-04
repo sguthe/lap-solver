@@ -60,13 +60,12 @@ namespace lap
 		template <class T>
 		void free(T a)
 		{
+			std::lock_guard<std::mutex> guard(lock);
 #ifdef LAP_DEBUG
 #ifndef LAP_NO_MEM_DEBUG
-#pragma omp critical
 			lapDebug << "Freeing memory at " << std::hex << a << std::dec << std::endl;
 #endif
 #endif
-			std::lock_guard<std::mutex> guard(lock);
 			for (unsigned long long i = 0; i < allocated.size(); i++)
 			{
 				if ((void *)a == allocated[i])
@@ -88,13 +87,12 @@ namespace lap
 		template <class T>
 		void alloc(T a, unsigned long long s, const char *file, const int line)
 		{
+			std::lock_guard<std::mutex> guard(lock);
 #ifdef LAP_DEBUG
 #ifndef LAP_NO_MEM_DEBUG
-#pragma omp critical
 			lapDebug << "Allocating " << s * sizeof(T) << " bytes at " << std::hex << a << std::dec << " \"" << file << ":" << line << std::endl;
 #endif
 #endif
-			std::lock_guard<std::mutex> guard(lock);
 			current += s;
 			peak = std::max(peak, current);
 			allocated.push_back((void *)a);
