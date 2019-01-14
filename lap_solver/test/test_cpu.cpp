@@ -1,9 +1,9 @@
 #ifdef _OPENMP
 #  define LAP_OPENMP
 #endif
-#define LAP_QUIET
+//#define LAP_QUIET
 //#define LAP_DEBUG
-#define LAP_NO_MEM_DEBUG
+//#define LAP_NO_MEM_DEBUG
 #include "../lap.h"
 
 #include <random>

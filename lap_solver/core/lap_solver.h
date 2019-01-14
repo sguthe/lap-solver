@@ -228,6 +228,7 @@ namespace lap
         __inline__ __attribute__((always_inline))
 #endif
 
+#if 0
 	template <class SC, class I>
 	__forceinline void initDistance(int f, int dim, int dim2, I &iterator, SC &min, int &jmin, char *colactive, int *pred, int *colsol, SC *d, SC *v)
 	{
@@ -341,6 +342,7 @@ namespace lap
 			}
 		}
 	}
+#endif
 
 	__forceinline void dijkstraCheck(int &endofpath, bool &unassignedfound, int jmin, int *colsol, char *colactive, int *colcomplete, int &completecount)
 	{
@@ -446,10 +448,10 @@ namespace lap
 
 		memset(v, 0, dim2 * sizeof(SC));
 
+		unsigned long long count = 0ULL;
 		while (epsilon >= SC(0))
 		{
 			SC total = SC(0);
-			unsigned long long count = 0ULL;
 			if (epsilon > SC(0))
 			{
 				if (epsilon < SC(2) * epsilon_lower) epsilon = SC(0);
@@ -457,6 +459,9 @@ namespace lap
 				{
 					if (!first)
 					{
+#ifdef LAP_DEBUG
+						lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
+#endif
 						if ((allow_reset) && (-last_avg <= SC(0.1) * epsilon))
 						{
 #ifdef LAP_DEBUG
@@ -476,6 +481,7 @@ namespace lap
 				}
 			}
 			SC eps = epsilon;
+			count = 0;
 #ifndef LAP_QUIET
 			{
 				std::stringstream ss;
@@ -517,7 +523,53 @@ namespace lap
 				completecount = 0;
 
 				// Dijkstra search
-				initDistance(f, dim, dim2, iterator, min, jmin, colactive, pred, colsol, d, v);
+				//initDistance(f, dim, dim2, iterator, min, jmin, colactive, pred, colsol, d, v);
+				{
+					min = std::numeric_limits<SC>::max();
+					jmin = dim2;
+					if (f < dim)
+					{
+						auto tt = iterator.getRow(f);
+						for (int j = 0; j < dim2; j++)
+						{
+							colactive[j] = 1;
+							pred[j] = f;
+							SC h = d[j] = tt[j] - v[j];
+							if (h < min)
+							{
+								// better
+								jmin = j;
+								min = h;
+							}
+							else if (h == min)
+							{
+								// same, do only update if old was used and new is free
+								if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
+							}
+						}
+					}
+					else
+					{
+						for (int j = 0; j < dim2; j++)
+						{
+							colactive[j] = 1;
+							pred[j] = f;
+							SC h = d[j] = -v[j];
+							if (h < min)
+							{
+								// better
+								jmin = j;
+								min = h;
+							}
+							else if (h == min)
+							{
+								// same, do only update if old was used and new is free
+								if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
+							}
+						}
+					}
+				}
+
 				dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
 
 				while (!unassignedfound)
@@ -534,7 +586,71 @@ namespace lap
 						total_virtual++;
 					}
 #endif
-					updateDistance(i, dim, dim2, iterator, min, jmin, min_n, jmin_n, colactive, pred, colsol, d, v);
+					//updateDistance(i, dim, dim2, iterator, min, jmin, min_n, jmin_n, colactive, pred, colsol, d, v);
+					{
+						jmin_n = dim2;
+						min_n = std::numeric_limits<SC>::max();
+						if (i < dim)
+						{
+							auto tt = iterator.getRow(i);
+							SC h2 = tt[jmin] - v[jmin] - min;
+							for (int j = 0; j < dim2; j++)
+							{
+								if (colactive[j] != 0)
+								{
+									SC v2 = tt[j] - v[j] - h2;
+									SC h = d[j];
+									if (v2 < h)
+									{
+										pred[j] = i;
+										d[j] = v2;
+										h = v2;
+									}
+									if (h < min_n)
+									{
+										// better
+										jmin_n = j;
+										min_n = h;
+									}
+									else if (h == min_n)
+									{
+										// same, do only update if old was used and new is free
+										if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
+									}
+								}
+							}
+						}
+						else
+						{
+							SC h2 = -v[jmin] - min;
+							for (int j = 0; j < dim2; j++)
+							{
+								if (colactive[j] != 0)
+								{
+									SC v2 = -v[j] - h2;
+									SC h = d[j];
+									if (v2 < h)
+									{
+										pred[j] = i;
+										d[j] = v2;
+										h = v2;
+									}
+									if (h < min_n)
+									{
+										// better
+										jmin_n = j;
+										min_n = h;
+									}
+									else if (h == min_n)
+									{
+										// same, do only update if old was used and new is free
+										if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
+									}
+								}
+							}
+						}
+					}
+
 					min = std::max(min, min_n);
 					jmin = jmin_n;
 					dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);

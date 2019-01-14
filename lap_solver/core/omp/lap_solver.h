@@ -131,6 +131,9 @@ namespace lap
 					{
 						if (!first)
 						{
+#ifdef LAP_DEBUG
+							lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
+#endif
 							if ((allow_reset) && (-last_avg <= SC(0.1) * epsilon))
 							{
 #ifdef LAP_DEBUG
@@ -429,7 +432,7 @@ namespace lap
 				if (eps > SC(0))
 				{
 					SC *vv;
-					lapAlloc(vv, dim, __FILE__, __LINE__);
+					lapAlloc(vv, dim2, __FILE__, __LINE__);
 					v_list.push_back(vv);
 					eps_list.push_back(eps);
 					memcpy(v_list.back(), v, sizeof(SC) * dim2);
