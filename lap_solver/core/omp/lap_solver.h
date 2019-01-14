@@ -266,7 +266,6 @@ namespace lap
 							unassignedfound = false;
 							completecount = 0;
 							dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
-							h2_global = std::numeric_limits<SC>::infinity();
 						}
 #pragma omp barrier
 						while (!unassignedfound)
@@ -280,19 +279,9 @@ namespace lap
 							{
 								auto tt = iterator.getRow(t, i);
 								SC h2;
-								if ((jmin >= start) && (jmin < end))
-								{
-									h2 = h2_global = tt[jmin - start] - v[jmin] - min;
-#pragma omp flush(h2_global)
-								}
-								else
-								{
-#pragma omp flush(h2_global)
-									while ((h2 = h2_global) == std::numeric_limits<SC>::infinity())
-									{
-#pragma omp flush(h2_global)
-									}
-								}
+								if ((jmin >= start) && (jmin < end)) h2_global = h2 = tt[jmin - start] - v[jmin] - min;
+#pragma omp barrier
+								if ((jmin < start) || (jmin >= end)) h2 = h2_global;
 								for (int j = start; j < end; j++)
 								{
 									int j_local = j - start;
