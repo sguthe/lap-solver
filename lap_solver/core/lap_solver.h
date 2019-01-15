@@ -299,6 +299,14 @@ namespace lap
 		long long total_virtual = 0LL;
 
 		int elapsed = -1;
+#else
+#ifdef LAP_DISPLAY_EVALUATED
+		long long total_hit = 0LL;
+		long long total_miss = 0LL;
+
+		long long total_rows = 0LL;
+		long long total_virtual = 0LL;
+#endif
 #endif
 
 		int  *pred;
@@ -393,14 +401,11 @@ namespace lap
 			for (int f = 0; f < dim2; f++)
 			{
 #ifndef LAP_QUIET
-				if (f < dim)
-				{
-					total_rows++;
-				}
-				else
-				{
-					total_virtual++;
-				}
+				if (f < dim) total_rows++; else total_virtual++;
+#else
+#ifdef LAP_DISPLAY_EVALUATED
+				if (f < dim) total_rows++; else total_virtual++;
+#endif
 #endif
 
 				unassignedfound = false;
@@ -458,14 +463,11 @@ namespace lap
 					// update 'distances' between freerow and all unscanned columns, via next scanned column.
 					int i = colsol[jmin];
 #ifndef LAP_QUIET
-					if (i < dim)
-					{
-						total_rows++;
-					}
-					else
-					{
-						total_virtual++;
-					}
+					if (i < dim) total_rows++; else total_virtual++;
+#else
+#ifdef LAP_DISPLAY_EVALUATED
+					if (i < dim) total_rows++; else total_virtual++;
+#endif
 #endif
 
 					jmin_n = dim2;
@@ -608,6 +610,16 @@ namespace lap
 			if ((total_hit != 0) || (total_miss != 0)) lapInfo << "  hit: " << total_hit << " miss: " << total_miss << std::endl;
 #endif
 		}
+
+#ifdef LAP_QUIET
+#ifdef LAP_DISPLAY_EVALUATED
+		iterator.getHitMiss(total_hit, total_miss);
+		lapInfo << "  rows evaluated: " << total_rows;
+		if (total_virtual > 0) lapInfo << " virtual rows evaluated: " << total_virtual;
+		lapInfo << std::endl;
+		if ((total_hit != 0) || (total_miss != 0)) lapInfo << "  hit: " << total_hit << " miss: " << total_miss << std::endl;
+#endif
+#endif
 
 		// free reserved memory.
 		lapFree(pred);

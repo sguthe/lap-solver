@@ -82,6 +82,14 @@ namespace lap
 			long long total_virtual = 0LL;
 
 			int elapsed = -1;
+#else
+#ifdef LAP_DISPLAY_EVALUATED
+			long long total_hit = 0LL;
+			long long total_miss = 0LL;
+
+			long long total_rows = 0LL;
+			long long total_virtual = 0LL;
+#endif
 #endif
 
 			int  *pred;
@@ -239,14 +247,11 @@ namespace lap
 #pragma omp master
 						{
 #ifndef LAP_QUIET
-							if (f < dim)
-							{
-								total_rows++;
-							}
-							else
-							{
-								total_virtual++;
-							}
+							if (f < dim) total_rows++; else total_virtual++;
+#else
+#ifdef LAP_DISPLAY_EVALUATED
+							if (f < dim) total_rows++; else total_virtual++;
+#endif
 #endif
 							min = min_private[0];
 							jmin = jmin_private[0];
@@ -344,14 +349,11 @@ namespace lap
 #pragma omp master
 							{
 #ifndef LAP_QUIET
-								if (i < dim)
-								{
-									total_rows++;
-								}
-								else
-								{
-									total_virtual++;
-								}
+								if (i < dim) total_rows++; else total_virtual++;
+#else
+#ifdef LAP_DISPLAY_EVALUATED
+								if (i < dim) total_rows++; else total_virtual++;
+#endif
 #endif
 								min_n = min_private[0];
 								jmin = jmin_private[0];
@@ -458,6 +460,15 @@ namespace lap
 #endif
 			}
 
+#ifdef LAP_QUIET
+#ifdef LAP_DISPLAY_EVALUATED
+			iterator.getHitMiss(total_hit, total_miss);
+			lapInfo << "  rows evaluated: " << total_rows;
+			if (total_virtual > 0) lapInfo << " virtual rows evaluated: " << total_virtual;
+			lapInfo << std::endl;
+			if ((total_hit != 0) || (total_miss != 0)) lapInfo << "  hit: " << total_hit << " miss: " << total_miss << std::endl;
+#endif
+#endif
 			// free reserved memory.
 			lapFree(pred);
 			lapFree(colactive);
