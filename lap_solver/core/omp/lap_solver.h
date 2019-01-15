@@ -118,6 +118,15 @@ namespace lap
 			lapAlloc(min_private, omp_get_max_threads(), __FILE__, __LINE__);
 			lapAlloc(jmin_private, omp_get_max_threads(), __FILE__, __LINE__);
 
+#ifdef LAP_ROWS_SCANNED
+			unsigned long long *scancount;
+			unsigned long long *pathlength;
+			lapAlloc(scancount, dim2, __FILE__, __LINE__);
+			lapAlloc(pathlength, dim2, __FILE__, __LINE__);
+			memset(scancount, 0, dim2 * sizeof(unsigned long long));
+			memset(pathlength, 0, dim2 * sizeof(unsigned long long));
+#endif
+
 			// this is the upper bound
 			SC epsilon = costfunc.getInitialEpsilon();
 			SC epsilon_lower = epsilon / SC(dim2);
@@ -387,6 +396,19 @@ namespace lap
 							{
 								updateColumnPrices(colcomplete, completecount, min, v, d);
 							}
+#ifdef LAP_ROWS_SCANNED
+							scancount[f] += completecount;
+							{
+								int i;
+								int eop = endofpath;
+								do
+								{
+									i = pred[eop];
+									eop = rowsol[i];
+									pathlength[f]++;
+								} while (i != f);
+							}
+#endif
 
 							// reset row and column assignments along the alternating path.
 							resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
@@ -469,6 +491,17 @@ namespace lap
 			if ((total_hit != 0) || (total_miss != 0)) lapInfo << "  hit: " << total_hit << " miss: " << total_miss << std::endl;
 #endif
 #endif
+
+#ifdef LAP_ROWS_SCANNED
+			for (int f = 0; f < dim2; f++)
+			{
+				lapInfo << "row: " << f << " scanned: " << scancount[f] << " length: " << pathlength[f] << std::endl;
+			}
+
+			lapFree(scancount);
+			lapFree(pathlength);
+#endif
+
 			// free reserved memory.
 			lapFree(pred);
 			lapFree(colactive);
