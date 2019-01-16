@@ -5,7 +5,7 @@
 //#define LAP_DISPLAY_EVALUATED
 //#define LAP_DEBUG
 //#define LAP_NO_MEM_DEBUG
-#define LAP_ROWS_SCANNED
+//#define LAP_ROWS_SCANNED
 #include "../lap.h"
 
 #include <random>
@@ -344,7 +344,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 
 				auto start_time = std::chrono::high_resolution_clock::now();
 
-				std::uniform_real_distribution<C> distribution(-1.0, 1.0);
+				std::uniform_real_distribution<C> distribution(0.0, 1.0);
 				std::mt19937_64 generator(1234);
 
 				// The following matrix will have at most the seletcted rank.
@@ -367,7 +367,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 							{
 								sum += vec[k * N + i] * vec[k * N + j];
 							}
-							tab[i * N + j] = (sum / C(rank)) + C(1);
+							tab[i * N + j] = (sum / C(rank));
 						}
 					}
 				}
@@ -453,7 +453,7 @@ void testRandomLowRankCached(long long max_tab, long long min_cached, long long 
 
 				auto start_time = std::chrono::high_resolution_clock::now();
 
-				std::uniform_real_distribution<C> distribution(-1.0, 1.0);
+				std::uniform_real_distribution<C> distribution(0.0, 1.0);
 				std::mt19937_64 generator(1234);
 
 				// The following matrix will have at most the seletcted rank.
@@ -471,7 +471,7 @@ void testRandomLowRankCached(long long max_tab, long long min_cached, long long 
 					{
 						sum += vec[k * N + x] * vec[k * N + y];
 					}
-					return sum / C(rank) + C(1);
+					return sum / C(rank);
 				};
 
 				int *rowsol = new int[N];

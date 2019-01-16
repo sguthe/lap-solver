@@ -262,6 +262,9 @@ namespace lap
 							if (f < dim) total_rows++; else total_virtual++;
 #endif
 #endif
+#ifdef LAP_ROWS_SCANNED
+							scancount[f]++;
+#endif
 							min = min_private[0];
 							jmin = jmin_private[0];
 							for (int tt = 1; tt < omp_get_num_threads(); tt++)
@@ -364,6 +367,9 @@ namespace lap
 								if (i < dim) total_rows++; else total_virtual++;
 #endif
 #endif
+#ifdef LAP_ROWS_SCANNED
+								scancount[i]++;
+#endif
 								min_n = min_private[0];
 								jmin = jmin_private[0];
 								for (int tt = 1; tt < omp_get_num_threads(); tt++)
@@ -397,7 +403,7 @@ namespace lap
 								updateColumnPrices(colcomplete, completecount, min, v, d);
 							}
 #ifdef LAP_ROWS_SCANNED
-							scancount[f] += completecount;
+//							scancount[f] += completecount;
 							{
 								int i;
 								int eop = endofpath;
