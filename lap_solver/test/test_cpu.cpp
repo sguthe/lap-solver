@@ -5,7 +5,7 @@
 //#define LAP_DISPLAY_EVALUATED
 //#define LAP_DEBUG
 //#define LAP_NO_MEM_DEBUG
-#define LAP_ROWS_SCANNED
+//#define LAP_ROWS_SCANNED
 #include "../lap.h"
 
 #include <random>
