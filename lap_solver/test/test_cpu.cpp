@@ -329,9 +329,9 @@ template <class C>
 void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C)
 {
 	// random costs (directly supply cost matrix)
-	for (long long NN = min_tab * min_tab; NN <= max_tab * max_tab; NN <<= 1)
+	for (long long rank = min_rank; (rank <= max_rank) && (rank * rank <= NN); rank <<= 1)
 	{
-		for (long long rank = min_rank; (rank <= max_rank) && (rank * rank <= NN); rank <<= 1)
+		for (long long NN = min_tab * min_tab; NN <= max_tab * max_tab; NN <<= 1)
 		{
 			for (int r = 0; r < runs; r++)
 			{
@@ -437,9 +437,9 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 template <class C>
 void testRandomLowRankCached(long long max_tab, long long min_cached, long long max_cached, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C)
 {
-	for (long long NN = min_cached * min_cached; NN <= max_cached * max_cached; NN <<= 1)
+	for (long long rank = min_rank; (rank <= max_rank) && (rank * rank <= NN); rank <<= 1)
 	{
-		for (long long rank = min_rank; (rank <= max_rank) && (rank * rank <= NN); rank <<= 1)
+		for (long long NN = min_cached * min_cached; NN <= max_cached * max_cached; NN <<= 1)
 		{
 			for (int r = 0; r < runs; r++)
 			{
