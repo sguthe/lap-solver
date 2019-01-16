@@ -569,7 +569,7 @@ namespace lap
 					{
 						i = pred[eop];
 						eop = rowsol[i];
-						pathlength[f]++;
+						if (i != f) pathlength[f]++;
 					} while (i != f);
 				}
 #endif

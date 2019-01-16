@@ -5,7 +5,7 @@
 //#define LAP_DISPLAY_EVALUATED
 //#define LAP_DEBUG
 //#define LAP_NO_MEM_DEBUG
-//#define LAP_ROWS_SCANNED
+#define LAP_ROWS_SCANNED
 #include "../lap.h"
 
 #include <random>
@@ -26,6 +26,18 @@ int main(int argc, char* argv[])
 	Options opt;
 	int r = opt.parseOptions(argc, argv);
 	if (r != 0) return r;
+
+	if (opt.use_omp)
+	{
+		// omp "warmup"
+		int *tmp = new int[1024];
+#pragma omp parallel for
+		for (int i = 0; i < 1024; i++)
+		{
+			tmp[i] = -1;
+		}
+		delete[] tmp;
+	}
 
 	if (opt.use_double)
 	{
