@@ -416,6 +416,9 @@ namespace lap
 				if (f < dim) total_rows++; else total_virtual++;
 #endif
 #endif
+#ifdef LAP_ROWS_SCANNED
+				scancount[f]++;
+#endif
 
 				unassignedfound = false;
 				completecount = 0;
@@ -477,6 +480,9 @@ namespace lap
 #ifdef LAP_DISPLAY_EVALUATED
 					if (i < dim) total_rows++; else total_virtual++;
 #endif
+#endif
+#ifdef LAP_ROWS_SCANNED
+					scancount[i]++;
 #endif
 
 					jmin_n = dim2;
@@ -556,7 +562,6 @@ namespace lap
 					updateColumnPrices(colcomplete, completecount, min, v, d);
 				}
 #ifdef LAP_ROWS_SCANNED
-				scancount[f] += completecount;
 				{
 					int i;
 					int eop = endofpath;
