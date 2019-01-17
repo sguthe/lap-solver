@@ -63,11 +63,16 @@ namespace lap
 				cost.getCostRow(&(c[(long long)x * (long long)y_size]), x, 0, y_size);
 			}
 		}
-		// used in derived class only
-		TableCost(int x_size, int y_size) : x_size(x_size), y_size(y_size), c(0), initialEpsilon(0), free_in_destructor(false) {}
+		void createTable()
+		{
+			lapAlloc(c, (long long)x_size * (long long)y_size, __FILE__, __LINE__);
+			free_in_destructor = true;
+		}
 	public:
 		template <class DirectCost> TableCost(int x_size, int y_size, DirectCost &cost) : x_size(x_size), y_size(y_size), initialEpsilon(0) { initTable(cost); }
 		template <class DirectCost> TableCost(int size, DirectCost &cost) : x_size(size), y_size(size), initialEpsilon(0) { initTable(cost); }
+		TableCost(int x_size, int y_size) : x_size(x_size), y_size(y_size), initialEpsilon(0) { createTable(); }
+		TableCost(int size) : x_size(size), y_size(size), initialEpsilon(0) { createTable(); }
 		TableCost(int x_size, int y_size, TC* tab) : x_size(x_size), y_size(y_size), c(tab), initialEpsilon(0) { free_in_destructor = false; }
 		TableCost(int size, TC* tab) : x_size(size), y_size(size), c(tab), initialEpsilon(0) { free_in_destructor = false; }
 		~TableCost() { if (free_in_destructor) lapFree(c); }
@@ -78,5 +83,6 @@ namespace lap
 		//__forceinline void getCostRow(TC *row, int x, int start, int end) const { memcpy(row, &(getRow(x)[start]), (end - start) * sizeof(TC)); }
 		__forceinline const TC *getRow(int x) const { return &(c[(long long)x * (long long)y_size]); }
 		__forceinline const TC getCost(int x, int y) const { return getRow(x)[y]; }
+		__forceinline void setRow(int x, TC *v) { memcpy(&(c[(long long)x * (long long)y_size]), v, y_size * sizeof(TC)); }
 	};
 }

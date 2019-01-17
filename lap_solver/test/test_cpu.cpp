@@ -101,6 +101,65 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
+template <class C, class T>
+void setRandomTable(T &tab, int N, bool sanity, bool omp)
+{
+	std::uniform_real_distribution<C> distribution(0.0, 1.0);
+	std::mt19937_64 generator(1234);
+
+	C *tmp = new C[N];
+
+	if (sanity)
+	{
+		C *vec = new C[N << 1];
+		for (long long i = 0; i < N << 1; i++) vec[i] = distribution(generator);
+		if (omp)
+		{
+#ifdef LAP_OPENMP
+#pragma omp parallel
+			{
+				C *tmp2 = new C[N];
+#pragma omp for
+				for (int i = 0; i < N; i++)
+				{
+					int j;
+					for (j = 0; j < i; j++) tmp2[j] = vec[i] + vec[j + N] + C(0.1);
+					tmp2[i] = vec[i] + vec[i + N];
+					for (j = i + 1; j < N; j++) tmp2[j] = vec[i] + vec[j + N] + C(0.1);
+					tab.setRow(i, tmp2);
+				}
+				delete[]tmp2;
+			}
+#endif
+		}
+		else
+		{
+			for (int i = 0; i < N; i++)
+			{
+				int j;
+				for (j = 0; j < i; j++) tmp[j] = vec[i] + vec[j + N] + C(0.1);
+				tmp[i] = vec[i] + vec[i + N];
+				for (j = i + 1; j < N; j++) tmp[j] = vec[i] + vec[j + N] + C(0.1);
+				tab.setRow(i, tmp);
+			}
+		}
+		delete[] vec;
+	}
+	else
+	{
+		for (int i = 0; i < N; i++)
+		{
+			for (int j = 0; j < N; j++)
+			{
+				tmp[j] = distribution(generator);
+			}
+			tab.setRow(i, tmp);
+		}
+	}
+
+	delete[] tmp;
+}
+
 template <class C>
 void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, bool sanity, std::string name_C)
 {
@@ -120,53 +179,17 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 
 			auto start_time = std::chrono::high_resolution_clock::now();
 
-			std::uniform_real_distribution<C> distribution(0.0, 1.0);
-			std::mt19937_64 generator(1234);
-
-			C *tab = new C[NN];
-			if (sanity)
-			{
-				C *vec = new C[N << 1];
-				for (long long i = 0; i < N << 1; i++) vec[i] = distribution(generator);
-				if (omp)
-				{
-#ifdef LAP_OPENMP
-#pragma omp parallel for
-					for (long long i = 0; i < N; i++)
-					{
-						long long ii = i * N;
-						long long j;
-						for (j = 0; j < i; j++) tab[ii + j] = vec[i] + vec[j + N] + C(0.1);
-						tab[ii + i] = vec[i] + vec[i + N];
-						for (j = i + 1; j < N; j++) tab[ii + j] = vec[i] + vec[j + N] + C(0.1);
-					}
-#endif
-				}
-				else
-				{
-					for (long long i = 0; i < N; i++)
-					{
-						long long ii = i * N;
-						long long j;
-						for (j = 0; j < i; j++) tab[ii + j] = vec[i] + vec[j + N] + C(0.1);
-						tab[ii + i] = vec[i] + vec[i + N];
-						for (j = i + 1; j < N; j++) tab[ii + j] = vec[i] + vec[j + N] + C(0.1);
-					}
-				}
-				delete[] vec;
-			}
-			else
-			{
-				for (long long i = 0; i < NN; i++) tab[i] = distribution(generator);
-			}
-
 			int *rowsol = new int[N];
+			C *tmp = 0;
+			if (sanity) lapAlloc(tmp, N, __FILE__, __LINE__);
 
 			if (omp)
 			{
 #ifdef LAP_OPENMP
 				lap::omp::Worksharing ws(N, 8);
-				lap::omp::TableCost<C> costMatrix(N, N, tab, ws);
+				//lap::omp::TableCost<C> costMatrix(N, N, tab, ws);
+				lap::omp::TableCost<C> costMatrix(N, N, ws);
+				setRandomTable<C>(costMatrix, N, sanity, omp);
 				lap::omp::DirectIterator<C, C, lap::omp::TableCost<C>> iterator(N, N, costMatrix, ws);
 				if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator));
 
@@ -179,11 +202,14 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 					ss << "cost = " << lap::omp::cost<C>(N, costMatrix, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
+				if (sanity) for (int i = 0; i < N; i++) tmp[i] = costMatrix.getCost(i, i);
 #endif
 			}
 			else
 			{
-				lap::TableCost<C> costMatrix(N, N, tab);
+				//lap::TableCost<C> costMatrix(N, N, tab);
+				lap::TableCost<C> costMatrix(N, N);
+				setRandomTable<C>(costMatrix, N, sanity, omp);
 				lap::DirectIterator<C, C, lap::TableCost<C>> iterator(N, N, costMatrix);
 				if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator));
 
@@ -196,6 +222,7 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 					ss << "cost = " << lap::cost<C>(N, costMatrix, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
+				if (sanity) for (int i = 0; i < N; i++) tmp[i] = costMatrix.getCost(i, i);
 			}
 
 			if (sanity)
@@ -209,12 +236,12 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 				if (passed) ss << "test passed: ";
 				else ss << "test failed: ";
 				C real_cost(0);
-				for (long long i = 0; i < N; i++) real_cost += tab[i + i * N];
+				for (long long i = 0; i < N; i++) real_cost += tmp[i];
 				ss << "ground truth cost = " << real_cost;
 				lap::displayTime(start_time, ss.str().c_str(), std::cout);
+				lapFree(tmp);
 			}
 			delete[] rowsol;
-			delete[] tab;
 		}
 	}
 }
@@ -366,40 +393,16 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 					for (long long j = 0; j < N; j++) vec[i * N + j] = distribution(generator);
 				}
 
-				C *tab = new C[NN];
-				if (omp)
+				// cost function
+				auto get_cost = [vec, N, rank](int x, int y) -> C
 				{
-#pragma omp parallel for
-					for (long long i = 0; i < N; i++)
+					C sum(0);
+					for (long long k = 0; k < rank; k++)
 					{
-						for (long long j = 0; j < N; j++)
-						{
-							C sum(0);
-							for (long long k = 0; k < rank; k++)
-							{
-								sum += vec[k * N + i] * vec[k * N + j];
-							}
-							tab[i * N + j] = (sum / C(rank));
-						}
+						sum += vec[k * N + x] * vec[k * N + y];
 					}
-				}
-				else
-				{
-					for (long long i = 0; i < N; i++)
-					{
-						for (long long j = 0; j < N; j++)
-						{
-							C sum(0);
-							for (long long k = 0; k < rank; k++)
-							{
-								sum += vec[k * N + i] * vec[k * N + j];
-							}
-							tab[i * N + j] = (sum / C(rank)) + C(1);
-						}
-					}
-				}
-
-				delete[] vec;
+					return sum / C(rank);
+				};
 
 				int *rowsol = new int[N];
 
@@ -407,7 +410,9 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 				{
 #ifdef LAP_OPENMP
 					lap::omp::Worksharing ws(N, 8);
-					lap::omp::TableCost<C> costMatrix(N, N, tab, ws);
+					lap::omp::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
+					lap::omp::TableCost<C> costMatrix(N, N, costFunction, ws);
+					delete[] vec;
 					lap::omp::DirectIterator<C, C, lap::omp::TableCost<C>> iterator(N, N, costMatrix, ws);
 					if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator));
 
@@ -424,7 +429,9 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 				}
 				else
 				{
-					lap::TableCost<C> costMatrix(N, N, tab);
+					lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
+					lap::TableCost<C> costMatrix(N, N, costFunction);
+					delete[] vec;
 					lap::DirectIterator<C, C, lap::TableCost<C>> iterator(N, N, costMatrix);
 					if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator));
 
@@ -440,7 +447,6 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 				}
 
 				delete[] rowsol;
-				delete[] tab;
 			}
 		}
 	}

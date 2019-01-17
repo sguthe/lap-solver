@@ -119,11 +119,29 @@ namespace lap
 				}
 				lapFree(tc);
 			}
+
+			void createTable()
+			{
+				free_in_destructor = true;
+				lapAlloc(cc, omp_get_max_threads(), __FILE__, __LINE__);
+				lapAlloc(stride, omp_get_max_threads(), __FILE__, __LINE__);
+#pragma omp parallel
+				{
+					const int t = omp_get_thread_num();
+					stride[t] = ws.part[t].second - ws.part[t].first;
+					lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+					// first touch
+					//memset(cc[t], 0, (long long)(stride[t]) * (long long)x_size * sizeof(TC));
+					cc[t][0] = TC(0);
+				}
+			}
 		public:
-			template <class DirectCost> TableCost(int x_size, int y_size, DirectCost &cost, Worksharing &ws) : 
+			template <class DirectCost> TableCost(int x_size, int y_size, DirectCost &cost, Worksharing &ws) :
 				x_size(x_size), y_size(y_size), initialEpsilon(0), ws(ws) { initTable(cost); }
-			template <class DirectCost> TableCost(int size, DirectCost &cost, Worksharing &ws) : 
+			template <class DirectCost> TableCost(int size, DirectCost &cost, Worksharing &ws) :
 				x_size(size), y_size(size), initialEpsilon(0), ws(ws) { initTable(cost); }
+			TableCost(int x_size, int y_size, Worksharing &ws) : x_size(x_size), y_size(y_size), initialEpsilon(0), ws(ws) { createTable(); }
+			TableCost(int size, Worksharing &ws) : x_size(size), y_size(size), initialEpsilon(0), ws(ws) { createTable(); }
 			TableCost(int x_size, int y_size, TC* tab, Worksharing &ws) : x_size(x_size), y_size(y_size), initialEpsilon(0), ws(ws) { referenceTable(tab); }
 			TableCost(int size, TC* tab, Worksharing &ws) : x_size(size), y_size(size), initialEpsilon(0), ws(ws) { referenceTable(tab); }
 			~TableCost()
@@ -152,6 +170,15 @@ namespace lap
 				long long off_x = x;
 				off_x *= stride[t];
 				return cc[t][off_x + off_y];
+			}
+			__forceinline void setRow(int x, TC *v)
+			{
+				for (int t = 0; t < omp_get_max_threads(); t++)
+				{
+					long long off_x = x;
+					off_x *= stride[t];
+					memcpy(&(cc[t][off_x]), &(v[ws.part[t].first]), (ws.part[t].second - ws.part[t].first) * sizeof(TC));
+				}
 			}
 		};
 	}
