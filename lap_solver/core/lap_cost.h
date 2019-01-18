@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 namespace lap
 {
 	// Wrapper around simple cost function
