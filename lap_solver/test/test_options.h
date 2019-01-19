@@ -30,6 +30,7 @@ public:
 	bool run_geometric_cached;
 	bool run_geometric_disjoint;
 	bool run_geometric_disjoint_cached;
+	bool run_integer;
 	std::vector<std::string> images;
 
 	int runs;
@@ -38,7 +39,7 @@ public:
 	{
 		lap_min_tab = lap_max_tab = lap_min_cached = lap_max_cached = lap_min_rank = lap_max_rank = 0ll;
 		use_double = use_float = use_single = use_epsilon = use_omp = false;
-		run_sanity = run_random = run_geometric = run_geometric_disjoint = run_random_low_rank = false;
+		run_sanity = run_random = run_geometric = run_geometric_disjoint = run_random_low_rank = run_integer = false;
 		run_sanity_cached = run_geometric_cached = run_geometric_disjoint_cached = run_random_low_rank_cached = false;
 		runs = 1;
 	}
@@ -62,6 +63,7 @@ public:
 		run_geometric_cached = true;
 		run_geometric_disjoint = true;
 		run_geometric_disjoint_cached = true;
+		run_integer = false;
 	}
 
 	int parseOptions(int argc, char* argv[])
@@ -155,6 +157,10 @@ public:
 			else if (!strcmp(argv[i], "-geometric_disjoint_cached"))
 			{
 				run_geometric_disjoint_cached = true;
+			}
+			else if (!strcmp(argv[i], "-integer"))
+			{
+				run_integer = true;
 			}
 			else if (!strcmp(argv[i], "-omp"))
 			{

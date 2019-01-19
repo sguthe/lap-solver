@@ -203,24 +203,24 @@ namespace lap
 #endif
 	}
 
-	template <class TC, class I>
-	TC guessEpsilon(int x_size, int y_size, I& iterator, int step)
+	template <class SC, class I>
+	SC guessEpsilon(int x_size, int y_size, I& iterator, int step)
 	{
-		TC epsilon(0);
+		SC epsilon(0);
 		for (int x = 0; x < x_size; x += step)
 		{
-			const TC *tt = iterator.getRow(x);
-			TC min_cost, max_cost;
+			const auto *tt = iterator.getRow(x);
+			SC min_cost, max_cost;
 			min_cost = max_cost = tt[0];
 			for (int y = 1; y < y_size; y++)
 			{
-				TC cost_l = tt[y];
+				SC cost_l = tt[y];
 				min_cost = std::min(min_cost, cost_l);
 				max_cost = std::max(max_cost, cost_l);
 			}
 			epsilon += max_cost - min_cost;
 		}
-		return (epsilon / TC(10 * (x_size + step - 1) / step));
+		return (epsilon / SC(10 * (x_size + step - 1) / step));
 	}
 
 #if defined(__GNUC__)

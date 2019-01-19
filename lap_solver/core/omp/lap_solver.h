@@ -6,13 +6,13 @@ namespace lap
 {
 	namespace omp
 	{
-		template <class TC, class I>
-		TC guessEpsilon(int x_size, int y_size, I& iterator, int step)
+		template <class SC, class I>
+		SC guessEpsilon(int x_size, int y_size, I& iterator, int step)
 		{
-			TC epsilon(0);
+			SC epsilon(0);
 			int x_count = x_size / step;
-			TC *min_cost;
-			TC *max_cost;
+			SC *min_cost;
+			SC *max_cost;
 			lapAlloc(min_cost, omp_get_max_threads() * x_count, __FILE__, __LINE__);
 			lapAlloc(max_cost, omp_get_max_threads() * x_count, __FILE__, __LINE__);
 #pragma omp parallel
@@ -21,12 +21,12 @@ namespace lap
 				for (int x = 0; x < x_size; x += step)
 				{
 					int xx = x / step;
-					const TC *tt = iterator.getRow(t, x);
-					TC min_cost_l, max_cost_l;
+					const auto *tt = iterator.getRow(t, x);
+					SC min_cost_l, max_cost_l;
 					min_cost_l = max_cost_l = tt[0];
 					for (int y = 1; y < iterator.ws.part[t].second - iterator.ws.part[t].first; y++)
 					{
-						TC cost_l = tt[y];
+						SC cost_l = tt[y];
 						min_cost_l = std::min(min_cost_l, cost_l);
 						max_cost_l = std::max(max_cost_l, cost_l);
 					}
@@ -37,8 +37,8 @@ namespace lap
 #pragma omp for
 				for (int x = 0; x < x_count; x++)
 				{
-					TC max_c = max_cost[x];
-					TC min_c = min_cost[x];
+					SC max_c = max_cost[x];
+					SC min_c = min_cost[x];
 					for (int xx = 0; xx < omp_get_max_threads(); xx++)
 					{
 						max_c = std::max(max_c, max_cost[x + x_count * xx]);
@@ -54,7 +54,7 @@ namespace lap
 			}
 			lapFree(min_cost);
 			lapFree(max_cost);
-			return (epsilon / TC(10 * (x_size + step - 1) / step));
+			return (epsilon / SC(10 * (x_size + step - 1) / step));
 		}
 
 		template <class SC, class CF, class I>
