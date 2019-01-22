@@ -11,7 +11,7 @@ namespace lap
 		int dim, dim2;
 		int entries;
 		CF &costfunc;
-		TC** rows;
+		TC* rows;
 		CACHE cache;
 
 	public:
@@ -19,19 +19,11 @@ namespace lap
 			: dim(dim), dim2(dim2), entries(entries), costfunc(costfunc)
 		{
 			cache.setSize(entries, dim);
-			lapAlloc(rows, entries, __FILE__, __LINE__);
-			for (int i = 0; i < entries; i++)
-			{
-				lapAlloc(rows[i], dim2, __FILE__, __LINE__);
-			}
+			lapAlloc(rows, (long long)entries * (long long)dim2, __FILE__, __LINE__);
 		}
 
 		~CachingIterator()
 		{
-			for (int i = 0; i < entries; i++)
-			{
-				lapFree(rows[i]);
-			}
 			lapFree(rows);
 		}
 
@@ -43,9 +35,9 @@ namespace lap
 			bool found = cache.find(idx, i);
 			if (!found)
 			{
-				costfunc.getCostRow(rows[idx], i, 0, dim2);
+				costfunc.getCostRow(rows + (long long)dim2 * (long long)idx, i, 0, dim2);
 			}
-			return rows[idx];
+			return rows + (long long)dim2 * (long long)idx;
 		}
 	};
 }

@@ -23,10 +23,10 @@ namespace lap
 					int xx = x / step;
 					const auto *tt = iterator.getRow(t, x);
 					SC min_cost_l, max_cost_l;
-					min_cost_l = max_cost_l = tt[0];
+					min_cost_l = max_cost_l = (SC)tt[0];
 					for (int y = 1; y < iterator.ws.part[t].second - iterator.ws.part[t].first; y++)
 					{
-						SC cost_l = tt[y];
+						SC cost_l = (SC)tt[y];
 						min_cost_l = std::min(min_cost_l, cost_l);
 						max_cost_l = std::max(max_cost_l, cost_l);
 					}
@@ -128,7 +128,7 @@ namespace lap
 #endif
 
 			// this is the upper bound
-			SC epsilon = costfunc.getInitialEpsilon();
+			SC epsilon = (SC)costfunc.getInitialEpsilon();
 			SC epsilon_lower = epsilon / SC(dim2);
 
 			SC last_avg = SC(0);
@@ -143,7 +143,20 @@ namespace lap
 				unsigned long long count = 0ULL;
 				if (epsilon > SC(0))
 				{
-					if (epsilon < SC(2) * epsilon_lower) epsilon = SC(0);
+					if (epsilon < SC(2) * epsilon_lower)
+					{
+#ifdef LAP_DEBUG
+						lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
+#endif
+						if ((allow_reset) && (-last_avg <= SC(0.1 * epsilon)))
+						{
+#ifdef LAP_DEBUG
+							lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+#endif
+							memset(v, 0, dim2 * sizeof(SC));
+						}
+						epsilon = SC(0);
+					}
 					else
 					{
 						if (!first)
@@ -151,18 +164,18 @@ namespace lap
 #ifdef LAP_DEBUG
 							lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
 #endif
-							if ((allow_reset) && (-last_avg <= SC(0.1) * epsilon))
+							if ((allow_reset) && (-last_avg <= SC(0.1 * epsilon)))
 							{
 #ifdef LAP_DEBUG
 								lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
 								memset(v, 0, dim2 * sizeof(SC));
-								if (last_avg == SC(0.0)) epsilon *= SC(0.1);
+								if (last_avg == SC(0.0)) epsilon = SC(epsilon * 0.1);
 								else epsilon = -last_avg;
 							}
 							else
 							{
-								epsilon = std::max(SC(0.1) * epsilon, SC(0.5) * (epsilon + last_avg));
+								epsilon = std::max(SC(0.1 * epsilon), SC(0.5 * (epsilon + last_avg)));
 								allow_reset = false;
 							}
 							if ((epsilon > SC(0)) && (epsilon < epsilon_lower)) epsilon = epsilon_lower;

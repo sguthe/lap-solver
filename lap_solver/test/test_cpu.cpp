@@ -20,7 +20,7 @@ template <class CF> void testGeometricCached(long long max_tab, long long min_ca
 template <class CF> void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C);
 template <class CF> void testRandomLowRankCached(long long max_tab, long long min_cached, long long max_cached, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C);
 template <class CF> void testImages(std::vector<std::string> &images, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
-void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon);
+template <class CF> void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
 
 int main(int argc, char* argv[])
 {
@@ -100,8 +100,18 @@ int main(int argc, char* argv[])
 	}
 	if (opt.run_integer)
 	{
-		if (opt.use_single) testInteger(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false);
-		if (opt.use_epsilon) testInteger(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true);
+		if (opt.use_double)
+		{
+			if (opt.use_single) testInteger<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("double"));
+			if (opt.use_epsilon) testInteger<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("double"));
+		}
+		if (opt.use_float)
+		{
+			if (opt.use_single) testInteger<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("float"));
+			if (opt.use_epsilon) testInteger<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("float"));
+		}
+		if (opt.use_single) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("long long"));
+		if (opt.use_epsilon) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("long long"));
 	}
 	return 0;
 }
@@ -814,7 +824,8 @@ void setIntegerTable(T &tab, int N, int range)
 	delete[] tmp;
 }
 
-void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon)
+template <class C>
+void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C)
 {
 	// random costs (directly supply cost matrix)
 	for (int range = 0; range < 3; range++)
@@ -826,7 +837,7 @@ void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool 
 				int N = (int)floor(sqrt((double)NN));
 
 				std::cout << "Integer";
-				std::cout << "<";
+				std::cout << "<" << name_C << " ";
 				if (range == 0) std::cout << "1/10n";
 				else if (range == 1) std::cout << "n";
 				else std::cout << "10n";
@@ -845,16 +856,16 @@ void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool 
 					lap::omp::Worksharing ws(N, 8);
 					lap::omp::TableCost<int> costMatrix(N, N, ws);
 					setIntegerTable(costMatrix, N, range);
-					lap::omp::DirectIterator<long long, int, lap::omp::TableCost<int>> iterator(N, N, costMatrix, ws);
-					if (epsilon) costMatrix.setInitialEpsilon((int)lap::omp::guessEpsilon<long long>(N, N, iterator));
+					lap::omp::DirectIterator<C, int, lap::omp::TableCost<int>> iterator(N, N, costMatrix, ws);
+					if (epsilon) costMatrix.setInitialEpsilon((int)lap::omp::guessEpsilon<C>(N, N, iterator));
 
 					lap::displayTime(start_time, "setup complete", std::cout);
 
-					lap::omp::solve<long long>(N, costMatrix, iterator, rowsol);
+					lap::omp::solve<C>(N, costMatrix, iterator, rowsol);
 
 					{
 						std::stringstream ss;
-						ss << "cost = " << lap::omp::cost<int>(N, costMatrix, rowsol);
+						ss << "cost = " << lap::omp::cost<C>(N, costMatrix, rowsol);
 						lap::displayTime(start_time, ss.str().c_str(), std::cout);
 					}
 #endif
@@ -863,12 +874,12 @@ void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool 
 				{
 					lap::TableCost<int> costMatrix(N, N);
 					setIntegerTable(costMatrix, N, range);
-					lap::DirectIterator<long long, int, lap::TableCost<int>> iterator(N, N, costMatrix);
-					if (epsilon) costMatrix.setInitialEpsilon((int)lap::guessEpsilon<long long>(N, N, iterator));
+					lap::DirectIterator<C, int, lap::TableCost<int>> iterator(N, N, costMatrix);
+					if (epsilon) costMatrix.setInitialEpsilon((int)lap::guessEpsilon<C>(N, N, iterator));
 
 					lap::displayTime(start_time, "setup complete", std::cout);
 
-					lap::solve<long long>(N, costMatrix, iterator, rowsol);
+					lap::solve<C>(N, costMatrix, iterator, rowsol);
 
 					{
 						std::stringstream ss;
