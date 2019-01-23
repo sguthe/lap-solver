@@ -274,6 +274,139 @@ namespace lap
 		} while (i != f);
 	}
 
+	template <class SC>
+	void getNextEpsilon(SC &epsilon, SC epsilon_lower, SC last_avg, bool first, bool &allow_reset, SC *v, int dim2)
+	{
+		if (epsilon > SC(0))
+		{
+			if (epsilon < SC(4) * epsilon_lower)
+			{
+#ifdef LAP_DEBUG
+				lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
+#endif
+				if ((allow_reset) && (-last_avg <= SC(epsilon / 16.0)))
+				{
+#ifdef LAP_DEBUG
+					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+#endif
+					memset(v, 0, dim2 * sizeof(SC));
+				}
+				epsilon = SC(0);
+			}
+			else
+			{
+				if (!first)
+				{
+					SC next = std::max(epsilon_lower, std::min(std::min(SC(0.25 * epsilon), epsilon + last_avg), -last_avg));
+#ifdef LAP_DEBUG
+					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
+#endif
+					if ((allow_reset) && (next < SC(epsilon / 16.0)))
+					{
+#ifdef LAP_DEBUG
+						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+#endif
+						memset(v, 0, dim2 * sizeof(SC));
+						epsilon = std::max(SC(epsilon / 256.0), next);
+					}
+					else
+					{
+						epsilon = std::max(SC(epsilon / 16.0), next);
+						allow_reset = false;
+					}
+				}
+			}
+		}
+	}
+
+	void getNextEpsilon(long long &epsilon, long long epsilon_lower, long long last_avg, bool first, bool &allow_reset, long long *v, int dim2)
+	{
+		if (epsilon > 0)
+		{
+			if (epsilon == 1)
+			{
+#ifdef LAP_DEBUG
+				lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
+#endif
+				if ((allow_reset) && (last_avg == 0))
+				{
+#ifdef LAP_DEBUG
+					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+#endif
+					memset(v, 0, dim2 * sizeof(long long));
+				}
+				epsilon = 0;
+			}
+			else
+			{
+				if (!first)
+				{
+					long long next = std::max(1ll, std::min(std::min(epsilon >> 2, epsilon + last_avg), -last_avg));
+#ifdef LAP_DEBUG
+					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
+#endif
+					if ((allow_reset) && (next < (epsilon >> 4)))
+					{
+#ifdef LAP_DEBUG
+						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+#endif
+						memset(v, 0, dim2 * sizeof(long long));
+						epsilon = std::max(1ll, std::max(epsilon >> 8, next));
+					}
+					else
+					{
+						epsilon = std::max(1ll, std::max(epsilon >> 4, next));
+						allow_reset = false;
+					}
+				}
+			}
+		}
+	}
+
+	void getNextEpsilon(int &epsilon, int epsilon_lower, int last_avg, bool first, bool &allow_reset, int *v, int dim2)
+	{
+		if (epsilon > 0)
+		{
+			if (epsilon == 1)
+			{
+#ifdef LAP_DEBUG
+				lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
+#endif
+				if ((allow_reset) && (last_avg == 0))
+				{
+#ifdef LAP_DEBUG
+					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+#endif
+					memset(v, 0, dim2 * sizeof(int));
+				}
+				epsilon = 0;
+			}
+			else
+			{
+				if (!first)
+				{
+					int next = std::max(1, std::min(std::min(epsilon >> 2, epsilon + last_avg), -last_avg));
+#ifdef LAP_DEBUG
+					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
+#endif
+					if ((allow_reset) && (next < (epsilon >> 4)))
+					{
+#ifdef LAP_DEBUG
+						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+#endif
+						memset(v, 0, dim2 * sizeof(int));
+						epsilon = std::max(1, std::max(epsilon >> 8, next));
+					}
+					else
+					{
+						epsilon = std::max(1, std::max(epsilon >> 4, next));
+						allow_reset = false;
+					}
+				}
+			}
+		}
+	}
+
 	template <class SC, class CF, class I>
 	void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol)
 
@@ -352,47 +485,8 @@ namespace lap
 		unsigned long long count = 0ULL;
 		while (epsilon >= SC(0))
 		{
+			getNextEpsilon(epsilon, epsilon_lower, last_avg, first, allow_reset, v, dim2);
 			SC total = SC(0);
-			if (epsilon > SC(0))
-			{
-				if (epsilon < SC(4) * epsilon_lower)
-				{
-#ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
-#endif
-					if ((allow_reset) && (-last_avg <= SC(epsilon / 16.0)))
-					{
-#ifdef LAP_DEBUG
-						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
-#endif
-						memset(v, 0, dim2 * sizeof(SC));
-					}
-					epsilon = SC(0);
-				}
-				else
-				{
-					if (!first)
-					{
-						SC next = std::max(epsilon_lower, std::min(std::min(SC(0.25 * epsilon), epsilon + last_avg), -last_avg));
-#ifdef LAP_DEBUG
-						lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
-#endif
-						if ((allow_reset) && (next < SC(epsilon / 16.0)))
-						{
-#ifdef LAP_DEBUG
-							lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
-#endif
-							memset(v, 0, dim2 * sizeof(SC));
-							epsilon = std::max(SC(epsilon / 256.0), next);
-						}
-						else
-						{
-							epsilon = std::max(SC(epsilon / 16.0), next);
-							allow_reset = false;
-						}
-					}
-				}
-			}
 			count = 0;
 #ifndef LAP_QUIET
 			{
@@ -440,6 +534,7 @@ namespace lap
 				if (f < dim)
 				{
 					auto tt = iterator.getRow(f);
+					bool taken = false;
 					for (int j = 0; j < dim2; j++)
 					{
 						colactive[j] = 1;
@@ -450,16 +545,22 @@ namespace lap
 							// better
 							jmin = j;
 							min = h;
+							taken = (colsol[j] >= 0);
 						}
-						else if (h == min)
+						else if ((h == min) && (taken))
 						{
 							// same, do only update if old was used and new is free
-							if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
+							if (colsol[j] < 0)
+							{
+								jmin = j;
+								taken = false;
+							}
 						}
 					}
 				}
 				else
 				{
+					bool taken = false;
 					for (int j = 0; j < dim2; j++)
 					{
 						colactive[j] = 1;
@@ -470,11 +571,16 @@ namespace lap
 							// better
 							jmin = j;
 							min = h;
+							taken = (colsol[j] >= 0);
 						}
-						else if (h == min)
+						else if ((h == min) && (taken))
 						{
 							// same, do only update if old was used and new is free
-							if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
+							if (colsol[j] < 0)
+							{
+								jmin = j;
+								taken = false;
+							}
 						}
 					}
 				}
@@ -502,6 +608,7 @@ namespace lap
 					{
 						auto tt = iterator.getRow(i);
 						SC h2 = tt[jmin] - v[jmin] - min;
+						bool taken = false;
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
@@ -519,11 +626,16 @@ namespace lap
 									// better
 									jmin_n = j;
 									min_n = h;
+									taken = (colsol[j] >= 0);
 								}
-								else if (h == min_n)
+								else if ((h == min_n) && (taken))
 								{
-									// same, do only update if old was used and new is free
-									if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
+									// same and old was taken, only update if new is free
+									if (colsol[j] < 0)
+									{
+										jmin_n = j;
+										taken = false;
+									}
 								}
 							}
 						}
@@ -531,6 +643,7 @@ namespace lap
 					else
 					{
 						SC h2 = -v[jmin] - min;
+						bool taken = false;
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
@@ -548,11 +661,16 @@ namespace lap
 									// better
 									jmin_n = j;
 									min_n = h;
+									taken = (colsol[j] >= 0);
 								}
-								else if (h == min_n)
+								else if ((h == min_n) && (taken))
 								{
-									// same, do only update if old was used and new is free
-									if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
+									// same and old was taken, only update if new is free
+									if (colsol[j] < 0)
+									{
+										jmin_n = j;
+										taken = false;
+									}
 								}
 							}
 						}
