@@ -534,7 +534,6 @@ namespace lap
 				if (f < dim)
 				{
 					auto tt = iterator.getRow(f);
-					bool taken = false;
 					for (int j = 0; j < dim2; j++)
 					{
 						colactive[j] = 1;
@@ -545,22 +544,16 @@ namespace lap
 							// better
 							jmin = j;
 							min = h;
-							taken = (colsol[j] >= 0);
 						}
-						else if ((h == min) && (taken))
+						else if (h == min)
 						{
 							// same, do only update if old was used and new is free
-							if (colsol[j] < 0)
-							{
-								jmin = j;
-								taken = false;
-							}
+							if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
 						}
 					}
 				}
 				else
 				{
-					bool taken = false;
 					for (int j = 0; j < dim2; j++)
 					{
 						colactive[j] = 1;
@@ -571,16 +564,11 @@ namespace lap
 							// better
 							jmin = j;
 							min = h;
-							taken = (colsol[j] >= 0);
 						}
-						else if ((h == min) && (taken))
+						else if (h == min)
 						{
 							// same, do only update if old was used and new is free
-							if (colsol[j] < 0)
-							{
-								jmin = j;
-								taken = false;
-							}
+							if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
 						}
 					}
 				}
@@ -608,7 +596,6 @@ namespace lap
 					{
 						auto tt = iterator.getRow(i);
 						SC h2 = tt[jmin] - v[jmin] - min;
-						bool taken = false;
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
@@ -626,16 +613,11 @@ namespace lap
 									// better
 									jmin_n = j;
 									min_n = h;
-									taken = (colsol[j] >= 0);
 								}
-								else if ((h == min_n) && (taken))
+								else if (h == min_n)
 								{
-									// same and old was taken, only update if new is free
-									if (colsol[j] < 0)
-									{
-										jmin_n = j;
-										taken = false;
-									}
+									// same, do only update if old was used and new is free
+									if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
 								}
 							}
 						}
@@ -643,7 +625,6 @@ namespace lap
 					else
 					{
 						SC h2 = -v[jmin] - min;
-						bool taken = false;
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
@@ -661,16 +642,11 @@ namespace lap
 									// better
 									jmin_n = j;
 									min_n = h;
-									taken = (colsol[j] >= 0);
 								}
-								else if ((h == min_n) && (taken))
+								else if (h == min_n)
 								{
-									// same and old was taken, only update if new is free
-									if (colsol[j] < 0)
-									{
-										jmin_n = j;
-										taken = false;
-									}
+									// same, do only update if old was used and new is free
+									if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
 								}
 							}
 						}

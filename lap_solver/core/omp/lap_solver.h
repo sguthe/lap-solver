@@ -183,54 +183,42 @@ namespace lap
 						if (f < dim)
 						{
 							auto tt = iterator.getRow(t, f);
-							bool taken_local = false;
 							for (int j = start; j < end; j++)
 							{
 								int j_local = j - start;
-								SC h = d[j] = tt[j_local] - v[j];
 								colactive[j] = 1;
 								pred[j] = f;
+								SC h = d[j] = tt[j_local] - v[j];
 								if (h < min_local)
 								{
 									// better
 									jmin_local = j;
 									min_local = h;
-									taken_local = (colsol[j] >= 0);
 								}
-								else if ((h == min_local) && (taken_local))
+								else if (h == min_local)
 								{
-									// same and old was taken, only update if new is free
-									if (colsol[j] < 0)
-									{
-										jmin_local = j;
-										taken_local = false;
-									}
+									// same, do only update if old was used and new is free
+									if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
 								}
 							}
 						}
 						else
 						{
-							bool taken_local = false;
 							for (int j = start; j < end; j++)
 							{
-								SC h = d[j] = -v[j];
 								colactive[j] = 1;
 								pred[j] = f;
+								SC h = d[j] = -v[j];
 								if (h < min_local)
 								{
 									// better
 									jmin_local = j;
 									min_local = h;
-									taken_local = (colsol[j] >= 0);
 								}
-								else if ((h == min_local) && (taken_local))
+								else if (h == min_local)
 								{
-									// same and old was taken, only update if new is free
-									if (colsol[j] < 0)
-									{
-										jmin_local = j;
-										taken_local = false;
-									}
+									// same, do only update if old was used and new is free
+									if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
 								}
 							}
 						}
@@ -283,7 +271,6 @@ namespace lap
 								if ((jmin >= start) && (jmin < end)) h2_global = h2 = tt[jmin - start] - v[jmin] - min;
 #pragma omp barrier
 								if ((jmin < start) || (jmin >= end)) h2 = h2_global;
-								bool taken_local = false;
 								for (int j = start; j < end; j++)
 								{
 									int j_local = j - start;
@@ -302,23 +289,17 @@ namespace lap
 											// better
 											jmin_local = j;
 											min_local = h;
-											taken_local = (colsol[j] >= 0);
 										}
-										else if ((h == min_local) && (taken_local))
+										else if (h == min_local)
 										{
 											// same, do only update if old was used and new is free
-											if (colsol[j] < 0)
-											{
-												jmin_local = j;
-												taken_local = false;
-											}
+											if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
 										}
 									}
 								}
 							}
 							else
 							{
-								bool taken_local = false;
 								SC h2 = -v[jmin] - min;
 								for (int j = start; j < end; j++)
 								{
@@ -337,16 +318,11 @@ namespace lap
 											// better
 											jmin_local = j;
 											min_local = h;
-											taken_local = (colsol[j] >= 0);
 										}
-										else if ((h == min_local) && (taken_local))
+										else if (h == min_local)
 										{
 											// same, do only update if old was used and new is free
-											if (colsol[j] < 0)
-											{
-												jmin_local = j;
-												taken_local = false;
-											}
+											if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
 										}
 									}
 								}
