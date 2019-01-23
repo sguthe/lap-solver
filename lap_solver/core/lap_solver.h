@@ -355,12 +355,12 @@ namespace lap
 			SC total = SC(0);
 			if (epsilon > SC(0))
 			{
-				if (epsilon < SC(2) * epsilon_lower)
+				if (epsilon < SC(4) * epsilon_lower)
 				{
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
 #endif
-					if ((allow_reset) && (-last_avg <= SC(0.1 * epsilon)))
+					if ((allow_reset) && (-last_avg <= SC(epsilon / 16.0)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -373,33 +373,31 @@ namespace lap
 				{
 					if (!first)
 					{
+						SC next = std::max(epsilon_lower, std::min(std::min(SC(0.25 * epsilon), epsilon + last_avg), -last_avg));
 #ifdef LAP_DEBUG
-						lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
+						lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
 #endif
-						if ((allow_reset) && (-last_avg <= SC(0.1 * epsilon)))
+						if ((allow_reset) && (next < SC(epsilon / 16.0)))
 						{
 #ifdef LAP_DEBUG
 							lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
 							memset(v, 0, dim2 * sizeof(SC));
-							if (last_avg == SC(0.0)) epsilon = SC(0.1 * epsilon);
-							else epsilon = -last_avg;
+							epsilon = std::max(SC(epsilon / 256.0), next);
 						}
 						else
 						{
-							epsilon = std::max(SC(0.1 * epsilon), SC(0.5 * (epsilon + last_avg)));
+							epsilon = std::max(SC(epsilon / 16.0), next);
 							allow_reset = false;
 						}
-						if ((epsilon > SC(0)) && (epsilon < epsilon_lower)) epsilon = epsilon_lower;
 					}
 				}
 			}
-			SC eps = epsilon;
 			count = 0;
 #ifndef LAP_QUIET
 			{
 				std::stringstream ss;
-				ss << "eps = " << eps;
+				ss << "eps = " << epsilon;
 				const std::string tmp = ss.str();
 				displayTime(start_time, tmp.c_str(), lapInfo);
 			}
@@ -566,9 +564,9 @@ namespace lap
 				}
 
 				// update column prices. can increase or decrease
-				if (eps > SC(0))
+				if (epsilon > SC(0))
 				{
-					updateColumnPrices(colcomplete, completecount, min, v, d, eps, total, count);
+					updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total, count);
 				}
 				else
 				{
@@ -611,12 +609,12 @@ namespace lap
 			else last_avg = SC(0);
 
 #ifdef LAP_DEBUG
-			if (eps > SC(0))
+			if (epsilon > SC(0))
 			{
 				SC *vv;
 				lapAlloc(vv, dim2, __FILE__, __LINE__);
 				v_list.push_back(vv);
-				eps_list.push_back(eps);
+				eps_list.push_back(epsilon);
 				memcpy(v_list.back(), v, sizeof(SC) * dim2);
 			}
 			else
