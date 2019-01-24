@@ -13,8 +13,9 @@
 #include <fstream>
 #include "test_options.h"
 
-template <class CF> void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, bool sanity, std::string name_C);
-template <class CF> void testRandomCached(long long max_tab, long long min_cached, long long max_cached, int runs, bool omp, bool epsilon, bool sanity, std::string name_C);
+template <class CF> void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
+template <class CF> void testSanity(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
+template <class CF> void testSanityCached(long long max_tab, long long min_cached, long long max_cached, int runs, bool omp, bool epsilon, std::string name_C);
 template <class CF> void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, bool disjoint, std::string name_C);
 template <class CF> void testGeometricCached(long long max_tab, long long min_cached, long long max_cached, int runs, bool omp, bool epsilon, bool disjoint, std::string name_C);
 template <class CF> void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C);
@@ -44,9 +45,9 @@ int main(int argc, char* argv[])
 	{
 		if (opt.use_single)
 		{
-			if (opt.run_sanity) testRandom<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, true, std::string("double"));
-			if (opt.run_sanity_cached) testRandomCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, false, true, std::string("double"));
-			if (opt.run_random) testRandom<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, false, std::string("double"));
+			if (opt.run_sanity) testSanity<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("double"));
+			if (opt.run_sanity_cached) testSanityCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, false, std::string("double"));
+			if (opt.run_random) testRandom<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("double"));
 			if (opt.run_random_low_rank) testRandomLowRank<double>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, false, std::string("double"));
 			if (opt.run_random_low_rank_cached) testRandomLowRankCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, false, std::string("double"));
 			if (opt.run_geometric) testGeometric<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, false, std::string("double"));
@@ -57,9 +58,9 @@ int main(int argc, char* argv[])
 		}
 		if (opt.use_epsilon)
 		{
-			if (opt.run_sanity) testRandom<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, true, std::string("double"));
-			if (opt.run_sanity_cached) testRandomCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, true, true, std::string("double"));
-			if (opt.run_random) testRandom<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, false, std::string("double"));
+			if (opt.run_sanity) testSanity<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("double"));
+			if (opt.run_sanity_cached) testSanityCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, true, std::string("double"));
+			if (opt.run_random) testRandom<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("double"));
 			if (opt.run_random_low_rank) testRandomLowRank<double>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, true, std::string("double"));
 			if (opt.run_random_low_rank_cached) testRandomLowRankCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, true, std::string("double"));
 			if (opt.run_geometric) testGeometric<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, false, std::string("double"));
@@ -73,9 +74,9 @@ int main(int argc, char* argv[])
 	{
 		if (opt.use_single)
 		{
-			if (opt.run_sanity) testRandom<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, true, std::string("float"));
-			if (opt.run_sanity_cached) testRandomCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, false, true, std::string("float"));
-			if (opt.run_random) testRandom<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, false, std::string("float"));
+			if (opt.run_sanity) testSanity<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("float"));
+			if (opt.run_sanity_cached) testSanityCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, false, std::string("float"));
+			if (opt.run_random) testRandom<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("float"));
 			if (opt.run_random_low_rank) testRandomLowRank<float>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, false, std::string("float"));
 			if (opt.run_random_low_rank_cached) testRandomLowRankCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, false, std::string("float"));
 			if (opt.run_geometric) testGeometric<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, false, std::string("float"));
@@ -86,9 +87,9 @@ int main(int argc, char* argv[])
 		}
 		if (opt.use_epsilon)
 		{
-			if (opt.run_sanity) testRandom<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, true, std::string("float"));
-			if (opt.run_sanity_cached) testRandomCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, true, true, std::string("float"));
-			if (opt.run_random) testRandom<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, false, std::string("float"));
+			if (opt.run_sanity) testSanity<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("float"));
+			if (opt.run_sanity_cached) testSanityCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, true, std::string("float"));
+			if (opt.run_random) testRandom<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("float"));
 			if (opt.run_random_low_rank) testRandomLowRank<float>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, true, std::string("float"));
 			if (opt.run_random_low_rank_cached) testRandomLowRankCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, true, std::string("float"));
 			if (opt.run_geometric) testGeometric<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, false, std::string("float"));
@@ -116,67 +117,132 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-template <class C, class T>
-void setRandomTable(T &tab, int N, bool sanity, bool omp)
-{
-	std::uniform_real_distribution<C> distribution(0.0, 1.0);
-	std::mt19937_64 generator(1234);
-
-	C *tmp = new C[N];
-
-	if (sanity)
-	{
-		C *vec = new C[N << 1];
-		for (long long i = 0; i < N << 1; i++) vec[i] = distribution(generator);
-		if (omp)
-		{
 #ifdef LAP_OPENMP
-#pragma omp parallel
-			{
-				C *tmp2 = new C[N];
-#pragma omp for
-				for (int i = 0; i < N; i++)
-				{
-					int j;
-					for (j = 0; j < i; j++) tmp2[j] = vec[i] + vec[j + N] + C(0.1);
-					tmp2[i] = vec[i] + vec[i + N];
-					for (j = i + 1; j < N; j++) tmp2[j] = vec[i] + vec[j + N] + C(0.1);
-					tab.setRow(i, tmp2);
-				}
-				delete[]tmp2;
-			}
+template <class SC, class TC, class CF, class TP>
+void solveTableOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool epsilon, bool sequential = false)
+{
+	lap::omp::SimpleCostFunction<TC, decltype(get_cost)> costFunction(get_cost, true);
+	lap::omp::Worksharing ws(N2, 8);
+	lap::omp::TableCost<TC> costMatrix(N1, N2, costFunction, ws);
+	lap::omp::DirectIterator<SC, TC, lap::omp::TableCost<TC>> iterator(N1, N2, costMatrix, ws);
+
+	lap::displayTime(start_time, "setup complete", std::cout);
+
+	// estimating epsilon should be part of solve time
+	if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<TC>(N1, N2, iterator));
+	lap::omp::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
+
+	std::stringstream ss;
+	ss << "cost = " << lap::omp::cost<SC>(N1, N2, costMatrix, rowsol);
+	lap::displayTime(start_time, ss.str().c_str(), std::cout);
+}
 #endif
-		}
-		else
-		{
-			for (int i = 0; i < N; i++)
-			{
-				int j;
-				for (j = 0; j < i; j++) tmp[j] = vec[i] + vec[j + N] + C(0.1);
-				tmp[i] = vec[i] + vec[i + N];
-				for (j = i + 1; j < N; j++) tmp[j] = vec[i] + vec[j + N] + C(0.1);
-				tab.setRow(i, tmp);
-			}
-		}
-		delete[] vec;
+
+template <class SC, class TC, class CF, class TP>
+void solveTable(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool epsilon)
+{
+	lap::SimpleCostFunction<TC, decltype(get_cost)> costFunction(get_cost);
+	lap::TableCost<TC> costMatrix(N1, N2, costFunction);
+	lap::DirectIterator<SC, TC, lap::TableCost<TC>> iterator(N1, N2, costMatrix);
+
+	lap::displayTime(start_time, "setup complete", std::cout);
+
+	// estimating epsilon should be part of solve time
+	if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator));
+	lap::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
+
+	std::stringstream ss;
+	ss << "cost = " << lap::cost<SC>(N1, N2, costMatrix, rowsol);
+	lap::displayTime(start_time, ss.str().c_str(), std::cout);
+}
+
+#ifdef LAP_OPENMP
+template <class SC, class TC, class CF, class TP>
+void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int entries, bool epsilon)
+{
+	lap::omp::SimpleCostFunction<TC, decltype(get_cost)> costFunction(get_cost);
+	lap::omp::Worksharing ws(N2, costFunction.getMultiple());
+
+	if (4 * entries < N1)
+	{
+		lap::omp::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, entries, costFunction, ws);
+		if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
+		lap::displayTime(start_time, "setup complete", std::cout);
+		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol);
 	}
 	else
 	{
-		for (int i = 0; i < N; i++)
-		{
-			for (int j = 0; j < N; j++)
-			{
-				tmp[j] = distribution(generator);
-			}
-			tab.setRow(i, tmp);
-		}
+		lap::omp::CachingIterator<SC, TC, decltype(costFunction), lap::CacheLFU> iterator(N1, N2, entries, costFunction, ws);
+		if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
+		lap::displayTime(start_time, "setup complete", std::cout);
+		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol);
 	}
 
-	delete[] tmp;
+	std::stringstream ss;
+	ss << "cost = " << lap::omp::cost<SC>(N1, N2, costFunction, rowsol);
+	lap::displayTime(start_time, ss.str().c_str(), std::cout);
+}
+#endif
+
+template <class SC, class TC, class CF, class TP>
+void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int entries, bool epsilon)
+{
+	lap::SimpleCostFunction<TC, decltype(get_cost)> costFunction(get_cost);
+
+	if (4 * entries < N1)
+	{
+		lap::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, entries, costFunction);
+		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
+		lap::displayTime(start_time, "setup complete", std::cout);
+		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol);
+	}
+	else
+	{
+		lap::CachingIterator<SC, TC, decltype(costFunction), lap::CacheLFU> iterator(N1, N2, entries, costFunction);
+		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
+		lap::displayTime(start_time, "setup complete", std::cout);
+		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol);
+	}
+
+	std::stringstream ss;
+	ss << "cost = " << lap::cost<SC>(N1, N2, costFunction, rowsol);
+	lap::displayTime(start_time, ss.str().c_str(), std::cout);
+}
+
+#ifdef LAP_OPENMP
+template <class SC, class TC, class CF, class TP>
+void solveAdaptiveOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int entries, bool epsilon)
+{
+	if (N1 <= entries)
+	{
+		std::cout << "using table with " << N1 << " rows." << std::endl;
+		solveTableOMP<SC, TC>(start_time, N1, N2, get_cost, rowsol, epsilon);
+	}
+	else
+	{
+		std::cout << "using caching with " << entries << "/" << N1 << " entries." << std::endl;
+		solveCachingOMP<SC, TC>(start_time, N1, N2, get_cost, rowsol, entries, epsilon);
+	}
+}
+#endif
+
+template <class SC, class TC, class CF, class TP>
+void solveAdaptive(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int entries, bool epsilon)
+{
+	if (N1 <= entries)
+	{
+		std::cout << "using table with " << N1 << " rows." << std::endl;
+		solveTable<SC, TC>(start_time, N1, N2, get_cost, rowsol, epsilon);
+	}
+	else
+	{
+		std::cout << "using caching with " << entries << "/" << N1 << " entries." << std::endl;
+		solveCaching<SC, TC>(start_time, N1, N2, get_cost, rowsol, entries, epsilon);
+	}
 }
 
 template <class C>
-void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, bool sanity, std::string name_C)
+void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C)
 {
 	// random costs (directly supply cost matrix)
 	for (long long NN = min_tab * min_tab; NN <= max_tab * max_tab; NN <<= 1)
@@ -185,100 +251,119 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 		{
 			int N = (int)floor(sqrt((double)NN));
 
-			if (sanity) std::cout << "Sanity";
-			else std::cout << "Random";
-			std::cout << "<" << name_C << "> " << N << "x" << N;
+			std::cout << "Random";
+			std::cout << "<" << name_C << "> " << N << "x" << N << " table";
 			if (omp) std::cout << " multithreaded";
 			if (epsilon) std::cout << " with epsilon scaling";
 			std::cout << std::endl;
 
+			std::uniform_real_distribution<C> distribution(0.0, 1.0);
+			std::mt19937_64 generator(1234);
+
 			auto start_time = std::chrono::high_resolution_clock::now();
 
 			int *rowsol = new int[N];
-			C *tmp = 0;
-			if (sanity) lapAlloc(tmp, N, __FILE__, __LINE__);
+
+			auto get_cost = [&distribution, &generator](int x, int y) -> C
+			{
+				return distribution(generator);
+			};
 
 			if (omp)
 			{
 #ifdef LAP_OPENMP
-				lap::omp::Worksharing ws(N, 8);
-				//lap::omp::TableCost<C> costMatrix(N, N, tab, ws);
-				lap::omp::TableCost<C> costMatrix(N, N, ws);
-				setRandomTable<C>(costMatrix, N, sanity, omp);
-				lap::omp::DirectIterator<C, C, lap::omp::TableCost<C>> iterator(N, N, costMatrix, ws);
-				if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator));
-
-				lap::displayTime(start_time, "setup complete", std::cout);
-
-				lap::omp::solve<C>(N, costMatrix, iterator, rowsol);
-
-				{
-					std::stringstream ss;
-					ss << "cost = " << lap::omp::cost<C>(N, costMatrix, rowsol);
-					lap::displayTime(start_time, ss.str().c_str(), std::cout);
-				}
-				if (sanity) for (int i = 0; i < N; i++) tmp[i] = costMatrix.getCost(i, i);
+				// initialization needs to be serial
+				solveTableOMP<C, C>(start_time, N, N, get_cost, rowsol, epsilon, true);
 #endif
 			}
 			else
 			{
-				//lap::TableCost<C> costMatrix(N, N, tab);
-				lap::TableCost<C> costMatrix(N, N);
-				setRandomTable<C>(costMatrix, N, sanity, omp);
-				lap::DirectIterator<C, C, lap::TableCost<C>> iterator(N, N, costMatrix);
-				if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator));
-
-				lap::displayTime(start_time, "setup complete", std::cout);
-
-				lap::solve<C>(N, costMatrix, iterator, rowsol);
-
-				{
-					std::stringstream ss;
-					ss << "cost = " << lap::cost<C>(N, costMatrix, rowsol);
-					lap::displayTime(start_time, ss.str().c_str(), std::cout);
-				}
-				if (sanity) for (int i = 0; i < N; i++) tmp[i] = costMatrix.getCost(i, i);
+				solveTable<C, C>(start_time, N, N, get_cost, rowsol, epsilon);
 			}
 
-			if (sanity)
-			{
-				bool passed = true;
-				for (long long i = 0; (passed) && (i < N); i++)
-				{
-					passed &= (rowsol[i] == i);
-				}
-				std::stringstream ss;
-				if (passed) ss << "test passed: ";
-				else ss << "test failed: ";
-				C real_cost(0);
-				for (long long i = 0; i < N; i++) real_cost += tmp[i];
-				ss << "ground truth cost = " << real_cost;
-				lap::displayTime(start_time, ss.str().c_str(), std::cout);
-				lapFree(tmp);
-			}
 			delete[] rowsol;
 		}
 	}
 }
 
 template <class C>
-void testRandomCached(long long max_tab, long long min_cached, long long max_cached, int runs, bool omp, bool epsilon, bool sanity, std::string name_C)
+void testSanity(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C)
 {
-	if (!sanity)
+	// random costs (directly supply cost matrix)
+	for (long long NN = min_tab * min_tab; NN <= max_tab * max_tab; NN <<= 1)
 	{
-		std::cout << "Random cached not supported." << std::endl;
-		return;
+		for (int r = 0; r < runs; r++)
+		{
+			int N = (int)floor(sqrt((double)NN));
+
+			std::cout << "Sanity";
+			std::cout << "<" << name_C << "> " << N << "x" << N << " table";
+			if (omp) std::cout << " multithreaded";
+			if (epsilon) std::cout << " with epsilon scaling";
+			std::cout << std::endl;
+
+			std::uniform_real_distribution<C> distribution(0.0, 1.0);
+			std::mt19937_64 generator(1234);
+
+			auto start_time = std::chrono::high_resolution_clock::now();
+
+			int *rowsol = new int[N];
+
+			C *vec = new C[N << 1];
+
+			for (long long i = 0; i < N << 1; i++) vec[i] = distribution(generator);
+			
+			// cost functions
+			auto get_cost = [&vec, &N](int x, int y) -> C
+			{
+				C r = vec[x] + vec[y + N];
+				if (x == y) return r;
+				else return r + C(0.1);
+			};
+
+
+			if (omp)
+			{
+#ifdef LAP_OPENMP
+				solveTableOMP<C, C>(start_time, N, N, get_cost, rowsol, epsilon);
+#endif
+			}
+			else
+			{
+				solveTable<C, C>(start_time, N, N, get_cost, rowsol, epsilon);
+			}
+
+			bool passed = true;
+			for (long long i = 0; (passed) && (i < N); i++)
+			{
+				passed &= (rowsol[i] == i);
+			}
+			std::stringstream ss;
+			if (passed) ss << "test passed: ";
+			else ss << "test failed: ";
+			C real_cost(0);
+			for (int i = 0; i < N; i++) real_cost += get_cost(i, i);
+			ss << "ground truth cost = " << real_cost;
+			lap::displayTime(start_time, ss.str().c_str(), std::cout);
+
+			delete[] vec;
+			delete[] rowsol;
+		}
 	}
+}
+
+template <class C>
+void testSanityCached(long long max_tab, long long min_cached, long long max_cached, int runs, bool omp, bool epsilon, std::string name_C)
+{
 	for (long long NN = min_cached * min_cached; NN <= max_cached * max_cached; NN <<= 1)
 	{
 		for (int r = 0; r < runs; r++)
 		{
 			int N = (int)floor(sqrt((double)NN));
-			int entries = std::min(N, (int)((max_tab * max_tab) / N));
+			int entries = (int)std::min((long long)N, (max_tab * max_tab) / N);
 
-			if (sanity) std::cout << "Sanity";
-			else std::cout << "Random";
-			std::cout << "<" << name_C << "> " << N << "x" << N;
+			std::cout << "Sanity";
+			std::cout << "<" << name_C << "> " << N << "x" << N << " (" << entries << ")";
 			if (omp) std::cout << " multithreaded";
 			if (epsilon) std::cout << " with epsilon scaling";
 			std::cout << std::endl;
@@ -289,13 +374,11 @@ void testRandomCached(long long max_tab, long long min_cached, long long max_cac
 			std::mt19937_64 generator(1234);
 
 			C *vec = new C[N << 1];
-			if (sanity)
-			{
-				for (long long i = 0; i < N << 1; i++) vec[i] = distribution(generator);
-			}
+
+			for (long long i = 0; i < N << 1; i++) vec[i] = distribution(generator);
 
 			// cost function
-			auto get_cost = [vec, N](int x, int y) -> C
+			auto get_cost = [&vec, &N](int x, int y) -> C
 			{
 				C r = vec[x] + vec[y + N];
 				if (x == y) return r;
@@ -307,72 +390,27 @@ void testRandomCached(long long max_tab, long long min_cached, long long max_cac
 			if (omp)
 			{
 #ifdef LAP_OPENMP
-				lap::omp::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-				lap::omp::Worksharing ws(N, costFunction.getMultiple());
-
-				if (4 * entries < N)
-				{
-					lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, entries, costFunction, ws);
-					if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-					lap::displayTime(start_time, "setup complete", std::cout);
-					lap::omp::solve<C>(N, costFunction, iterator, rowsol);
-				}
-				else
-				{
-					lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N, N, entries, costFunction, ws);
-					if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-					lap::displayTime(start_time, "setup complete", std::cout);
-					lap::omp::solve<C>(N, costFunction, iterator, rowsol);
-				}
-
-				{
-					std::stringstream ss;
-					ss << "cost = " << lap::omp::cost<C>(N, costFunction, rowsol);
-					lap::displayTime(start_time, ss.str().c_str(), std::cout);
-				}
+				solveCachingOMP<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 #endif
 			}
 			else
 			{
-				lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-
-				if (4 * entries < N)
-				{
-					lap::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, entries, costFunction);
-					if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-					lap::displayTime(start_time, "setup complete", std::cout);
-					lap::solve<C>(N, costFunction, iterator, rowsol);
-				}
-				else
-				{
-					lap::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N, N, entries, costFunction);
-					if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-					lap::displayTime(start_time, "setup complete", std::cout);
-					lap::solve<C>(N, costFunction, iterator, rowsol);
-				}
-
-				{
-					std::stringstream ss;
-					ss << "cost = " << lap::cost<C>(N, costFunction, rowsol);
-					lap::displayTime(start_time, ss.str().c_str(), std::cout);
-				}
+				solveCaching<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 			}
 
-			if (sanity)
+			bool passed = true;
+			for (long long i = 0; (passed) && (i < N); i++)
 			{
-				bool passed = true;
-				for (long long i = 0; (passed) && (i < N); i++)
-				{
-					passed &= (rowsol[i] == i);
-				}
-				std::stringstream ss;
-				if (passed) ss << "test passed: ";
-				else ss << "test failed: ";
-				C real_cost(0);
-				for (int i = 0; i < N; i++) real_cost += get_cost(i, i);
-				ss << "ground truth cost = " << real_cost;
-				lap::displayTime(start_time, ss.str().c_str(), std::cout);
+				passed &= (rowsol[i] == i);
 			}
+			std::stringstream ss;
+			if (passed) ss << "test passed: ";
+			else ss << "test failed: ";
+			C real_cost(0);
+			for (int i = 0; i < N; i++) real_cost += get_cost(i, i);
+			ss << "ground truth cost = " << real_cost;
+			lap::displayTime(start_time, ss.str().c_str(), std::cout);
+
 			delete[] rowsol;
 			delete[] vec;
 		}
@@ -391,7 +429,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 			{
 				int N = (int)floor(sqrt((double)NN));
 
-				std::cout << "RandomLowRank<" << name_C << "> " << N << "x" << N << " rank = " << rank;
+				std::cout << "RandomLowRank<" << name_C << "> " << N << "x" << N << " table rank = " << rank;
 				if (omp) std::cout << " multithreaded";
 				if (epsilon) std::cout << " with epsilon scaling";
 				std::cout << std::endl;
@@ -409,7 +447,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 				}
 
 				// cost function
-				auto get_cost = [vec, N, rank](int x, int y) -> C
+				auto get_cost = [&vec, &N, &rank](int x, int y) -> C
 				{
 					C sum(0);
 					for (long long k = 0; k < rank; k++)
@@ -424,43 +462,15 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 				if (omp)
 				{
 #ifdef LAP_OPENMP
-					lap::omp::Worksharing ws(N, 8);
-					lap::omp::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-					lap::omp::TableCost<C> costMatrix(N, N, costFunction, ws);
-					delete[] vec;
-					lap::omp::DirectIterator<C, C, lap::omp::TableCost<C>> iterator(N, N, costMatrix, ws);
-					if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator));
-
-					lap::displayTime(start_time, "setup complete", std::cout);
-
-					lap::omp::solve<C>(N, costMatrix, iterator, rowsol);
-
-					{
-						std::stringstream ss;
-						ss << "cost = " << lap::omp::cost<C>(N, costMatrix, rowsol);
-						lap::displayTime(start_time, ss.str().c_str(), std::cout);
-					}
+					solveTableOMP<C, C>(start_time, N, N, get_cost, rowsol, epsilon);
 #endif
 				}
 				else
 				{
-					lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-					lap::TableCost<C> costMatrix(N, N, costFunction);
-					delete[] vec;
-					lap::DirectIterator<C, C, lap::TableCost<C>> iterator(N, N, costMatrix);
-					if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator));
-
-					lap::displayTime(start_time, "setup complete", std::cout);
-
-					lap::solve<C>(N, costMatrix, iterator, rowsol);
-
-					{
-						std::stringstream ss;
-						ss << "cost = " << lap::cost<C>(N, costMatrix, rowsol);
-						lap::displayTime(start_time, ss.str().c_str(), std::cout);
-					}
+					solveTable<C, C>(start_time, N, N, get_cost, rowsol, epsilon);
 				}
 
+				delete[] vec;
 				delete[] rowsol;
 			}
 		}
@@ -477,9 +487,9 @@ void testRandomLowRankCached(long long max_tab, long long min_cached, long long 
 			for (int r = 0; r < runs; r++)
 			{
 				int N = (int)floor(sqrt((double)NN));
-				int entries = std::min(N, (int)((max_tab * max_tab) / N));
+				int entries = (int)std::min((long long)N, (max_tab * max_tab) / N);
 
-				std::cout << "RandomLowRank<" << name_C << "> " << N << "x" << N << " rank = " << rank;
+				std::cout << "RandomLowRank<" << name_C << "> " << N << "x" << N << " (" << entries << ") rank = " << rank;
 				if (omp) std::cout << " multithreaded";
 				if (epsilon) std::cout << " with epsilon scaling";
 				std::cout << std::endl;
@@ -497,7 +507,7 @@ void testRandomLowRankCached(long long max_tab, long long min_cached, long long 
 				}
 
 				// cost function
-				auto get_cost = [vec, N, rank](int x, int y) -> C
+				auto get_cost = [&vec, &N, &rank](int x, int y) -> C
 				{
 					C sum(0);
 					for (long long k = 0; k < rank; k++)
@@ -512,55 +522,12 @@ void testRandomLowRankCached(long long max_tab, long long min_cached, long long 
 				if (omp)
 				{
 #ifdef LAP_OPENMP
-					lap::omp::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-					lap::omp::Worksharing ws(N, costFunction.getMultiple());
-
-					if (4 * entries < N)
-					{
-						lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, entries, costFunction, ws);
-						if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-						lap::displayTime(start_time, "setup complete", std::cout);
-						lap::omp::solve<C>(N, costFunction, iterator, rowsol);
-					}
-					else
-					{
-						lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N, N, entries, costFunction, ws);
-						if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-						lap::displayTime(start_time, "setup complete", std::cout);
-						lap::omp::solve<C>(N, costFunction, iterator, rowsol);
-					}
-
-					{
-						std::stringstream ss;
-						ss << "cost = " << lap::omp::cost<C>(N, costFunction, rowsol);
-						lap::displayTime(start_time, ss.str().c_str(), std::cout);
-					}
+					solveCachingOMP<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 #endif
 				}
 				else
 				{
-					lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-
-					if (4 * entries < N)
-					{
-						lap::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, entries, costFunction);
-						if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-						lap::displayTime(start_time, "setup complete", std::cout);
-						lap::solve<C>(N, costFunction, iterator, rowsol);
-					}
-					else
-					{
-						lap::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N, N, entries, costFunction);
-						if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-						lap::displayTime(start_time, "setup complete", std::cout);
-						lap::solve<C>(N, costFunction, iterator, rowsol);
-					}
-
-					{
-						std::stringstream ss;
-						ss << "cost = " << lap::cost<C>(N, costFunction, rowsol);
-						lap::displayTime(start_time, ss.str().c_str(), std::cout);
-					}
+					solveCaching<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 				}
 
 				delete[] rowsol;
@@ -582,7 +549,7 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 
 			std::cout << "Geometric";
 			if (disjoint) std::cout << " Disjoint";
-			std::cout << " R^2<" << name_C << "> " << N << "x" << N;
+			std::cout << " R^2<" << name_C << "> " << N << "x" << N << " table";
 			if (omp) std::cout << " multithreaded";
 			if (epsilon) std::cout << " with epsilon scaling";
 			std::cout << std::endl;
@@ -619,7 +586,7 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 			}
 
 			// cost function
-			auto get_cost = [tab_s, tab_t](int x, int y) -> C
+			auto get_cost = [&tab_s, &tab_t](int x, int y) -> C
 			{
 				int xx = x + x;
 				int yy = y + y;
@@ -633,48 +600,16 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 			if (omp)
 			{
 #ifdef LAP_OPENMP
-				lap::omp::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-				lap::omp::Worksharing ws(N, costFunction.getMultiple());
-				lap::omp::TableCost<C> costMatrix(N, costFunction, ws);
-				lap::omp::DirectIterator<C, C, decltype(costMatrix)> iterator(N, N, costMatrix, ws);
-				if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator));
-
-#endif
-				delete[] tab_s;
-				delete[] tab_t;
-#ifdef LAP_OPENMP
-				lap::displayTime(start_time, "setup complete", std::cout);
-
-				lap::omp::solve<C>(N, costMatrix, iterator, rowsol);
-
-				{
-					std::stringstream ss;
-					ss << "cost = " << lap::omp::cost<C>(N, costMatrix, rowsol);
-					lap::displayTime(start_time, ss.str().c_str(), std::cout);
-				}
+				solveTableOMP<C, C>(start_time, N, N, get_cost, rowsol, epsilon);
 #endif
 			}
 			else
 			{
-				lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-				lap::TableCost<C> costMatrix(N, costFunction);
-				lap::DirectIterator<C, C, decltype(costMatrix)> iterator(N, N, costMatrix);
-				if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator));
-
-				delete[] tab_s;
-				delete[] tab_t;
-
-				lap::displayTime(start_time, "setup complete", std::cout);
-
-				lap::solve<C>(N, costMatrix, iterator, rowsol);
-
-				{
-					std::stringstream ss;
-					ss << "cost = " << lap::cost<C>(N, costMatrix, rowsol);
-					lap::displayTime(start_time, ss.str().c_str(), std::cout);
-				}
+				solveTable<C, C>(start_time, N, N, get_cost, rowsol, epsilon);
 			}
 
+			delete[] tab_s;
+			delete[] tab_t;
 			delete[] rowsol;
 		}
 	}
@@ -688,7 +623,7 @@ void testGeometricCached(long long max_tab, long long min_cached, long long max_
 		for (int r = 0; r < runs; r++)
 		{
 			int N = (int)floor(sqrt((double)NN));
-			int entries = std::min(N, (int)((max_tab * max_tab) / N));
+			int entries = (int)std::min((long long)N, (max_tab * max_tab) / N);
 
 			std::cout << "Geometric";
 			if (disjoint) std::cout << " Disjoint";
@@ -728,7 +663,7 @@ void testGeometricCached(long long max_tab, long long min_cached, long long max_
 			}
 
 			// cost function
-			auto get_cost = [tab_s, tab_t](int x, int y) -> C
+			auto get_cost = [&tab_s, &tab_t](int x, int y) -> C
 			{
 				int xx = x + x;
 				int yy = y + y;
@@ -742,55 +677,12 @@ void testGeometricCached(long long max_tab, long long min_cached, long long max_
 			if (omp)
 			{
 #ifdef LAP_OPENMP
-				lap::omp::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-				lap::omp::Worksharing ws(N, costFunction.getMultiple());
-
-				if (4 * entries < N)
-				{
-					lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, entries, costFunction, ws);
-					if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-					lap::displayTime(start_time, "setup complete", std::cout);
-					lap::omp::solve<C>(N, costFunction, iterator, rowsol);
-				}
-				else
-				{
-					lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N, N, entries, costFunction, ws);
-					if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-					lap::displayTime(start_time, "setup complete", std::cout);
-					lap::omp::solve<C>(N, costFunction, iterator, rowsol);
-				}
-
-				{
-					std::stringstream ss;
-					ss << "cost = " << lap::omp::cost<C>(N, costFunction, rowsol);
-					lap::displayTime(start_time, ss.str().c_str(), std::cout);
-				}
+				solveCachingOMP<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 #endif
 			}
 			else
 			{
-				lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-
-				if (4 * entries < N)
-				{
-					lap::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, entries, costFunction);
-					if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-					lap::displayTime(start_time, "setup complete", std::cout);
-					lap::solve<C>(N, costFunction, iterator, rowsol);
-				}
-				else
-				{
-					lap::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N, N, entries, costFunction);
-					if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator, (int)(N / entries)));
-					lap::displayTime(start_time, "setup complete", std::cout);
-					lap::solve<C>(N, costFunction, iterator, rowsol);
-				}
-
-				{
-					std::stringstream ss;
-					ss << "cost = " << lap::cost<C>(N, costFunction, rowsol);
-					lap::displayTime(start_time, ss.str().c_str(), std::cout);
-				}
+				solveCaching<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 			}
 
 			delete[] rowsol;
@@ -798,30 +690,6 @@ void testGeometricCached(long long max_tab, long long min_cached, long long max_
 			delete[] tab_t;
 		}
 	}
-}
-
-template <class T>
-void setIntegerTable(T &tab, int N, int range)
-{
-	int n;
-	if (range == 0) n = N / 10;
-	else if (range == 1) n = N;
-	else n = 10 * N;
-	std::uniform_int_distribution<int> distribution(0, n);
-	std::mt19937_64 generator(1234);
-
-	int *tmp = new int[N];
-
-	for (int i = 0; i < N; i++)
-	{
-		for (int j = 0; j < N; j++)
-		{
-			tmp[j] = distribution(generator);
-		}
-		tab.setRow(i, tmp);
-	}
-
-	delete[] tmp;
 }
 
 template <class C>
@@ -841,52 +709,39 @@ void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool 
 				if (range == 0) std::cout << "1/10n";
 				else if (range == 1) std::cout << "n";
 				else std::cout << "10n";
-				std::cout << "> " << N << "x" << N;
+				std::cout << "> " << N << "x" << N << " table";
 				if (omp) std::cout << " multithreaded";
 				if (epsilon) std::cout << " with epsilon scaling";
 				std::cout << std::endl;
 
+				int n;
+				if (range == 0) n = N / 10;
+				else if (range == 1) n = N;
+				else n = 10 * N;
+				std::uniform_int_distribution<int> distribution(0, n);
+				std::mt19937_64 generator(1234);
+
 				auto start_time = std::chrono::high_resolution_clock::now();
+
+				auto get_cost = [&distribution, &generator](int x, int y) -> int
+				{
+					return distribution(generator);
+				};
 
 				int *rowsol = new int[N];
 
 				if (omp)
 				{
 #ifdef LAP_OPENMP
-					lap::omp::Worksharing ws(N, 8);
-					lap::omp::TableCost<int> costMatrix(N, N, ws);
-					setIntegerTable(costMatrix, N, range);
-					lap::omp::DirectIterator<C, int, lap::omp::TableCost<int>> iterator(N, N, costMatrix, ws);
-					if (epsilon) costMatrix.setInitialEpsilon((int)lap::omp::guessEpsilon<C>(N, N, iterator));
-
-					lap::displayTime(start_time, "setup complete", std::cout);
-
-					lap::omp::solve<C>(N, costMatrix, iterator, rowsol);
-
-					{
-						std::stringstream ss;
-						ss << "cost = " << lap::omp::cost<C>(N, costMatrix, rowsol);
-						lap::displayTime(start_time, ss.str().c_str(), std::cout);
-					}
+					// initialization needs to be serial
+					solveTableOMP<C, int>(start_time, N, N, get_cost, rowsol, epsilon, true);
 #endif
 				}
 				else
 				{
-					lap::TableCost<int> costMatrix(N, N);
-					setIntegerTable(costMatrix, N, range);
-					lap::DirectIterator<C, int, lap::TableCost<int>> iterator(N, N, costMatrix);
-					if (epsilon) costMatrix.setInitialEpsilon((int)lap::guessEpsilon<C>(N, N, iterator));
-
-					lap::displayTime(start_time, "setup complete", std::cout);
-
-					lap::solve<C>(N, costMatrix, iterator, rowsol);
-
-					{
-						std::stringstream ss;
-						ss << "cost = " << lap::cost<int>(N, costMatrix, rowsol);
-						lap::displayTime(start_time, ss.str().c_str(), std::cout);
-					}
+					solveTable<C, int>(start_time, N, N, get_cost, rowsol, epsilon);
 				}
+
 				delete[] rowsol;
 			}
 		}
@@ -981,120 +836,20 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				int *rowsol = new int[N2];
 
-				long long entries = (max_tab * max_tab) / N2;
-
+				int entries = (int) std::min((long long)N1, (max_tab * max_tab) / N2);
 
 				if (omp)
 				{
 #ifdef LAP_OPENMP
-					lap::omp::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-					lap::omp::Worksharing ws(N2, costFunction.getMultiple());
-
-					if (N1 <= entries)
-					{
-						std::cout << "using table with " << N1 << " rows." << std::endl;
-
-						lap::omp::TableCost<C> costMatrix(N1, N2, costFunction, ws);
-						lap::omp::DirectIterator<C, C, decltype(costMatrix)> iterator(N1, N2, costMatrix, ws);
-						if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
-
-						lap::displayTime(start_time, "setup complete", std::cout);
-
-						lap::omp::solve<C>(N1, N2, costMatrix, iterator, rowsol);
-
-						{
-							std::stringstream ss;
-							ss << "cost = " << lap::omp::cost<C>(N1, N2, costMatrix, rowsol);
-							lap::displayTime(start_time, ss.str().c_str(), std::cout);
-						}
-					}
-					else
-					{
-						std::cout << "using caching with " << entries << "/" << N1 << " entries." << std::endl;
-
-						if (4 * entries < N1)
-						{
-							lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, (int)entries, costFunction, ws);
-							if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
-							lap::displayTime(start_time, "setup complete", std::cout);
-							lap::omp::solve<C>(N1, N2, costFunction, iterator, rowsol);
-
-							{
-								std::stringstream ss;
-								ss << "cost = " << lap::omp::cost<C>(N1, N2, costFunction, rowsol);
-								lap::displayTime(start_time, ss.str().c_str(), std::cout);
-							}
-						}
-						else
-						{
-							lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N1, N2, (int)entries, costFunction, ws);
-							if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
-							lap::displayTime(start_time, "setup complete", std::cout);
-							lap::omp::solve<C>(N1, N2, costFunction, iterator, rowsol);
-
-							{
-								std::stringstream ss;
-								ss << "cost = " << lap::omp::cost<C>(N1, N2, costFunction, rowsol);
-								lap::displayTime(start_time, ss.str().c_str(), std::cout);
-							}
-						}
-					}
+					solveAdaptiveOMP<C, C>(start_time, N1, N2, get_cost, rowsol, entries, epsilon);
 #endif
 				}
 				else
 				{
-					lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-
-					if (N1 <= entries)
-					{
-						std::cout << "using table with " << N1 << " rows." << std::endl;
-
-						lap::TableCost<C> costMatrix(N1, N2, costFunction);
-						lap::DirectIterator<C, C, decltype(costMatrix)> iterator(N1, N2, costMatrix);
-						if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
-
-						lap::displayTime(start_time, "setup complete", std::cout);
-
-						lap::solve<C>(N1, N2, costMatrix, iterator, rowsol);
-
-						{
-							std::stringstream ss;
-							ss << "cost = " << lap::cost<C>(N1, N2, costMatrix, rowsol);
-							lap::displayTime(start_time, ss.str().c_str(), std::cout);
-						}
-					}
-					else
-					{
-						std::cout << "using caching with " << entries << "/" << N1 << " entries." << std::endl;
-
-						if (4 * entries < N1)
-						{
-							lap::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, (int)entries, costFunction);
-							if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
-							lap::displayTime(start_time, "setup complete", std::cout);
-							lap::solve<C>(N1, N2, costFunction, iterator, rowsol);
-
-							{
-								std::stringstream ss;
-								ss << "cost = " << lap::cost<C>(N1, N2, costFunction, rowsol);
-								lap::displayTime(start_time, ss.str().c_str(), std::cout);
-							}
-						}
-						else
-						{
-							lap::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N1, N2, (int)entries, costFunction);
-							if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N1, N2, iterator, std::max(1, (int)(N1 / entries))));
-							lap::displayTime(start_time, "setup complete", std::cout);
-							lap::solve<C>(N1, N2, costFunction, iterator, rowsol);
-
-							{
-								std::stringstream ss;
-								ss << "cost = " << lap::cost<C>(N1, N2, costFunction, rowsol);
-								lap::displayTime(start_time, ss.str().c_str(), std::cout);
-							}
-						}
-					}
+					solveAdaptive<C, C>(start_time, N1, N2, get_cost, rowsol, entries, epsilon);
 				}
+
+				delete[] rowsol;
 			}
 		}
 	}

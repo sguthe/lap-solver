@@ -11,13 +11,16 @@ namespace lap
 		template <class TC, typename GETCOST>
 		class SimpleCostFunction : public lap::SimpleCostFunction<TC, GETCOST>
 		{
+		protected:
+			bool sequential;
 		public:
-			SimpleCostFunction(GETCOST &getcost) : lap::SimpleCostFunction<TC, GETCOST>(getcost) {}
+			SimpleCostFunction(GETCOST &getcost, bool sequential = false) : lap::SimpleCostFunction<TC, GETCOST>(getcost), sequential(sequential) {}
 			~SimpleCostFunction() {}
 		public:
 			__forceinline bool allEnabled() const { return true; }
 			__forceinline bool enabled(int t) const { return true; }
 			__forceinline int getMultiple() const { return 8; }
+			__forceinline bool isSequential() const { return sequential; }
 		};
 
 		// Wrapper around enabled cost funtion, e.g. CUDA, OpenCL or OpenMPI where only a subset of threads takes part in calculating the cost function
@@ -30,13 +33,15 @@ namespace lap
 			GETENABLED getenabled;
 			// scheduling granularity
 			int multiple;
+			bool sequential;
 		public:
-			RowCostFunction(GETENABLED &getenabled, GETCOSTROW &getcostrow, int multiple = 1) : lap::RowCostFunction<TC, GETCOSTROW>(getcostrow), getenabled(getenabled), multiple(multiple) {}
+			RowCostFunction(GETENABLED &getenabled, GETCOSTROW &getcostrow, int multiple = 1, bool sequential = false) : lap::RowCostFunction<TC, GETCOSTROW>(getcostrow), getenabled(getenabled), multiple(multiple), sequential(sequential) {}
 			~RowCostFunction() {}
 		public:
 			__forceinline bool enabled(int t) const { return getenabled(t); }
 			__forceinline bool allEnabled() const { for (int i = 0; i < omp_get_max_threads(); i++) if (!enabled(i)) return false; return true; }
 			__forceinline int getMultiple() const { return multiple; }
+			__forceinline bool isSequential() const { return sequential; }
 		};
 
 		// Costs stored in a table. Used for conveniency only
@@ -71,53 +76,75 @@ namespace lap
 				free_in_destructor = true;
 				lapAlloc(cc, omp_get_max_threads(), __FILE__, __LINE__);
 				lapAlloc(stride, omp_get_max_threads(), __FILE__, __LINE__);
-				// used in case not all threads take part in the calculation
-				bool *tc;
-				lapAlloc(tc, omp_get_max_threads(), __FILE__, __LINE__);
-				memset(tc, 0, omp_get_max_threads() * sizeof(bool));
-#pragma omp parallel
+				if (cost.isSequential())
 				{
-					const int t = omp_get_thread_num();
-					stride[t] = ws.part[t].second - ws.part[t].first;
-					lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
-					// first touch
-					//memset(cc[t], 0, (long long)(stride[t]) * (long long)x_size * sizeof(TC));
-					cc[t][0] = TC(0);
-					if (cost.allEnabled())
+					// cost table needs to be initialized sequentially
+#pragma omp parallel
 					{
-						for (int x = 0; x < x_size; x++)
+						const int t = omp_get_thread_num();
+						stride[t] = ws.part[t].second - ws.part[t].first;
+						lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+						// first touch
+						cc[t][0] = TC(0);
+					}
+					for (int x = 0; x < x_size; x++)
+					{
+						for (int t = 0; t < omp_get_max_threads(); t++)
 						{
 							cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
 						}
 					}
-					else
+				}
+				else
+				{
+					// used in case not all threads take part in the calculation
+					bool *tc;
+					lapAlloc(tc, omp_get_max_threads(), __FILE__, __LINE__);
+					memset(tc, 0, omp_get_max_threads() * sizeof(bool));
+#pragma omp parallel
 					{
-						int t_local = t;
-						tc[t] = cost.enabled(t);
-						if (cost.enabled(t))
+						const int t = omp_get_thread_num();
+						stride[t] = ws.part[t].second - ws.part[t].first;
+						lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+						// first touch
+						//memset(cc[t], 0, (long long)(stride[t]) * (long long)x_size * sizeof(TC));
+						cc[t][0] = TC(0);
+						if (cost.allEnabled())
 						{
-							while (t_local < omp_get_max_threads())
+							for (int x = 0; x < x_size; x++)
 							{
-								for (int x = 0; x < x_size; x++)
+								cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
+							}
+						}
+						else
+						{
+							int t_local = t;
+							tc[t] = cost.enabled(t);
+							if (cost.enabled(t))
+							{
+								while (t_local < omp_get_max_threads())
 								{
-									cost.getCostRow(cc[t_local] + (long long)x * (long long)stride[t_local], x, ws.part[t_local].first, ws.part[t_local].second);
-								}
-								// find next
-#pragma omp critical
-								{
-									do
+									for (int x = 0; x < x_size; x++)
 									{
-										t_local++;
-										if (t_local >= omp_get_max_threads()) t_local = 0;
-									} while ((t_local != t) && (tc[t_local] == true));
-									if (t_local == t) t_local = omp_get_max_threads();
-									else tc[t_local] = true;
+										cost.getCostRow(cc[t_local] + (long long)x * (long long)stride[t_local], x, ws.part[t_local].first, ws.part[t_local].second);
+									}
+									// find next
+#pragma omp critical
+									{
+										do
+										{
+											t_local++;
+											if (t_local >= omp_get_max_threads()) t_local = 0;
+										} while ((t_local != t) && (tc[t_local] == true));
+										if (t_local == t) t_local = omp_get_max_threads();
+										else tc[t_local] = true;
+									}
 								}
 							}
 						}
 					}
+					lapFree(tc);
 				}
-				lapFree(tc);
 			}
 
 			void createTable()
