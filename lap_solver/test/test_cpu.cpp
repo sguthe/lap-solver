@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
 template <class SC, class TC, class CF, class TP>
 void solveTableOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool epsilon, bool sequential = false)
 {
-	lap::omp::SimpleCostFunction<TC, decltype(get_cost)> costFunction(get_cost, true);
+	lap::omp::SimpleCostFunction<TC, decltype(get_cost)> costFunction(get_cost, sequential);
 	lap::omp::Worksharing ws(N2, 8);
 	lap::omp::TableCost<TC> costMatrix(N1, N2, costFunction, ws);
 	lap::omp::DirectIterator<SC, TC, lap::omp::TableCost<TC>> iterator(N1, N2, costMatrix, ws);
