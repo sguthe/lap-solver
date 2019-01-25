@@ -100,6 +100,7 @@ namespace lap
 			SC *d;
 			int *colsol;
 			SC *v;
+			SC *v_old;
 
 #ifdef LAP_DEBUG
 			std::vector<SC *> v_list;
@@ -111,6 +112,7 @@ namespace lap
 			lapAlloc(d, dim2, __FILE__, __LINE__);
 			lapAlloc(pred, dim2, __FILE__, __LINE__);
 			lapAlloc(v, dim2, __FILE__, __LINE__);
+			lapAlloc(v_old, dim2, __FILE__, __LINE__);
 			lapAlloc(colsol, dim2, __FILE__, __LINE__);
 
 			SC *min_private;
@@ -133,15 +135,15 @@ namespace lap
 
 			SC last_avg = SC(0);
 			bool first = true;
-			bool allow_reset = true;
 
 			memset(v, 0, dim2 * sizeof(SC));
+			memset(v_old, 0, dim2 * sizeof(SC));
 
 			while (epsilon >= SC(0))
 			{
 				SC total = SC(0);
 				unsigned long long count = 0ULL;
-				lap::getNextEpsilon(epsilon, epsilon_lower, last_avg, first, allow_reset, v, dim2); 
+				lap::getNextEpsilon(epsilon, epsilon_lower, last_avg, first, v, v_old, dim2); 
 #ifndef LAP_QUIET
 				{
 					std::stringstream ss;
@@ -486,6 +488,7 @@ namespace lap
 			lapFree(colcomplete);
 			lapFree(d);
 			lapFree(v);
+			lapFree(v_old);
 			lapFree(colsol);
 			lapFree(min_private);
 			lapFree(jmin_private);
