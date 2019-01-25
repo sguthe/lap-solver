@@ -279,12 +279,12 @@ namespace lap
 	{
 		if (epsilon > SC(0))
 		{
-			if (epsilon < SC(4) * epsilon_lower)
+			if (epsilon <= epsilon_lower)
 			{
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
 #endif
-				if ((allow_reset) && (-last_avg <= SC(epsilon / 1024.0)))
+				if ((allow_reset) && (-last_avg <= SC(0.0625 * epsilon)))
 				{
 #ifdef LAP_DEBUG
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -297,11 +297,11 @@ namespace lap
 			{
 				if (!first)
 				{
-					SC next = std::max(epsilon_lower, std::min(SC(0.5 * epsilon), -last_avg));
+					SC next = std::max(epsilon_lower, std::min(SC(0.125 * epsilon), -last_avg));
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
 #endif
-					if ((allow_reset) && (-last_avg <= SC(epsilon / 256.0)))
+					if ((allow_reset) && (-last_avg <= SC(0.0625 * epsilon)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -311,7 +311,7 @@ namespace lap
 					}
 					else
 					{
-						epsilon = std::max(SC(epsilon / 256.0), next);
+						epsilon = std::max(SC(epsilon / 64.0), next);
 						allow_reset = false;
 					}
 				}
@@ -341,11 +341,11 @@ namespace lap
 			{
 				if (!first)
 				{
-					long long next = std::max(1ll, std::min(epsilon >> 1, -last_avg));
+					long long next = std::max(1ll, std::min(epsilon >> 4, -last_avg));
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
 #endif
-					if ((allow_reset) && (next < (epsilon >> 8)))
+					if ((allow_reset) && (next < (epsilon >> 3)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -355,7 +355,7 @@ namespace lap
 					}
 					else
 					{
-						epsilon = std::max(1ll, std::max(epsilon >> 8, next));
+						epsilon = std::max(1ll, std::max(epsilon >> 6, next));
 						allow_reset = false;
 					}
 				}
@@ -385,11 +385,11 @@ namespace lap
 			{
 				if (!first)
 				{
-					int next = std::max(1, std::min(epsilon >> 1, -last_avg));
+					int next = std::max(1, std::min(epsilon >> 4, -last_avg));
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
 #endif
-					if ((allow_reset) && (next < (epsilon >> 8)))
+					if ((allow_reset) && (next < (epsilon >> 3)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -399,7 +399,7 @@ namespace lap
 					}
 					else
 					{
-						epsilon = std::max(1, std::max(epsilon >> 8, next));
+						epsilon = std::max(1, std::max(epsilon >> 6, next));
 						allow_reset = false;
 					}
 				}
