@@ -129,7 +129,7 @@ void solveTableOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bo
 	lap::displayTime(start_time, "setup complete", std::cout);
 
 	// estimating epsilon should be part of solve time
-	if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<TC>(N1, N2, iterator));
+	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator));
 	lap::omp::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
 
 	std::stringstream ss;
@@ -148,7 +148,7 @@ void solveTable(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
 	// estimating epsilon should be part of solve time
-	if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator));
+	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::guessEpsilon<SC>(N1, N2, iterator));
 	lap::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
 
 	std::stringstream ss;
@@ -166,15 +166,21 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 	if (4 * entries < N1)
 	{
 		lap::omp::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, entries, costFunction, ws);
-		if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
+
 		lap::displayTime(start_time, "setup complete", std::cout);
+
+		// estimating epsilon should be part of solve time
+		if (epsilon) costFunction.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator, (int)(N1 / entries)));
 		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol);
 	}
 	else
 	{
 		lap::omp::CachingIterator<SC, TC, decltype(costFunction), lap::CacheLFU> iterator(N1, N2, entries, costFunction, ws);
-		if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
+
 		lap::displayTime(start_time, "setup complete", std::cout);
+
+		// estimating epsilon should be part of solve time
+		if (epsilon) costFunction.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator, (int)(N1 / entries)));
 		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol);
 	}
 
@@ -192,15 +198,19 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 	if (4 * entries < N1)
 	{
 		lap::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, entries, costFunction);
-		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
+
 		lap::displayTime(start_time, "setup complete", std::cout);
+
+		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
 		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol);
 	}
 	else
 	{
 		lap::CachingIterator<SC, TC, decltype(costFunction), lap::CacheLFU> iterator(N1, N2, entries, costFunction);
-		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
+
 		lap::displayTime(start_time, "setup complete", std::cout);
+
+		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
 		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol);
 	}
 
