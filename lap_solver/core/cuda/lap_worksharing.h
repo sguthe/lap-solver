@@ -15,11 +15,12 @@ namespace lap
 		public:
 			Worksharing(int size, int multiple)
 			{
+				int max_devices = (size + multiple - 1) / multiple;
 				int device_count;
 				cudaDeviceProp deviceProp;
 				cudaGetDeviceCount(&device_count);
 
-				for (int current_device = 0; (current_device < device_count); current_device++)
+				for (int current_device = 0; ((current_device < device_count) && (device.size() < max_devices)); current_device++)
 				{
 					cudaGetDeviceProperties(&deviceProp, current_device);
 
