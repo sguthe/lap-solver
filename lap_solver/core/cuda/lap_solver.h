@@ -475,7 +475,7 @@ namespace lap
 						jmin_taken = dim2;
 						if (f < dim)
 						{
-							SC h2;
+							SC h2(0);
 							for (int t = 0; t < devices; t++)
 							{
 								int start = iterator.ws.part[t].first;
@@ -517,7 +517,7 @@ namespace lap
 						}
 						else
 						{
-							SC h2;
+							SC h2(0);
 							for (int t = 0; t < devices; t++)
 							{
 								int start = iterator.ws.part[t].first;
