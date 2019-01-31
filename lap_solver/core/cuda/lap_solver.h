@@ -251,10 +251,6 @@ namespace lap
 
 			int  *pred;
 			int  endofpath;
-			// needs to be removed
-			char *colactive;
-			// needs to be removed
-			SC *d;
 			int *colsol;
 			SC *v;
 			SC *v2;
@@ -266,15 +262,15 @@ namespace lap
 			std::vector<SC> eps_list;
 #endif
 
-			lapAlloc(colactive, dim2, __FILE__, __LINE__);
-			lapAlloc(d, dim2, __FILE__, __LINE__);
-			lapAlloc(pred, dim2, __FILE__, __LINE__);
-			lapAlloc(v, dim2, __FILE__, __LINE__);
-			lapAlloc(v2, dim2, __FILE__, __LINE__);
-			lapAlloc(colsol, dim2, __FILE__, __LINE__);
+			// used for copying
+			min_struct<SC> *host_min_private;
+			cudaMallocHost(&pred, dim2 * sizeof(int));
+			cudaMallocHost(&v, dim2 * sizeof(SC));
+			cudaMallocHost(&v2, dim2 * sizeof(SC));
+			cudaMallocHost(&colsol, dim2 * sizeof(int));
+			cudaMallocHost(&host_min_private, devices * sizeof(min_struct<SC>));
 
 			min_struct<SC> **min_private;
-			min_struct<SC> *host_min_private;
 			char **colactive_private;
 			int **pred_private;
 			SC **d_private;
@@ -283,7 +279,7 @@ namespace lap
 			SC **v_private;
 			SC **temp_storage;
 			size_t *temp_storage_bytes;
-			lapAlloc(host_min_private, devices, __FILE__, __LINE__);
+			// on device
 			lapAlloc(min_private, devices, __FILE__, __LINE__);
 			lapAlloc(colactive_private, devices, __FILE__, __LINE__);
 			lapAlloc(pred_private, devices, __FILE__, __LINE__);
@@ -760,14 +756,12 @@ namespace lap
 			}
 
 			// free reserved memory.
-			lapFree(pred);
-			lapFree(colactive);
-			lapFree(d);
-			lapFree(v);
-			lapFree(v2);
-			lapFree(colsol);
+			cudaFreeHost(pred);
+			cudaFreeHost(v);
+			cudaFreeHost(v2);
+			cudaFreeHost(colsol);
 			lapFree(min_private);
-			lapFree(host_min_private);
+			cudaFreeHost(host_min_private);
 			lapFree(colactive_private);
 			lapFree(pred_private);
 			lapFree(d_private);
