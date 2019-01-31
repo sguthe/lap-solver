@@ -29,7 +29,7 @@ namespace lap
 			for (int t = 0; t < devices; t++)
 			{
 				cudaSetDevice(iterator.ws.device[t]);
-				for (int x = 0; x < x_size; x += step)
+				for (int x = x_size - 1; x >= 0; x -= step)
 				{
 					const auto *tt = iterator.getRow(t, x);
 					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
