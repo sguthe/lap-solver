@@ -13,15 +13,15 @@
 #include <fstream>
 #include "test_options.h"
 
-template <class CF> void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
-template <class CF> void testSanity(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
-template <class CF> void testSanityCached(long long max_tab, long long min_cached, long long max_cached, int runs, bool omp, bool epsilon, std::string name_C);
-template <class CF> void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, bool disjoint, std::string name_C);
-template <class CF> void testGeometricCached(long long max_tab, long long min_cached, long long max_cached, int runs, bool omp, bool epsilon, bool disjoint, std::string name_C);
-template <class CF> void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C);
-template <class CF> void testRandomLowRankCached(long long max_tab, long long min_cached, long long max_cached, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C);
-template <class CF> void testImages(std::vector<std::string> &images, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
-template <class CF> void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
+template <class C> void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
+template <class C> void testSanity(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
+template <class C> void testSanityCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool omp, bool epsilon, std::string name_C);
+template <class C> void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, bool disjoint, std::string name_C);
+template <class C> void testGeometricCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool omp, bool epsilon, bool disjoint, std::string name_C);
+template <class C> void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C);
+template <class C> void testRandomLowRankCached(long long min_cached, long long max_cached, long long max_memory, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C);
+template <class C> void testImages(std::vector<std::string> &images, long long max_memory, int runs, bool omp, bool epsilon, std::string name_C);
+template <class C> void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
 
 int main(int argc, char* argv[])
 {
@@ -46,28 +46,28 @@ int main(int argc, char* argv[])
 		if (opt.use_single)
 		{
 			if (opt.run_sanity) testSanity<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("double"));
-			if (opt.run_sanity_cached) testSanityCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, false, std::string("double"));
+			if (opt.run_sanity_cached) testSanityCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, false, std::string("double"));
 			if (opt.run_random) testRandom<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("double"));
 			if (opt.run_random_low_rank) testRandomLowRank<double>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, false, std::string("double"));
-			if (opt.run_random_low_rank_cached) testRandomLowRankCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, false, std::string("double"));
+			if (opt.run_random_low_rank_cached) testRandomLowRankCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, false, std::string("double"));
 			if (opt.run_geometric) testGeometric<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, false, std::string("double"));
 			if (opt.run_geometric_disjoint) testGeometric<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, true, std::string("double"));
-			if (opt.run_geometric_cached) testGeometricCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, false, false, std::string("double"));
-			if (opt.run_geometric_disjoint_cached) testGeometricCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, false, true, std::string("double"));
-			if (opt.images.size() > 1) testImages<double>(opt.images, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("double"));
+			if (opt.run_geometric_cached) testGeometricCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, false, false, std::string("double"));
+			if (opt.run_geometric_disjoint_cached) testGeometricCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, false, true, std::string("double"));
+			if (opt.images.size() > 1) testImages<double>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, false, std::string("double"));
 		}
 		if (opt.use_epsilon)
 		{
 			if (opt.run_sanity) testSanity<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("double"));
-			if (opt.run_sanity_cached) testSanityCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, true, std::string("double"));
+			if (opt.run_sanity_cached) testSanityCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, true, std::string("double"));
 			if (opt.run_random) testRandom<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("double"));
 			if (opt.run_random_low_rank) testRandomLowRank<double>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, true, std::string("double"));
-			if (opt.run_random_low_rank_cached) testRandomLowRankCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, true, std::string("double"));
+			if (opt.run_random_low_rank_cached) testRandomLowRankCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, true, std::string("double"));
 			if (opt.run_geometric) testGeometric<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, false, std::string("double"));
 			if (opt.run_geometric_disjoint) testGeometric<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, true, std::string("double"));
-			if (opt.run_geometric_cached) testGeometricCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, true, false, std::string("double"));
-			if (opt.run_geometric_disjoint_cached) testGeometricCached<double>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, true, true, std::string("double"));
-			if (opt.images.size() > 1) testImages<double>(opt.images, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("double"));
+			if (opt.run_geometric_cached) testGeometricCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, true, false, std::string("double"));
+			if (opt.run_geometric_disjoint_cached) testGeometricCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, true, true, std::string("double"));
+			if (opt.images.size() > 1) testImages<double>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, true, std::string("double"));
 		}
 	}
 	if (opt.use_float)
@@ -75,28 +75,28 @@ int main(int argc, char* argv[])
 		if (opt.use_single)
 		{
 			if (opt.run_sanity) testSanity<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("float"));
-			if (opt.run_sanity_cached) testSanityCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, false, std::string("float"));
+			if (opt.run_sanity_cached) testSanityCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, false, std::string("float"));
 			if (opt.run_random) testRandom<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("float"));
 			if (opt.run_random_low_rank) testRandomLowRank<float>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, false, std::string("float"));
-			if (opt.run_random_low_rank_cached) testRandomLowRankCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, false, std::string("float"));
+			if (opt.run_random_low_rank_cached) testRandomLowRankCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, false, std::string("float"));
 			if (opt.run_geometric) testGeometric<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, false, std::string("float"));
 			if (opt.run_geometric_disjoint) testGeometric<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, true, std::string("float"));
-			if (opt.run_geometric_cached) testGeometricCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, false, false, std::string("float"));
-			if (opt.run_geometric_disjoint_cached) testGeometricCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, false, true, std::string("float"));
-			if (opt.images.size() > 1) testImages<float>(opt.images, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("float"));
+			if (opt.run_geometric_cached) testGeometricCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, false, false, std::string("float"));
+			if (opt.run_geometric_disjoint_cached) testGeometricCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, false, true, std::string("float"));
+			if (opt.images.size() > 1) testImages<float>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, false, std::string("float"));
 		}
 		if (opt.use_epsilon)
 		{
 			if (opt.run_sanity) testSanity<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("float"));
-			if (opt.run_sanity_cached) testSanityCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, true, std::string("float"));
+			if (opt.run_sanity_cached) testSanityCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, true, std::string("float"));
 			if (opt.run_random) testRandom<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("float"));
 			if (opt.run_random_low_rank) testRandomLowRank<float>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, true, std::string("float"));
-			if (opt.run_random_low_rank_cached) testRandomLowRankCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, true, std::string("float"));
+			if (opt.run_random_low_rank_cached) testRandomLowRankCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.lap_min_rank, opt.lap_max_rank, opt.runs, opt.use_omp, true, std::string("float"));
 			if (opt.run_geometric) testGeometric<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, false, std::string("float"));
 			if (opt.run_geometric_disjoint) testGeometric<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, true, std::string("float"));
-			if (opt.run_geometric_cached) testGeometricCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, true, false, std::string("float"));
-			if (opt.run_geometric_disjoint_cached) testGeometricCached<float>(opt.lap_max_tab, opt.lap_min_cached, opt.lap_max_cached, opt.runs, opt.use_omp, true, true, std::string("float"));
-			if (opt.images.size() > 1) testImages<float>(opt.images, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("float"));
+			if (opt.run_geometric_cached) testGeometricCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, true, false, std::string("float"));
+			if (opt.run_geometric_disjoint_cached) testGeometricCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, true, true, std::string("float"));
+			if (opt.images.size() > 1) testImages<float>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, true, std::string("float"));
 		}
 	}
 	if (opt.run_integer)
@@ -363,14 +363,14 @@ void testSanity(long long min_tab, long long max_tab, int runs, bool omp, bool e
 }
 
 template <class C>
-void testSanityCached(long long max_tab, long long min_cached, long long max_cached, int runs, bool omp, bool epsilon, std::string name_C)
+void testSanityCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool omp, bool epsilon, std::string name_C)
 {
 	for (long long NN = min_cached * min_cached; NN <= max_cached * max_cached; NN <<= 1)
 	{
 		for (int r = 0; r < runs; r++)
 		{
 			int N = (int)floor(sqrt((double)NN));
-			int entries = (int)std::min((long long)N, (max_tab * max_tab) / N);
+			int entries = (int)std::min((long long)N, (long long)(max_memory / (sizeof(C) * N)));
 
 			std::cout << "Sanity";
 			std::cout << "<" << name_C << "> " << N << "x" << N << " (" << entries << ")";
@@ -488,7 +488,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 }
 
 template <class C>
-void testRandomLowRankCached(long long max_tab, long long min_cached, long long max_cached, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C)
+void testRandomLowRankCached(long long min_cached, long long max_cached, long long max_memory, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C)
 {
 	for (long long rank = min_rank; rank <= max_rank; rank <<= 1)
 	{
@@ -497,7 +497,7 @@ void testRandomLowRankCached(long long max_tab, long long min_cached, long long 
 			for (int r = 0; r < runs; r++)
 			{
 				int N = (int)floor(sqrt((double)NN));
-				int entries = (int)std::min((long long)N, (max_tab * max_tab) / N);
+				int entries = (int)std::min((long long)N, (long long)(max_memory / (sizeof(C) * N)));
 
 				std::cout << "RandomLowRank<" << name_C << "> " << N << "x" << N << " (" << entries << ") rank = " << rank;
 				if (omp) std::cout << " multithreaded";
@@ -626,14 +626,14 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 }
 
 template <class C> 
-void testGeometricCached(long long max_tab, long long min_cached, long long max_cached, int runs, bool omp, bool epsilon, bool disjoint, std::string name_C)
+void testGeometricCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool omp, bool epsilon, bool disjoint, std::string name_C)
 {
 	for (long long NN = min_cached * min_cached; NN <= max_cached * max_cached; NN <<= 1)
 	{
 		for (int r = 0; r < runs; r++)
 		{
 			int N = (int)floor(sqrt((double)NN));
-			int entries = (int)std::min((long long)N, (max_tab * max_tab) / N);
+			int entries = (int)std::min((long long)N, (long long)(max_memory / (sizeof(C) * N)));
 
 			std::cout << "Geometric";
 			if (disjoint) std::cout << " Disjoint";
@@ -801,7 +801,7 @@ public:
 	~PPMImage() { delete[] raw; }
 };
 
-template <class C> void testImages(std::vector<std::string> &images, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C)
+template <class C> void testImages(std::vector<std::string> &images, long long max_memory, int runs, bool omp, bool epsilon, std::string name_C)
 {
 	std::cout << "Comparing images ";
 	if (omp) std::cout << " multithreaded";
@@ -846,7 +846,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				int *rowsol = new int[N2];
 
-				int entries = (int) std::min((long long)N1, (max_tab * max_tab) / N2);
+				int entries = (int) std::min((long long)N1, (long long)(max_memory / (sizeof(C) * N2)));
 
 				if (omp)
 				{

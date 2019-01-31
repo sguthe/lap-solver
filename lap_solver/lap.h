@@ -73,10 +73,22 @@ namespace lap
 		// Iterator classes used for accessing the cost functions
 		template <class SC, class TC, class CF> class DirectIterator;
 		template <class SC, class TC, class CF, class CACHE> class CachingIterator;
+	}
+#endif
 
-		// Caching Schemes to be used for caching iterator
-		//class CacheSLRU;
-		//class CacheLFU;
+#ifdef LAP_CUDA
+	namespace omp
+	{
+		// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
+		template <class SC, class TC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol);
+		template <class SC, class TC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol);
+		template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
+		template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
+		template <class SC, class I> SC guessEpsilon(int x_size, int y_size, I& iterator, int step = 1);
+
+		// Iterator classes used for accessing the cost functions
+		template <class SC, class TC, class CF> class DirectIterator;
+		template <class SC, class TC, class CF, class CACHE> class CachingIterator;
 	}
 #endif
 }
@@ -94,4 +106,13 @@ namespace lap
 #include "core/omp/lap_direct_iterator.h"
 #include "core/omp/lap_caching_iterator.h"
 #include "core/omp/lap_solver.h"
+#endif
+
+#ifdef LAP_CUDA
+#include <omp.h>
+#include "core/cuda/lap_cost.h"
+#include "core/cuda/lap_cache.h"
+#include "core/cuda/lap_direct_iterator.h"
+#include "core/cuda/lap_caching_iterator.h"
+#include "core/cuda/lap_solver.h"
 #endif

@@ -149,6 +149,7 @@ namespace lap
 		}
 
 		__forceinline void getHitMiss(long long &hit, long long &miss) { hit = chit; miss = cmiss; chit = 0; cmiss = 0; }
+		__forceinline int getEntries() { return (int)list.size(); }
 	};
 
 	// least frequently used
@@ -298,5 +299,6 @@ namespace lap
 		}
 
 		__forceinline void getHitMiss(long long &hit, long long &miss) { hit = chit; miss = cmiss; chit = 0; cmiss = 0; }
+		__forceinline int getEntries() { return entries; }
 	};
 }

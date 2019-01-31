@@ -15,6 +15,9 @@
     <Filter Include="core\omp">
       <UniqueIdentifier>{e75fa28e-2b4a-4c02-b2d2-c26fc2c4fc4b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="core\cuda">
+      <UniqueIdentifier>{c36b662e-b00b-40ea-80fc-49941e07b0d0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\test\test_gpu.cu">
@@ -57,6 +60,24 @@
     </ClInclude>
     <ClInclude Include="..\..\core\omp\lap_solver.h">
       <Filter>core\omp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_cache.h">
+      <Filter>core\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_caching_iterator.h">
+      <Filter>core\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_cost.h">
+      <Filter>core\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_direct_iterator.h">
+      <Filter>core\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_solver.h">
+      <Filter>core\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_worksharing.h">
+      <Filter>core\cuda</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

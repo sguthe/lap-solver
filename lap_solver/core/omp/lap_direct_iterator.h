@@ -1,8 +1,6 @@
 #pragma once
 
-#include <algorithm>
 #include "lap_worksharing.h"
-#include "../lap_direct_iterator.h"
 
 namespace lap
 {

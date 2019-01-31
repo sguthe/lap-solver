@@ -14,6 +14,7 @@ public:
 	long long lap_max_rank;
 	long long lap_min_cached;
 	long long lap_max_cached;
+	long long lap_max_memory;
 
 	bool use_double;
 	bool use_float;
@@ -37,7 +38,7 @@ public:
 public:
 	Options()
 	{
-		lap_min_tab = lap_max_tab = lap_min_cached = lap_max_cached = lap_min_rank = lap_max_rank = 0ll;
+		lap_min_tab = lap_max_tab = lap_min_cached = lap_max_cached = lap_min_rank = lap_max_rank = lap_max_memory = 0ll;
 		use_double = use_float = use_single = use_epsilon = use_omp = false;
 		run_sanity = run_random = run_geometric = run_geometric_disjoint = run_random_low_rank = run_integer = false;
 		run_sanity_cached = run_geometric_cached = run_geometric_disjoint_cached = run_random_low_rank_cached = false;
@@ -50,6 +51,7 @@ public:
 		lap_max_tab = 64000ll;
 		lap_min_cached = 64000ll;
 		lap_max_cached = 256000ll;
+		lap_max_memory = 4ll * 1024ll * 1024ll * 1024ll;
 	}
 	void setDefault()
 	{
@@ -105,6 +107,10 @@ public:
 			else if (!strcmp(argv[i], "-cached_max"))
 			{
 				lap_max_cached = atoll(argv[++i]);
+			}
+			else if (!strcmp(argv[i], "-memory"))
+			{
+				lap_max_memory = atoll(argv[++i]);
 			}
 			else if (!strcmp(argv[i], "-double"))
 			{
