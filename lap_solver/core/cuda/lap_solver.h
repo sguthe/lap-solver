@@ -524,10 +524,9 @@ namespace lap
 								if ((jmin >= start) && (jmin < end))
 								{
 									cudaSetDevice(iterator.ws.device[t]);
-									SC v_jmin;
-									cudaMemcpyAsync(&(v_jmin), &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost);
+									cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost);
 									cudaDeviceSynchronize();
-									h2 = -v_jmin - min;
+									h2 = -v_jmin[0] - min;
 								}
 							}
 							for (int t = 0; t < devices; t++)
