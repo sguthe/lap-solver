@@ -18,7 +18,7 @@ namespace lap
 			SC** d_temp_storage;
 			size_t *temp_storage_bytes;
 			SC** d_out;
-			lapAlloc(minmax_cost, 2 * (x_size / step) * devices, __FILE__, __LINE__);
+			cudaMallocHost(&minmax_cost, 2 * (x_size / step) * devices * sizeof(SC));
 			lapAlloc(d_temp_storage, devices, __FILE__, __LINE__);
 			lapAlloc(temp_storage_bytes, devices, __FILE__, __LINE__);
 			lapAlloc(d_out, devices, __FILE__, __LINE__);
@@ -70,7 +70,7 @@ namespace lap
 				}
 				epsilon += max_cost - min_cost;
 			}
-			lapFree(minmax_cost);
+			cudaFreeHost(minmax_cost);
 			for (int t = 0; t < devices; t++)
 			{
 				if (temp_storage_bytes[t] != 0)
@@ -254,6 +254,9 @@ namespace lap
 			int *colsol;
 			SC *v;
 			SC *v2;
+			// for calculating h2
+			TC *tt_jmin;
+			SC *v_jmin;
 
 			int devices = (int)iterator.ws.device.size();
 
@@ -269,6 +272,8 @@ namespace lap
 			cudaMallocHost(&v2, dim2 * sizeof(SC));
 			cudaMallocHost(&colsol, dim2 * sizeof(int));
 			cudaMallocHost(&host_min_private, devices * sizeof(min_struct<SC>));
+			cudaMallocHost(&tt_jmin, sizeof(TC));
+			cudaMallocHost(&v_jmin, sizeof(SC));
 
 			min_struct<SC> **min_private;
 			char **colactive_private;
@@ -480,12 +485,10 @@ namespace lap
 								{
 									cudaSetDevice(iterator.ws.device[t]);
 									auto tt = iterator.getRow(t, i);
-									TC tt_jmin;
-									SC v_jmin;
-									cudaMemcpyAsync(&(tt_jmin), &(tt[jmin - start]), sizeof(tt_jmin), cudaMemcpyDeviceToHost);
-									cudaMemcpyAsync(&(v_jmin), &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost);
+									cudaMemcpyAsync(tt_jmin, &(tt[jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost);
+									cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost);
 									cudaDeviceSynchronize();
-									h2 = tt_jmin - v_jmin - min;
+									h2 = tt_jmin[0] - v_jmin[0] - min;
 								}
 							}
 							for (int t = 0; t < devices; t++)
@@ -760,6 +763,8 @@ namespace lap
 			cudaFreeHost(v);
 			cudaFreeHost(v2);
 			cudaFreeHost(colsol);
+			cudaFreeHost(tt_jmin);
+			cudaFreeHost(v_jmin);
 			lapFree(min_private);
 			cudaFreeHost(host_min_private);
 			lapFree(colactive_private);
