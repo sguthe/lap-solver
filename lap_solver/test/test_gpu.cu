@@ -285,6 +285,20 @@ void getCost_sanity_kernel(C *cost, C *vec, int *rowsol, int N)
 }
 
 template <class C>
+__global__
+void getGTCost_sanity_kernel(C *cost, C *vec, int N)
+{
+	int x = threadIdx.x + blockIdx.x * blockDim.x;
+	if (x >= N) return;
+	int y = x;
+
+	C r = vec[x] + vec[y + N];
+	if (x != y) r += C(0.1);
+
+	cost[x] = r;
+}
+
+template <class C>
 void testSanityCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool epsilon, std::string name_C)
 {
 	for (long long NN = min_cached * min_cached; NN <= max_cached * max_cached; NN <<= 1)
@@ -367,9 +381,39 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 				}
 				for (int i = 0; i < N; i++) my_cost += row[i];
 				delete[] row;
-				ss << "cost = " << my_cost;// lap::cost<C, float>(N, costFunction, rowsol);
+				ss << "cost = " << my_cost;
 				lap::displayTime(start_time, ss.str().c_str(), std::cout);
 			}
+
+			bool passed = true;
+			for (long long i = 0; (passed) && (i < N); i++)
+			{
+				passed &= (rowsol[i] == i);
+			}
+			std::stringstream ss;
+			if (passed) ss << "test passed: ";
+			else ss << "test failed: ";
+			{
+				// set device back to 0
+				cudaSetDevice(ws.device[0]);
+				C my_cost(0);
+				C *row = new C[N];
+				// calculate costs directly
+				{
+					C *d_row;
+					cudaMalloc(&d_row, N * sizeof(C));
+					dim3 block_size, grid_size;
+					block_size.x = 256;
+					grid_size.x = (N + block_size.x - 1) / block_size.x;
+					getGTCost_sanity_kernel<<<grid_size, block_size>>>(d_row, d_vec[0], N);
+					cudaMemcpy(row, d_row, N * sizeof(C), cudaMemcpyDeviceToHost);
+					cudaFree(d_row);
+				}
+				for (int i = 0; i < N; i++) my_cost += row[i];
+				delete[] row;
+				ss << "ground truth cost = " << my_cost;
+			}
+			lap::displayTime(start_time, ss.str().c_str(), std::cout);
 
 			for (int i = 0; i < num_enabled; i++)
 			{
