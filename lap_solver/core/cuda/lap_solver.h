@@ -296,16 +296,23 @@ namespace lap
 			for (int t = 0; t < devices; t++)
 			{
 				cudaSetDevice(iterator.ws.device[t]);
-				int size = iterator.ws.part[t].second - iterator.ws.part[t].first;
+				int start = iterator.ws.part[t].first;
+				int end = iterator.ws.part[t].second;
+				int size = end - start;
 				cudaMalloc(&(min_private[t]), sizeof(min_struct<SC>));
 				cudaMalloc(&(colactive_private[t]), sizeof(char) * size);
-				cudaMalloc(&(pred_private[t]), sizeof(int) * size);
 				cudaMalloc(&(d_private[t]), sizeof(SC) * size);
 				cudaMalloc(&(d2_private[t]), sizeof(SC) * size);
-				cudaMalloc(&(colsol_private[t]), sizeof(int) * size);
 				cudaMalloc(&(v_private[t]), sizeof(SC) * size);
 				temp_storage[t] = 0;
 				temp_storage_bytes[t] = 0;
+#ifdef LAP_CUDA_AVOID_MEMCPY
+				colsol_private[t] = &(colsol[start]);
+				pred_private[t] = &(pred[start]);
+#else
+				cudaMalloc(&(colsol_private[t]), sizeof(int) * size);
+				cudaMalloc(&(pred_private[t]), sizeof(int) * size);
+#endif
 			}
 
 #ifdef LAP_ROWS_SCANNED
@@ -383,8 +390,10 @@ namespace lap
 
 					for (int f = 0; f < dim2; f++)
 					{
+#ifndef LAP_CUDA_AVOID_MEMCPY
 						// upload colsol to devices
 						cudaMemcpyAsync(colsol_private[t], &(colsol[start]), sizeof(int) * size, cudaMemcpyHostToDevice, stream);
+#endif
 						// initialize Search
 						initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
 						if (f < dim)
@@ -564,7 +573,9 @@ namespace lap
 
 						// update column prices. can increase or decrease
 						// need to copy pred from GPUs here
+#ifndef LAP_CUDA_AVOID_MEMCPY
 						cudaMemcpyAsync(&(pred[start]), pred_private[t], sizeof(int) * size, cudaMemcpyDeviceToHost, stream);
+#endif
 						if (epsilon > SC(0))
 						{
 							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d2_private[t], epsilon, size);
@@ -573,7 +584,10 @@ namespace lap
 						{
 							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d2_private[t], size);
 						}
+						// synchronization only required due to copy
+#ifndef LAP_CUDA_AVOID_MEMCPY
 						cudaStreamSynchronize(stream);
+#endif
 #pragma omp barrier
 #pragma omp master
 						{
@@ -695,11 +709,13 @@ namespace lap
 				cudaSetDevice(iterator.ws.device[t]);
 				cudaFree(min_private[t]);
 				cudaFree(colactive_private[t]);
-				cudaFree(pred_private[t]);
 				cudaFree(d_private[t]);
-				cudaFree(colsol_private[t]);
 				cudaFree(v_private[t]);
 				if (temp_storage[t] != 0) cudaFree(temp_storage[t]);
+#ifndef LAP_CUDA_AVOID_MEMCPY
+				cudaFree(pred_private[t]);
+				cudaFree(colsol_private[t]);
+#endif
 			}
 
 			// free reserved memory.
