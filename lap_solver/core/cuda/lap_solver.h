@@ -15,36 +15,44 @@ namespace lap
 			SC epsilon(0);
 			int devices = (int)iterator.ws.device.size();
 			SC* minmax_cost;
-			SC** d_temp_storage;
-			size_t *temp_storage_bytes;
 			SC** d_out;
 			cudaMallocHost(&minmax_cost, 2 * (x_size / step) * devices * sizeof(SC));
-			lapAlloc(d_temp_storage, devices, __FILE__, __LINE__);
-			lapAlloc(temp_storage_bytes, devices, __FILE__, __LINE__);
 			lapAlloc(d_out, devices, __FILE__, __LINE__);
 			memset(minmax_cost, 0, 2 * sizeof(SC) * devices);
+			memset(d_out, 0, sizeof(SC*) * devices);
+			SC** d_temp_storage;
+			size_t *temp_storage_bytes;
+			lapAlloc(d_temp_storage, devices, __FILE__, __LINE__);
+			lapAlloc(temp_storage_bytes, devices, __FILE__, __LINE__);
 			memset(d_temp_storage, 0, sizeof(SC*) * devices);
 			memset(temp_storage_bytes, 0, sizeof(size_t) * devices);
-			memset(d_out, 0, sizeof(SC*) * devices);
 			for (int t = 0; t < devices; t++)
 			{
 				cudaSetDevice(iterator.ws.device[t]);
-				for (int x = x_size - 1; x >= 0; x -= step)
+			}
+			for (int x = step * ((x_size - 1) / step); x >= 0; x -= step)
+			{
+				for (int t = 0; t < devices; t++)
 				{
-					const auto *tt = iterator.getRow(t, x);
+					cudaSetDevice(iterator.ws.device[t]);
+					auto tt = iterator.getRow(t, x);
 					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					if (temp_storage_bytes[t] == 0)
 					{
 						cudaMalloc(&(d_out[t]), 2 * (x_size / step) * sizeof(SC));
 						size_t temp_size(0);
 						cub::DeviceReduce::Min(d_temp_storage[t], temp_size, tt, d_out[t], num_items);
-						cub::DeviceReduce::Min(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t], num_items);
+						cub::DeviceReduce::Max(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t], num_items);
 						temp_storage_bytes[t] = std::max(temp_storage_bytes[t], temp_size);
 						cudaMalloc(&(d_temp_storage[t]), 2 * temp_storage_bytes[t]);
 					}
 					cub::DeviceReduce::Min(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t] + 2 * (x / step), num_items);
 					cub::DeviceReduce::Max(d_temp_storage[t] + temp_storage_bytes[t], temp_storage_bytes[t], tt, d_out[t] + 2 * (x / step) + 1, num_items);
 				}
+			}
+			for (int t = 0; t < devices; t++)
+			{
+				cudaSetDevice(iterator.ws.device[t]);
 				cudaMemcpyAsync(&(minmax_cost[2 * t *  (x_size / step)]), d_out[t], 2 * (x_size / step) * sizeof(SC), cudaMemcpyDeviceToHost);
 			}
 			for (int t = 0; t < devices; t++)
@@ -95,16 +103,14 @@ namespace lap
 		};
 
 		template <class SC>
-		__global__
-		void initializeMin_kernel(min_struct<SC> *s, int dim2)
+		__global__ void initializeMin_kernel(min_struct<SC> *s, int dim2)
 		{
 			s->jmin_free = dim2;
 			s->jmin_taken = dim2;
 		}
 
 		template <class SC, class TC>
-		__global__
-		void initializeSearch_kernel(SC *v, SC *d, TC *tt, char *colactive, int *pred, int f, int size)
+		__global__ void initializeSearch_kernel(SC *v, SC *d, TC *tt, char *colactive, int *pred, int f, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -115,8 +121,7 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__global__
-		void continueSearch_kernel(SC *v, SC *d, TC *tt, char *colactive, int *pred, int i, SC h2, int size)
+		__global__ void continueSearch_kernel(SC *v, SC *d, TC *tt, char *colactive, int *pred, int i, SC h2, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -134,8 +139,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__
-		void initializeSearch_kernel(SC *v, SC *d, char *colactive, int *pred, int f, int size)
+		__global__ void initializeSearch_kernel(SC *v, SC *d, char *colactive, int *pred, int f, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -146,8 +150,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__
-		void continueSearch_kernel(SC *v, SC *d, char *colactive, int *pred, int i, SC h2, int size)
+		__global__ void continueSearch_kernel(SC *v, SC *d, char *colactive, int *pred, int i, SC h2, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -165,8 +168,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__
-		void findMin_kernel(min_struct<SC> *s, SC *d, int *colsol, int start, int end)
+		__global__ void findMin_kernel(min_struct<SC> *s, SC *d, int *colsol, int start, int end)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j + start >= end) return;
@@ -179,8 +181,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__
-		void setColInactive_kernel(char *colactive, SC *d, SC *d2, SC max, int jmin)
+		__global__ void setColInactive_kernel(char *colactive, SC *d, SC *d2, SC max, int jmin)
 		{
 			colactive[jmin] = 0;
 			d2[jmin] = d[jmin];
@@ -188,8 +189,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__
-		void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, int size)
+		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -201,8 +201,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__
-		void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC eps, int size)
+		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC eps, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
