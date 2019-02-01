@@ -57,8 +57,7 @@ namespace lap
 				bool found = cache[t].find(idx, i);
 				if (!found)
 				{
-					cudaSetDevice(ws.device[t]);
-					costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, t, i, ws.part[t].first, ws.part[t].second);
+					costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, t, ws.stream[t], i, ws.part[t].first, ws.part[t].second);
 				}
 				return rows[t] + (long long)size * (long long)idx;
 			}

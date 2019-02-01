@@ -18,7 +18,7 @@ namespace lap
 		public:
 			__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
-			__forceinline void getCostRow(TC *row, int t, int x, int start, int end) const { getcostrow(row, t, x, start, end); }
+			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end) const { getcostrow(row, t, stream, x, start, end); }
 		};
 	}
 }

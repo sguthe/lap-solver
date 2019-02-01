@@ -11,6 +11,7 @@
 #include "test_options.h"
 
 #include <cuda.h>
+#include <cuda_runtime.h>
 
 template <class C> void testSanityCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool epsilon, std::string name_C);
 template <class C> void testGeometricCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool epsilon, bool disjoint, std::string name_C);
@@ -176,6 +177,8 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			lap::cuda::Worksharing ws(N, 256);
 			int num_enabled = (int)ws.device.size();
 
+			int step = (int)N / (int)std::min((long long)N, (long long)((num_enabled * max_memory) / (sizeof(C) * N)));
+
 			C **d_tab_s = new C*[num_enabled];
 			C **d_tab_t = new C*[num_enabled];
 
@@ -197,12 +200,12 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			int *rowsol = new int[N];
 
 			// cost function
-			auto get_cost_row = [&d_tab_s, &d_tab_t, &N](C *d_row, int t, int x, int start, int end)
+			auto get_cost_row = [&d_tab_s, &d_tab_t, &N](C *d_row, int t, cudaStream_t stream, int x, int start, int end)
 			{
 				dim3 block_size, grid_size;
 				block_size.x = 256;
 				grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
-				getCostRow_geometric_kernel<<<grid_size, block_size>>>(d_row, d_tab_s[t], d_tab_t[t], x, start, end, N);
+				getCostRow_geometric_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_tab_s[t], d_tab_t[t], x, start, end, N);
 			};
 
 			lap::cuda::RowCostFunction<C, decltype(get_cost_row)> costFunction(get_cost_row);
@@ -210,7 +213,7 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			// different cache size, so always use SLRU
 			lap::cuda::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(C), costFunction, ws);
 			lap::displayTime(start_time, "setup complete", std::cout);
-			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C>(N, N, iterator));
+			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C>(N, N, iterator, step));
 
 			lap::cuda::solve<C, C>(N, costFunction, iterator, rowsol);
 
@@ -324,6 +327,8 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			lap::cuda::Worksharing ws(N, 256);
 			int num_enabled = (int)ws.device.size();
 
+			int step = (int)N / (int)std::min((long long)N, (long long)((num_enabled * max_memory) / (sizeof(C) * N)));
+
 			C **d_vec = new C*[num_enabled];
 
 			for (int i = 0; i < num_enabled; i++)
@@ -341,12 +346,12 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			int *rowsol = new int[N];
 
 			// cost function
-			auto get_cost_row = [&d_vec, &N](C *d_row, int t, int x, int start, int end)
+			auto get_cost_row = [&d_vec, &N](C *d_row, int t, cudaStream_t stream, int x, int start, int end)
 			{
 				dim3 block_size, grid_size;
 				block_size.x = 256;
 				grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
-				getCostRow_sanity_kernel<<<grid_size, block_size>>>(d_row, d_vec[t], x, start, end, N);
+				getCostRow_sanity_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_vec[t], x, start, end, N);
 			};
 
 			lap::cuda::RowCostFunction<C, decltype(get_cost_row)> costFunction(get_cost_row);
@@ -354,7 +359,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			// different cache size, so always use SLRU
 			lap::cuda::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(C), costFunction, ws);
 			lap::displayTime(start_time, "setup complete", std::cout);
-			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C>(N, N, iterator));
+			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C>(N, N, iterator, step));
 
 			lap::cuda::solve<C, C>(N, costFunction, iterator, rowsol);
 
@@ -495,6 +500,8 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				lap::cuda::Worksharing ws(N, 256);
 				int num_enabled = (int)ws.device.size();
 
+				int step = (int)N / (int)std::min((long long)N, (long long)((num_enabled * max_memory) / (sizeof(C) * N)));
+
 				C **d_vec = new C*[num_enabled];
 
 				for (int i = 0; i < num_enabled; i++)
@@ -512,12 +519,12 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				int *rowsol = new int[N];
 
 				// cost function
-				auto get_cost_row = [&d_vec, &N, &rank](C *d_row, int t, int x, int start, int end)
+				auto get_cost_row = [&d_vec, &N, &rank](C *d_row, int t, cudaStream_t stream, int x, int start, int end)
 				{
 					dim3 block_size, grid_size;
 					block_size.x = 256;
 					grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
-					getCostRow_lowRank_kernel<<<grid_size, block_size>>>(d_row, d_vec[t], rank, x, start, end, N);
+					getCostRow_lowRank_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_vec[t], rank, x, start, end, N);
 				};
 
 				lap::cuda::RowCostFunction<C, decltype(get_cost_row)> costFunction(get_cost_row);
@@ -525,7 +532,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				// different cache size, so always use SLRU
 				lap::cuda::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(C), costFunction, ws);
 				lap::displayTime(start_time, "setup complete", std::cout);
-				if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C>(N, N, iterator));
+				if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C>(N, N, iterator, step));
 
 				lap::cuda::solve<C, C>(N, costFunction, iterator, rowsol);
 

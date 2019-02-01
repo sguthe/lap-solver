@@ -3,7 +3,9 @@
 #include "../lap_solver.h"
 #include <algorithm>
 #include <cuda.h>
+#include <cuda_runtime.h>
 #include <cub/cub.cuh>
+#include <omp.h>
 
 namespace lap
 {
@@ -14,6 +16,8 @@ namespace lap
 		{
 			SC epsilon(0);
 			int devices = (int)iterator.ws.device.size();
+			int old_threads = omp_get_max_threads();
+			omp_set_num_threads(devices);
 			SC* minmax_cost;
 			SC** d_out;
 			cudaMallocHost(&minmax_cost, 2 * (x_size / step) * devices * sizeof(SC));
@@ -26,39 +30,29 @@ namespace lap
 			lapAlloc(temp_storage_bytes, devices, __FILE__, __LINE__);
 			memset(d_temp_storage, 0, sizeof(SC*) * devices);
 			memset(temp_storage_bytes, 0, sizeof(size_t) * devices);
+#pragma omp parallel for
 			for (int t = 0; t < devices; t++)
 			{
 				cudaSetDevice(iterator.ws.device[t]);
-			}
-			for (int x = step * ((x_size - 1) / step); x >= 0; x -= step)
-			{
-				for (int t = 0; t < devices; t++)
+				int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
+				cudaStream_t stream = iterator.ws.stream[t];
+				for (int x = step * ((x_size - 1) / step); x >= 0; x -= step)
 				{
-					cudaSetDevice(iterator.ws.device[t]);
 					auto tt = iterator.getRow(t, x);
-					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					if (temp_storage_bytes[t] == 0)
 					{
 						cudaMalloc(&(d_out[t]), 2 * (x_size / step) * sizeof(SC));
 						size_t temp_size(0);
-						cub::DeviceReduce::Min(d_temp_storage[t], temp_size, tt, d_out[t], num_items);
-						cub::DeviceReduce::Max(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t], num_items);
+						cub::DeviceReduce::Min(d_temp_storage[t], temp_size, tt, d_out[t], num_items, stream);
+						cub::DeviceReduce::Max(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t], num_items, stream);
 						temp_storage_bytes[t] = std::max(temp_storage_bytes[t], temp_size);
 						cudaMalloc(&(d_temp_storage[t]), 2 * temp_storage_bytes[t]);
 					}
-					cub::DeviceReduce::Min(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t] + 2 * (x / step), num_items);
-					cub::DeviceReduce::Max(d_temp_storage[t] + temp_storage_bytes[t], temp_storage_bytes[t], tt, d_out[t] + 2 * (x / step) + 1, num_items);
+					cub::DeviceReduce::Min(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t] + 2 * (x / step), num_items, stream);
+					cub::DeviceReduce::Max(d_temp_storage[t] + temp_storage_bytes[t], temp_storage_bytes[t], tt, d_out[t] + 2 * (x / step) + 1, num_items, stream);
 				}
-			}
-			for (int t = 0; t < devices; t++)
-			{
-				cudaSetDevice(iterator.ws.device[t]);
-				cudaMemcpyAsync(&(minmax_cost[2 * t *  (x_size / step)]), d_out[t], 2 * (x_size / step) * sizeof(SC), cudaMemcpyDeviceToHost);
-			}
-			for (int t = 0; t < devices; t++)
-			{
-				cudaSetDevice(iterator.ws.device[t]);
-				cudaDeviceSynchronize();
+				cudaMemcpyAsync(&(minmax_cost[2 * t *  (x_size / step)]), d_out[t], 2 * (x_size / step) * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+				cudaStreamSynchronize(stream);
 			}
 			for (int x = 0; x < x_size; x += step)
 			{
@@ -79,10 +73,12 @@ namespace lap
 				epsilon += max_cost - min_cost;
 			}
 			cudaFreeHost(minmax_cost);
+#pragma omp parallel for
 			for (int t = 0; t < devices; t++)
 			{
 				if (temp_storage_bytes[t] != 0)
 				{
+					cudaSetDevice(iterator.ws.device[t]);
 					cudaFree(d_out[t]);
 					cudaFree(d_temp_storage[t]);
 				}
@@ -90,6 +86,7 @@ namespace lap
 			lapFree(d_temp_storage);
 			lapFree(temp_storage_bytes);
 			lapFree(d_out);
+			omp_set_num_threads(old_threads);
 			return (epsilon / SC(10 * (x_size + step - 1) / step));
 		}
 
@@ -258,6 +255,8 @@ namespace lap
 			SC *v_jmin;
 
 			int devices = (int)iterator.ws.device.size();
+			int old_threads = omp_get_max_threads();
+			omp_set_num_threads(devices);
 
 #ifdef LAP_DEBUG
 			std::vector<SC *> v_list;
@@ -293,6 +292,7 @@ namespace lap
 			lapAlloc(v_private, devices, __FILE__, __LINE__);
 			lapAlloc(temp_storage, devices, __FILE__, __LINE__);
 			lapAlloc(temp_storage_bytes, devices, __FILE__, __LINE__);
+#pragma omp parallel for
 			for (int t = 0; t < devices; t++)
 			{
 				cudaSetDevice(iterator.ws.device[t]);
@@ -344,12 +344,14 @@ namespace lap
 				memset(colsol, -1, dim2 * sizeof(int));
 
 				// upload v to devices
+#pragma omp parallel for
 				for (int t = 0; t < devices; t++)
 				{
 					cudaSetDevice(iterator.ws.device[t]);
 					int size = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					int start = iterator.ws.part[t].first;
-					cudaMemcpyAsync(v_private[t], &(v[start]), sizeof(SC) * size, cudaMemcpyHostToDevice);
+					cudaStream_t stream = iterator.ws.stream[t];
+					cudaMemcpyAsync(v_private[t], &(v[start]), sizeof(SC) * size, cudaMemcpyHostToDevice, stream);
 				}
 
 				int jmin, jmin_free, jmin_taken;
@@ -365,317 +367,260 @@ namespace lap
 				displayProgress(start_time, elapsed, 0, dim2, " rows");
 #endif
 				long long count = 0ll;
-				for (int f = 0; f < dim2; f++)
+				SC h2(0);
+#pragma omp parallel
 				{
-					// upload colsol to devices
-					for (int t = 0; t < devices; t++)
-					{
-						cudaSetDevice(iterator.ws.device[t]);
-						int size = iterator.ws.part[t].second - iterator.ws.part[t].first;
-						int start = iterator.ws.part[t].first;
-						cudaMemcpyAsync(colsol_private[t], &(colsol[start]), sizeof(int) * size, cudaMemcpyHostToDevice);
-					}
-#ifndef LAP_QUIET
-					if (f < dim) total_rows++; else total_virtual++;
-#else
-#ifdef LAP_DISPLAY_EVALUATED
-					if (f < dim) total_rows++; else total_virtual++;
-#endif
-#endif
-#ifdef LAP_ROWS_SCANNED
-					scancount[f]++;
-#endif
-					count++;
+					int t = omp_get_thread_num();
+					cudaSetDevice(iterator.ws.device[t]);
+					int start = iterator.ws.part[t].first;
+					int end = iterator.ws.part[t].second;
+					int size = end - start;
+					cudaStream_t stream = iterator.ws.stream[t];
+					
+					dim3 block_size, grid_size;
+					block_size.x = 256;
+					grid_size.x = (size + block_size.x - 1) / block_size.x;
 
-					unassignedfound = false;
-
-					// Dijkstra search
-					min = std::numeric_limits<SC>::max();
-					jmin_free = dim2;
-					jmin_taken = dim2;
-					for (int t = 0; t < devices; t++)
+					for (int f = 0; f < dim2; f++)
 					{
-						cudaSetDevice(iterator.ws.device[t]);
-						int start = iterator.ws.part[t].first;
-						int end = iterator.ws.part[t].second;
-						int size = end - start;
+						// upload colsol to devices
+						cudaMemcpyAsync(colsol_private[t], &(colsol[start]), sizeof(int) * size, cudaMemcpyHostToDevice, stream);
 						// initialize Search
-						initializeMin_kernel<<<1, 1>>>(min_private[t], dim2);
-						dim3 block_size, grid_size;
-						block_size.x = 256;
-						grid_size.x = (size + block_size.x - 1) / block_size.x;
+						initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
 						if (f < dim)
-							initializeSearch_kernel<<<grid_size, block_size>>>(v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
+							initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
 						else
-							initializeSearch_kernel<<<grid_size, block_size>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
+							initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
 						if (temp_storage_bytes[t] == 0)
 						{
-							cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size);
+							cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
 							cudaMalloc(&(temp_storage[t]), temp_storage_bytes[t]);
 						}
-						cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size);
+						cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
 						// min is now set so we need to find the correspoding minima for free and taken columns
-						findMin_kernel<<<grid_size, block_size>>>(min_private[t], d_private[t], colsol_private[t], start, end);
-						cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost);
-					}
-					for (int t = 0; t < devices; t++)
-					{
-						cudaSetDevice(iterator.ws.device[t]);
-						cudaDeviceSynchronize();
-						if (host_min_private[t].min < min)
+						findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
+						cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
+						cudaStreamSynchronize(stream);
+#pragma omp barrier
+#pragma omp master
 						{
-							min = host_min_private[t].min;
-							jmin_free = host_min_private[t].jmin_free;
-							jmin_taken = host_min_private[t].jmin_taken;
-						}
-						else if (host_min_private[t].min == min)
-						{
-							jmin_free = std::min(jmin_free, host_min_private[t].jmin_free);
-							jmin_taken = std::min(jmin_taken, host_min_private[t].jmin_taken);
-						}
-					}
-
-					if (jmin_free < dim2) jmin = jmin_free;
-					else jmin = jmin_taken;
-
-					// dijkstraCheck
-					for (int t = 0; t < devices; t++)
-					{
-						int start = iterator.ws.part[t].first;
-						int end = iterator.ws.part[t].second;
-						if ((jmin >= start) && (jmin < end))
-						{
-							cudaSetDevice(iterator.ws.device[t]);
-							setColInactive_kernel<<<1, 1>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
-						}
-					}
-					if (colsol[jmin] < 0)
-					{
-						endofpath = jmin;
-						unassignedfound = true;
-					}
-
-					while (!unassignedfound)
-					{
-						// update 'distances' between freerow and all unscanned columns, via next scanned column.
-						int i = colsol[jmin];
 #ifndef LAP_QUIET
-						if (f < dim) total_rows++; else total_virtual++;
+							if (f < dim) total_rows++; else total_virtual++;
 #else
 #ifdef LAP_DISPLAY_EVALUATED
-						if (f < dim) total_rows++; else total_virtual++;
+							if (f < dim) total_rows++; else total_virtual++;
 #endif
 #endif
 #ifdef LAP_ROWS_SCANNED
-						scancount[i]++;
+							scancount[f]++;
 #endif
-						count++;
+							count++;
 
-						jmin_free = dim2;
-						jmin_taken = dim2;
-						if (f < dim)
-						{
-							SC h2(0);
+							unassignedfound = false;
+
+							// Dijkstra search
+							min = std::numeric_limits<SC>::max();
+							jmin_free = dim2;
+							jmin_taken = dim2;
 							for (int t = 0; t < devices; t++)
 							{
-								int start = iterator.ws.part[t].first;
-								int end = iterator.ws.part[t].second;
+								if (host_min_private[t].min < min)
+								{
+									min = host_min_private[t].min;
+									jmin_free = host_min_private[t].jmin_free;
+									jmin_taken = host_min_private[t].jmin_taken;
+								}
+								else if (host_min_private[t].min == min)
+								{
+									jmin_free = std::min(jmin_free, host_min_private[t].jmin_free);
+									jmin_taken = std::min(jmin_taken, host_min_private[t].jmin_taken);
+								}
+							}
+
+							if (jmin_free < dim2) jmin = jmin_free;
+							else jmin = jmin_taken;
+
+							// dijkstraCheck
+							if (colsol[jmin] < 0)
+							{
+								endofpath = jmin;
+								unassignedfound = true;
+							}
+						}
+#pragma omp barrier
+						// single device
+						if ((jmin >= start) && (jmin < end))
+						{
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+						}
+
+						while (!unassignedfound)
+						{
+							// update 'distances' between freerow and all unscanned columns, via next scanned column.
+							int i = colsol[jmin];
+							if (f < dim)
+							{
+								auto tt = iterator.getRow(t, i);
+								// single device
 								if ((jmin >= start) && (jmin < end))
 								{
-									cudaSetDevice(iterator.ws.device[t]);
-									auto tt = iterator.getRow(t, i);
-									cudaMemcpyAsync(tt_jmin, &(tt[jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost);
-									cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost);
-									cudaDeviceSynchronize();
+									cudaMemcpyAsync(tt_jmin, &(tt[jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
+									cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
+									cudaStreamSynchronize(stream);
 									h2 = tt_jmin[0] - v_jmin[0] - min;
 								}
-							}
-							for (int t = 0; t < devices; t++)
-							{
-								cudaSetDevice(iterator.ws.device[t]);
-								int start = iterator.ws.part[t].first;
-								int end = iterator.ws.part[t].second;
-								int size = end - start;
+								// propagate h2
+#pragma omp barrier
 								// initialize Search
-								initializeMin_kernel<<<1, 1>>>(min_private[t], dim2);
-								dim3 block_size, grid_size;
-								block_size.x = 256;
-								grid_size.x = (size + block_size.x - 1) / block_size.x;
-								continueSearch_kernel<<<grid_size, block_size>>>(v_private[t], d_private[t], iterator.getRow(t, i), colactive_private[t], pred_private[t], i, h2, size);
+								initializeMin_kernel << <1, 1, 0, stream >> >(min_private[t], dim2);
+								continueSearch_kernel << <grid_size, block_size, 0, stream >> >(v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, h2, size);
 								if (temp_storage_bytes[t] == 0)
 								{
-									cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size);
+									cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
 									cudaMalloc(&(temp_storage[t]), temp_storage_bytes[t]);
 								}
-								cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size);
+								cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
 								// min is now set so we need to find the correspoding minima for free and taken columns
-								findMin_kernel<<<grid_size, block_size>>>(min_private[t], d_private[t], colsol_private[t], start, end);
-								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost);
+								findMin_kernel << <grid_size, block_size, 0, stream >> >(min_private[t], d_private[t], colsol_private[t], start, end);
+								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
+								cudaStreamSynchronize(stream);
 							}
-						}
-						else
-						{
-							SC h2(0);
-							for (int t = 0; t < devices; t++)
+							else
 							{
-								int start = iterator.ws.part[t].first;
-								int end = iterator.ws.part[t].second;
 								if ((jmin >= start) && (jmin < end))
 								{
-									cudaSetDevice(iterator.ws.device[t]);
-									cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost);
-									cudaDeviceSynchronize();
+									cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
+									cudaStreamSynchronize(stream);
 									h2 = -v_jmin[0] - min;
 								}
-							}
-							for (int t = 0; t < devices; t++)
-							{
-								cudaSetDevice(iterator.ws.device[t]);
-								int start = iterator.ws.part[t].first;
-								int end = iterator.ws.part[t].second;
-								int size = end - start;
+								// propagate h2
+#pragma omp barrier
 								// initialize Search
-								initializeMin_kernel<<<1, 1>>>(min_private[t], dim2);
-								dim3 block_size, grid_size;
-								block_size.x = 256;
-								grid_size.x = (size + block_size.x - 1) / block_size.x;
-								continueSearch_kernel<<<grid_size, block_size>>> (v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, size);
+								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+								continueSearch_kernel<<<grid_size, block_size, 0, stream>>> (v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, size);
 								if (temp_storage_bytes[t] == 0)
 								{
-									cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size);
+									cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
 									cudaMalloc(&(temp_storage[t]), temp_storage_bytes[t]);
 								}
-								cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size);
+								cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
 								// min is now set so we need to find the correspoding minima for free and taken columns
-								findMin_kernel<<<grid_size, block_size>>>(min_private[t], d_private[t], colsol_private[t], start, end);
-								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost);
+								findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
+								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
+								cudaStreamSynchronize(stream);
 							}
-						}
-						min_n = std::numeric_limits<SC>::max();
-						for (int t = 0; t < devices; t++)
-						{
-							cudaSetDevice(iterator.ws.device[t]);
-							cudaDeviceSynchronize();
-							if (host_min_private[t].min < min_n)
+#pragma omp barrier
+#pragma omp master
 							{
-								min_n = host_min_private[t].min;
-								jmin_free = host_min_private[t].jmin_free;
-								jmin_taken = host_min_private[t].jmin_taken;
+#ifndef LAP_QUIET
+								if (f < dim) total_rows++; else total_virtual++;
+#else
+#ifdef LAP_DISPLAY_EVALUATED
+								if (f < dim) total_rows++; else total_virtual++;
+#endif
+#endif
+#ifdef LAP_ROWS_SCANNED
+								scancount[i]++;
+#endif
+								count++;
+
+								jmin_free = dim2;
+								jmin_taken = dim2;
+								min_n = std::numeric_limits<SC>::max();
+								for (int t = 0; t < devices; t++)
+								{
+									if (host_min_private[t].min < min_n)
+									{
+										min_n = host_min_private[t].min;
+										jmin_free = host_min_private[t].jmin_free;
+										jmin_taken = host_min_private[t].jmin_taken;
+									}
+									else if (host_min_private[t].min == min_n)
+									{
+										jmin_free = std::min(jmin_free, host_min_private[t].jmin_free);
+										jmin_taken = std::min(jmin_taken, host_min_private[t].jmin_taken);
+									}
+								}
+
+								if (jmin_free < dim2) jmin = jmin_free;
+								else jmin = jmin_taken;
+
+								min = std::max(min, min_n);
+								// dijkstraCheck
+								if (colsol[jmin] < 0)
+								{
+									endofpath = jmin;
+									unassignedfound = true;
+								}
 							}
-							else if (host_min_private[t].min == min_n)
-							{
-								jmin_free = std::min(jmin_free, host_min_private[t].jmin_free);
-								jmin_taken = std::min(jmin_taken, host_min_private[t].jmin_taken);
-							}
-						}
+#pragma omp barrier
 
-						if (jmin_free < dim2) jmin = jmin_free;
-						else jmin = jmin_taken;
-
-						min = std::max(min, min_n);
-
-						// dijkstraCheck
-						for (int t = 0; t < devices; t++)
-						{
-							int start = iterator.ws.part[t].first;
-							int end = iterator.ws.part[t].second;
+							// single device
 							if ((jmin >= start) && (jmin < end))
 							{
-								cudaSetDevice(iterator.ws.device[t]);
-								setColInactive_kernel<<<1, 1>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
 							}
 						}
-						if (colsol[jmin] < 0)
-						{
-							endofpath = jmin;
-							unassignedfound = true;
-						}
-					}
 
-					// update column prices. can increase or decrease
-					for (int t = 0; t < devices; t++)
-					{
-						cudaSetDevice(iterator.ws.device[t]);
-						int start = iterator.ws.part[t].first;
-						int end = iterator.ws.part[t].second;
-						int size = end - start;
-						// initialize Search
-						initializeMin_kernel<<<1, 1>>>(min_private[t], dim2);
-						dim3 block_size, grid_size;
-						block_size.x = 256;
-						grid_size.x = (size + block_size.x - 1) / block_size.x;
+						// update column prices. can increase or decrease
+						// need to copy pred from GPUs here
+						cudaMemcpyAsync(&(pred[start]), pred_private[t], sizeof(int) * size, cudaMemcpyDeviceToHost, stream);
 						if (epsilon > SC(0))
 						{
-							updateColumnPrices_kernel<<<grid_size, block_size>>>(colactive_private[t], min, v_private[t], d2_private[t], epsilon, size);
+							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d2_private[t], epsilon, size);
 						}
 						else
 						{
-							updateColumnPrices_kernel<<<grid_size, block_size>>>(colactive_private[t], min, v_private[t], d2_private[t], size);
+							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d2_private[t], size);
 						}
-					}
-#ifdef LAP_ROWS_SCANNED
-					{
-						int i;
-						int eop = endofpath;
-						do
+						cudaStreamSynchronize(stream);
+#pragma omp barrier
+#pragma omp master
 						{
-							i = pred[eop];
-							eop = rowsol[i];
-							if (i != f) pathlength[f]++;
-						} while (i != f);
-					}
+#ifdef LAP_ROWS_SCANNED
+							{
+								int i;
+								int eop = endofpath;
+								do
+								{
+									i = pred[eop];
+									eop = rowsol[i];
+									if (i != f) pathlength[f]++;
+								} while (i != f);
+							}
 #endif
 
-					// need to copy pred from GPUs here
-					// upload data to devices
-					for (int t = 0; t < devices; t++)
-					{
-						cudaSetDevice(iterator.ws.device[t]);
-						int size = iterator.ws.part[t].second - iterator.ws.part[t].first;
-						int start = iterator.ws.part[t].first;
-						cudaMemcpyAsync(&(pred[start]), pred_private[t], sizeof(int) * size, cudaMemcpyDeviceToHost);
-					}
-					for (int t = 0; t < devices; t++)
-					{
-						cudaSetDevice(iterator.ws.device[t]);
-						cudaDeviceSynchronize();
-					}
-					// reset row and column assignments along the alternating path.
-					lap::resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
+							// reset row and column assignments along the alternating path.
+							lap::resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 #ifndef LAP_QUIET
-					int level;
-					if ((level = displayProgress(start_time, elapsed, f + 1, dim2, " rows")) != 0)
-					{
-						long long hit, miss;
-						iterator.getHitMiss(hit, miss);
-						total_hit += hit;
-						total_miss += miss;
-						if ((hit != 0) || (miss != 0))
-						{
-							if (level == 1) lapInfo << "  hit: " << hit << " miss: " << miss << " (" << miss - (f + 1 - old_complete) << " + " << f + 1 - old_complete << ")" << std::endl;
-							else lapDebug << "  hit: " << hit << " miss: " << miss << " (" << miss - (f + 1 - old_complete) << " + " << f + 1 - old_complete << ")" << std::endl;
-						}
-						old_complete = f + 1;
-					}
+							int level;
+							if ((level = displayProgress(start_time, elapsed, f + 1, dim2, " rows")) != 0)
+							{
+								long long hit, miss;
+								iterator.getHitMiss(hit, miss);
+								total_hit += hit;
+								total_miss += miss;
+								if ((hit != 0) || (miss != 0))
+								{
+									if (level == 1) lapInfo << "  hit: " << hit << " miss: " << miss << " (" << miss - (f + 1 - old_complete) << " + " << f + 1 - old_complete << ")" << std::endl;
+									else lapDebug << "  hit: " << hit << " miss: " << miss << " (" << miss - (f + 1 - old_complete) << " + " << f + 1 - old_complete << ")" << std::endl;
+								}
+								old_complete = f + 1;
+							}
 #endif
-				}
+						}
+#pragma omp barrier
+					}
+
+					// download updated v
+					cudaMemcpyAsync(&(v2[start]), v_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
+					cudaStreamSynchronize(stream);
+				} // end of #pragma omp parallel
 
 				// now we need to compare the previous v with the new one to get back all the changes
 				SC total(0);
 				SC scaled_epsilon = epsilon * SC(count) / SC(dim2);
 
-				for (int t = 0; t < devices; t++)
-				{
-					cudaSetDevice(iterator.ws.device[t]);
-					int size = iterator.ws.part[t].second - iterator.ws.part[t].first;
-					int start = iterator.ws.part[t].first;
-					cudaMemcpyAsync(&(v2[start]), v_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost);
-				}
-				for (int t = 0; t < devices; t++)
-				{
-					cudaSetDevice(iterator.ws.device[t]);
-					cudaDeviceSynchronize();
-				}
 				for (int i = 0; i < dim2; i++) total += v2[i] - v[i] + scaled_epsilon;
 
 				if (count > 0) last_avg = total / SC(count);
@@ -744,6 +689,7 @@ namespace lap
 #endif
 
 			// free CUDA memory
+#pragma omp parallel for
 			for (int t = 0; t < devices; t++)
 			{
 				cudaSetDevice(iterator.ws.device[t]);
@@ -772,6 +718,7 @@ namespace lap
 			lapFree(v_private);
 			lapFree(temp_storage_bytes);
 			lapFree(temp_storage);
+			omp_set_num_threads(old_threads);
 		}
 
 		// shortcut for square problems
