@@ -97,6 +97,14 @@ namespace lap
 			SC min;
 			int jmin_free;
 			int jmin_taken;
+			int colsol_take;
+		};
+
+		class reset_struct
+		{
+		public:
+			int i;
+			int j;
 		};
 
 		template <class SC>
@@ -186,6 +194,15 @@ namespace lap
 		}
 
 		template <class SC>
+		__global__ void setColInactive_kernel(char *colactive, SC *d, SC *d2, min_struct<SC> *s, int *colsol, SC max, int jmin)
+		{
+			colactive[jmin] = 0;
+			d2[jmin] = d[jmin];
+			d[jmin] = max;
+			s->colsol_take = colsol[jmin];
+		}
+
+		template <class SC>
 		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -209,6 +226,53 @@ namespace lap
 			}
 		}
 
+		__global__ void resetRowColumnAssignment_kernel(int *pred, int *colsol, int *rowsol, reset_struct *state, int start, int end, int endofpath, int f)
+		{
+			int j = endofpath;
+			int i;
+			do
+			{
+				i = pred[j - start];
+				colsol[j - start] = i;
+				int j1 = rowsol[i];
+				rowsol[i] = j;
+				if ((i != f) && (j1 < 0))
+				{
+					// not last element but not in this list
+					state->i = i;
+					state->j = j;
+					return;
+				}
+				j = j1;
+			} while (i != f);
+			state->i = -1;
+		}
+
+		__global__ void resetRowColumnAssignmentContinue_kernel(int *pred, int *colsol, int *rowsol, reset_struct *state_in, reset_struct *state_out, int start, int end, int f)
+		{
+			int i = state_in->i;
+			int j = rowsol[i];
+			// rowsol for i not found in this range
+			if ((j < 0) || (j == state_in->j)) return;
+			// clear old rowsol since it is no longer in this range
+			rowsol[i] = -1;
+			do 
+			{
+				i = pred[j - start];
+				colsol[j - start] = i;
+				int j1 = rowsol[i];
+				rowsol[i] = j;
+				if ((i != f) && (j1 < 0))
+				{
+					// not last element but not in this list
+					state_out->i = i;
+					state_out->j = j;
+					return;
+				}
+				j = j1;
+			} while (i != f);
+			state_out->i = -1;
+		}
 
 		template <class SC, class TC, class CF, class I>
 		void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol)
@@ -245,9 +309,11 @@ namespace lap
 #endif
 #endif
 
-			int  *pred;
 			int  endofpath;
+#ifndef LAP_CUDA_LOCAL_ROWSOL
+			int  *pred;
 			int *colsol;
+#endif
 			SC *v;
 			SC *v2;
 			// for calculating h2
@@ -265,10 +331,15 @@ namespace lap
 
 			// used for copying
 			min_struct<SC> *host_min_private;
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+			reset_struct *host_reset;
+			cudaMallocHost(&host_reset, 2 * sizeof(reset_struct));
+#else
 			cudaMallocHost(&pred, dim2 * sizeof(int));
+			cudaMallocHost(&colsol, dim2 * sizeof(int));
+#endif
 			cudaMallocHost(&v, dim2 * sizeof(SC));
 			cudaMallocHost(&v2, dim2 * sizeof(SC));
-			cudaMallocHost(&colsol, dim2 * sizeof(int));
 			cudaMallocHost(&host_min_private, devices * sizeof(min_struct<SC>));
 			cudaMallocHost(&tt_jmin, sizeof(TC));
 			cudaMallocHost(&v_jmin, sizeof(SC));
@@ -279,6 +350,9 @@ namespace lap
 			SC **d_private;
 			SC **d2_private;
 			int **colsol_private;
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+			int **rowsol_private;
+#endif
 			SC **v_private;
 			SC **temp_storage;
 			size_t *temp_storage_bytes;
@@ -289,6 +363,9 @@ namespace lap
 			lapAlloc(d_private, devices, __FILE__, __LINE__);
 			lapAlloc(d2_private, devices, __FILE__, __LINE__);
 			lapAlloc(colsol_private, devices, __FILE__, __LINE__);
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+			lapAlloc(rowsol_private, devices, __FILE__, __LINE__);
+#endif
 			lapAlloc(v_private, devices, __FILE__, __LINE__);
 			lapAlloc(temp_storage, devices, __FILE__, __LINE__);
 			lapAlloc(temp_storage_bytes, devices, __FILE__, __LINE__);
@@ -312,6 +389,9 @@ namespace lap
 #else
 				cudaMalloc(&(colsol_private[t]), sizeof(int) * size);
 				cudaMalloc(&(pred_private[t]), sizeof(int) * size);
+#endif
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+				cudaMalloc(&(rowsol_private[t]), sizeof(int) * dim2);
 #endif
 			}
 
@@ -347,8 +427,10 @@ namespace lap
 #endif
 				// this is to ensure termination of the while statement
 				if (epsilon == SC(0)) epsilon = SC(-1.0);
+#ifndef LAP_CUDA_LOCAL_ROWSOL
 				memset(rowsol, -1, dim2 * sizeof(int));
 				memset(colsol, -1, dim2 * sizeof(int));
+#endif
 
 				// upload v to devices
 #pragma omp parallel for
@@ -359,6 +441,10 @@ namespace lap
 					int start = iterator.ws.part[t].first;
 					cudaStream_t stream = iterator.ws.stream[t];
 					cudaMemcpyAsync(v_private[t], &(v[start]), sizeof(SC) * size, cudaMemcpyHostToDevice, stream);
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+					cudaMemsetAsync(rowsol_private[t], -1, dim2 * sizeof(int), stream);
+					cudaMemsetAsync(colsol_private[t], -1, size * sizeof(int), stream);
+#endif
 				}
 
 				int jmin, jmin_free, jmin_taken;
@@ -383,14 +469,14 @@ namespace lap
 					int end = iterator.ws.part[t].second;
 					int size = end - start;
 					cudaStream_t stream = iterator.ws.stream[t];
-					
+
 					dim3 block_size, grid_size;
 					block_size.x = 256;
 					grid_size.x = (size + block_size.x - 1) / block_size.x;
 
 					for (int f = 0; f < dim2; f++)
 					{
-#ifndef LAP_CUDA_AVOID_MEMCPY
+#if (!defined LAP_CUDA_AVOID_MEMCPY) && (!defined LAP_CUDA_LOCAL_ROWSOL)
 						// upload colsol to devices
 						cudaMemcpyAsync(colsol_private[t], &(colsol[start]), sizeof(int) * size, cudaMemcpyHostToDevice, stream);
 #endif
@@ -446,27 +532,40 @@ namespace lap
 								}
 							}
 
-							if (jmin_free < dim2) jmin = jmin_free;
-							else jmin = jmin_taken;
-
 							// dijkstraCheck
-							if (colsol[jmin] < 0)
+							if (jmin_free < dim2)
 							{
+								jmin = jmin_free;
 								endofpath = jmin;
 								unassignedfound = true;
+							}
+							else
+							{
+								jmin = jmin_taken;
+								unassignedfound = false;
 							}
 						}
 #pragma omp barrier
 						// single device
-						if ((jmin >= start) && (jmin < end))
+						if ((jmin >= start) && (jmin < end) && (!unassignedfound))
 						{
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+							cudaStreamSynchronize(stream);
+#else
 							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#endif
 						}
 
 						while (!unassignedfound)
 						{
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+#pragma omp barrier
+							int i = host_min_private[iterator.ws.find(jmin)].colsol_take;
+#else
 							int i = colsol[jmin];
+#endif
 							if (f < dim)
 							{
 								auto tt = iterator.getRow(t, i);
@@ -481,8 +580,8 @@ namespace lap
 								// propagate h2
 #pragma omp barrier
 								// initialize Search
-								initializeMin_kernel << <1, 1, 0, stream >> >(min_private[t], dim2);
-								continueSearch_kernel << <grid_size, block_size, 0, stream >> >(v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, h2, size);
+								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+								continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, h2, size);
 								if (temp_storage_bytes[t] == 0)
 								{
 									cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
@@ -490,7 +589,7 @@ namespace lap
 								}
 								cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
 								// min is now set so we need to find the correspoding minima for free and taken columns
-								findMin_kernel << <grid_size, block_size, 0, stream >> >(min_private[t], d_private[t], colsol_private[t], start, end);
+								findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
 								cudaStreamSynchronize(stream);
 							}
@@ -506,7 +605,7 @@ namespace lap
 #pragma omp barrier
 								// initialize Search
 								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
-								continueSearch_kernel<<<grid_size, block_size, 0, stream>>> (v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, size);
+								continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, size);
 								if (temp_storage_bytes[t] == 0)
 								{
 									cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
@@ -551,29 +650,38 @@ namespace lap
 									}
 								}
 
-								if (jmin_free < dim2) jmin = jmin_free;
-								else jmin = jmin_taken;
-
 								min = std::max(min, min_n);
+								
 								// dijkstraCheck
-								if (colsol[jmin] < 0)
+								if (jmin_free < dim2)
 								{
+									jmin = jmin_free;
 									endofpath = jmin;
 									unassignedfound = true;
+								}
+								else
+								{
+									jmin = jmin_taken;
+									unassignedfound = false;
 								}
 							}
 #pragma omp barrier
 
 							// single device
-							if ((jmin >= start) && (jmin < end))
+							if ((jmin >= start) && (jmin < end) && (!unassignedfound))
 							{
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+								cudaStreamSynchronize(stream);
+#else
 								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#endif
 							}
 						}
 
 						// update column prices. can increase or decrease
 						// need to copy pred from GPUs here
-#ifndef LAP_CUDA_AVOID_MEMCPY
+#if (!defined LAP_CUDA_AVOID_MEMCPY) && (!defined LAP_CUDA_LOCAL_ROWSOL)
 						cudaMemcpyAsync(&(pred[start]), pred_private[t], sizeof(int) * size, cudaMemcpyDeviceToHost, stream);
 #endif
 						if (epsilon > SC(0))
@@ -589,6 +697,47 @@ namespace lap
 						cudaStreamSynchronize(stream);
 #endif
 #pragma omp barrier
+						// reset row and column assignments along the alternating path.
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+						{
+							if ((endofpath >= start) && (endofpath < end))
+							{
+								resetRowColumnAssignment_kernel<<<1, 1, 0, stream>>>(pred_private[t], colsol_private[t], rowsol_private[t], host_reset, start, end, endofpath, f);
+								cudaStreamSynchronize(stream);
+							}
+#pragma omp barrier
+							while (host_reset->i != -1)
+							{
+								resetRowColumnAssignmentContinue_kernel<<<1, 1, 0, stream>>>(pred_private[t], colsol_private[t], rowsol_private[t], &(host_reset[0]), &(host_reset[1]), start, end, f);
+								cudaStreamSynchronize(stream);
+#pragma omp barrier
+#pragma omp master
+								{
+									std::swap(host_reset[0], host_reset[1]);
+								}
+#pragma omp barrier
+							}
+						}
+#ifndef LAP_QUIET
+#pragma omp master
+						{
+							int level;
+							if ((level = displayProgress(start_time, elapsed, f + 1, dim2, " rows")) != 0)
+							{
+								long long hit, miss;
+								iterator.getHitMiss(hit, miss);
+								total_hit += hit;
+								total_miss += miss;
+								if ((hit != 0) || (miss != 0))
+								{
+									if (level == 1) lapInfo << "  hit: " << hit << " miss: " << miss << " (" << miss - (f + 1 - old_complete) << " + " << f + 1 - old_complete << ")" << std::endl;
+									else lapDebug << "  hit: " << hit << " miss: " << miss << " (" << miss - (f + 1 - old_complete) << " + " << f + 1 - old_complete << ")" << std::endl;
+								}
+								old_complete = f + 1;
+							}
+						}
+#endif
+#else
 #pragma omp master
 						{
 #ifdef LAP_ROWS_SCANNED
@@ -603,8 +752,6 @@ namespace lap
 								} while (i != f);
 							}
 #endif
-
-							// reset row and column assignments along the alternating path.
 							lap::resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 #ifndef LAP_QUIET
 							int level;
@@ -623,6 +770,7 @@ namespace lap
 							}
 #endif
 						}
+#endif
 #pragma omp barrier
 					}
 
@@ -702,6 +850,25 @@ namespace lap
 			lapFree(pathlength);
 #endif
 
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+			{
+				int *colsol;
+				cudaMallocHost(&colsol, dim2 * sizeof(int));
+#pragma omp parallel for
+				for (int t = 0; t < devices; t++)
+				{
+					cudaSetDevice(iterator.ws.device[t]);
+					int start = iterator.ws.part[t].first;
+					int end = iterator.ws.part[t].second;
+					int size = end - start;
+					cudaStream_t stream = iterator.ws.stream[t];
+					cudaMemcpyAsync(&(colsol[start]), colsol_private[t], sizeof(int) * size, cudaMemcpyDeviceToHost, stream);
+					cudaStreamSynchronize(stream);
+				}
+				for (int j = 0; j < dim2; j++) rowsol[colsol[j]] = j;
+				cudaFreeHost(colsol);
+			}
+#endif
 			// free CUDA memory
 #pragma omp parallel for
 			for (int t = 0; t < devices; t++)
@@ -716,13 +883,20 @@ namespace lap
 				cudaFree(pred_private[t]);
 				cudaFree(colsol_private[t]);
 #endif
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+				cudaFree(rowsol_private[t]);
+#endif
 			}
 
 			// free reserved memory.
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+			cudaFreeHost(host_reset);
+#else
 			cudaFreeHost(pred);
+			cudaFreeHost(colsol);
+#endif
 			cudaFreeHost(v);
 			cudaFreeHost(v2);
-			cudaFreeHost(colsol);
 			cudaFreeHost(tt_jmin);
 			cudaFreeHost(v_jmin);
 			lapFree(min_private);
@@ -731,6 +905,9 @@ namespace lap
 			lapFree(pred_private);
 			lapFree(d_private);
 			lapFree(colsol_private);
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+			lapFree(rowsol_private);
+#endif
 			lapFree(v_private);
 			lapFree(temp_storage_bytes);
 			lapFree(temp_storage);

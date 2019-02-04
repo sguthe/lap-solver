@@ -6,6 +6,11 @@
 //#define LAP_ROWS_SCANNED
 // at least under linux with 8 GPUs this is bad
 //#define LAP_CUDA_AVOID_MEMCPY
+// these two don't work together at the moment
+#ifndef LAP_ROWS_SCANNED
+# define LAP_CUDA_LOCAL_ROWSOL
+#endif
+
 #include "../lap.h"
 
 #include <random>
