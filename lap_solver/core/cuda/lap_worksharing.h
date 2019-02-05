@@ -17,7 +17,7 @@ namespace lap
 			std::vector<cudaEvent_t> event;
 #endif
 		public:
-			Worksharing(int size, int multiple, std::vector<int> &devs)
+			Worksharing(int size, int multiple, std::vector<int> &devs, bool silent)
 			{
 				int max_devices = (size + multiple - 1) / multiple;
 				int device_count;
@@ -43,7 +43,7 @@ namespace lap
 							{
 								if ((allow_wddm) || (deviceProp.tccDriver))
 								{
-									lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
+									if (!silent) lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
 									device.push_back(current_device);
 								}
 							}
@@ -66,7 +66,7 @@ namespace lap
 						// If this GPU is not running on Compute Mode prohibited, then we can add it to the list
 						if (deviceProp.computeMode != cudaComputeModeProhibited)
 						{
-							lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
+							if (!silent) lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
 							device.push_back(current_device);
 						}
 					}
@@ -83,7 +83,7 @@ namespace lap
 						// If this GPU is not running on Compute Mode prohibited, then we can add it to the list
 						if (deviceProp.computeMode != cudaComputeModeProhibited)
 						{
-							lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
+							if (!silent) lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
 							device.push_back(current_device);
 						}
 					}

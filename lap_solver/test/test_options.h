@@ -34,6 +34,7 @@ public:
 	bool run_integer;
 	std::vector<std::string> images;
 	std::vector<int> devices;
+	bool silent;
 
 	int runs;
 public:
@@ -44,6 +45,7 @@ public:
 		run_sanity = run_random = run_geometric = run_geometric_disjoint = run_random_low_rank = run_integer = false;
 		run_sanity_cached = run_geometric_cached = run_geometric_disjoint_cached = run_random_low_rank_cached = false;
 		runs = 1;
+		silent = false;
 	}
 public:
 	void setDefaultSize()
@@ -168,6 +170,10 @@ public:
 			else if (!strcmp(argv[i], "-integer"))
 			{
 				run_integer = true;
+			}
+			else if (!strcmp(argv[i], "-silent"))
+			{
+				silent = true;
 			}
 			else if (!strcmp(argv[i], "-device"))
 			{
