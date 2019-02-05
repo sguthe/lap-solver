@@ -17,19 +17,48 @@ namespace lap
 			std::vector<cudaEvent_t> event;
 #endif
 		public:
-			Worksharing(int size, int multiple)
+			Worksharing(int size, int multiple, std::vector<int> &devs)
 			{
 				int max_devices = (size + multiple - 1) / multiple;
 				int device_count;
+
 				cudaDeviceProp deviceProp;
-				cudaGetDeviceCount(&device_count);
+
+				if (devs.empty())
+				{
+					cudaGetDeviceCount(&device_count);
 
 #ifndef LAP_CUDA_ALLOW_WDDM
-				bool allow_wddm = false;
-				bool done_searching = false;
+					bool allow_wddm = false;
+					bool done_searching = false;
 
-				while (!done_searching)
-				{
+					while (!done_searching)
+					{
+						for (int current_device = 0; ((current_device < device_count) && ((int)device.size() < max_devices)); current_device++)
+						{
+							cudaGetDeviceProperties(&deviceProp, current_device);
+
+							// If this GPU is not running on Compute Mode prohibited, then we can add it to the list
+							if (deviceProp.computeMode != cudaComputeModeProhibited)
+							{
+								if ((allow_wddm) || (deviceProp.tccDriver))
+								{
+									lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
+									device.push_back(current_device);
+								}
+							}
+						}
+						if (device.empty())
+						{
+							if (allow_wddm) done_searching = true;
+							else allow_wddm = true;
+						}
+						else
+						{
+							done_searching = true;
+						}
+					}
+#else
 					for (int current_device = 0; ((current_device < device_count) && ((int)device.size() < max_devices)); current_device++)
 					{
 						cudaGetDeviceProperties(&deviceProp, current_device);
@@ -37,31 +66,28 @@ namespace lap
 						// If this GPU is not running on Compute Mode prohibited, then we can add it to the list
 						if (deviceProp.computeMode != cudaComputeModeProhibited)
 						{
-							if ((allow_wddm) || (deviceProp.tccDriver)) device.push_back(current_device);
+							lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
+							device.push_back(current_device);
 						}
 					}
-					if (device.empty())
-					{
-						if (allow_wddm) done_searching = true;
-						else allow_wddm = true;
-					}
-					else
-					{
-						done_searching = true;
-					}
-				}
-#else
-				for (int current_device = 0; ((current_device < device_count) && ((int)device.size() < max_devices)); current_device++)
-				{
-					cudaGetDeviceProperties(&deviceProp, current_device);
-
-					// If this GPU is not running on Compute Mode prohibited, then we can add it to the list
-					if (deviceProp.computeMode != cudaComputeModeProhibited)
-					{
-						device.push_back(current_device);
-					}
-				}
 #endif
+				}
+				else
+				{
+					device_count = (int)devs.size();
+					for (int i = 0; ((i < device_count) && ((int)device.size() < max_devices)); i++)
+					{
+						int current_device = devs[i];
+						cudaGetDeviceProperties(&deviceProp, current_device);
+
+						// If this GPU is not running on Compute Mode prohibited, then we can add it to the list
+						if (deviceProp.computeMode != cudaComputeModeProhibited)
+						{
+							lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
+							device.push_back(current_device);
+						}
+					}
+				}
 
 				if (device.size() == 0)
 				{

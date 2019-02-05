@@ -172,6 +172,44 @@ namespace lap
 			}
 		}
 
+		template <class SC, class TC>
+		__global__ void continueSearchJMin_kernel(SC *v, SC *d, TC *tt, char *colactive, int *pred, int i, int jmin, SC min, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+			if (j >= size) return;
+
+			if (colactive[j] != 0)
+			{
+				SC h2 = tt[jmin] - v[jmin] - min;
+				SC v2 = tt[j] - v[j] - h2;
+				SC h = d[j];
+				if (v2 < h)
+				{
+					pred[j] = i;
+					d[j] = v2;
+				}
+			}
+		}
+
+		template <class SC>
+		__global__ void continueSearchJMin_kernel(SC *v, SC *d, char *colactive, int *pred, int i, int jmin, SC min, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+			if (j >= size) return;
+
+			if (colactive[j] != 0)
+			{
+				SC h2 = -v[jmin] - min;
+				SC v2 = -v[j] - h2;
+				SC h = d[j];
+				if (v2 < h)
+				{
+					pred[j] = i;
+					d[j] = v2;
+				}
+			}
+		}
+
 		template <class SC>
 		__global__ void findMin_kernel(min_struct<SC> *s, SC *d, int *colsol, int start, int end)
 		{
@@ -630,32 +668,15 @@ namespace lap
 								auto tt = iterator.getRow(t, i);
 								// initialize Search
 								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
-								cudaMemcpyAsync(tt_jmin, &(tt[jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
-								cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
-#ifdef LAP_CUDA_EVENT_SYNC
-								cudaEventRecord(event, stream);
-								cudaEventSynchronize(event);
-#else
-								cudaStreamSynchronize(stream);
-#endif
-								h2 = tt_jmin[0] - v_jmin[0] - min;
 								// continue search
-								continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, h2, size);
+								continueSearchJMin_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, jmin, min, size);
 							}
 							else
 							{
 								// initialize Search
 								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
-								cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
-#ifdef LAP_CUDA_EVENT_SYNC
-								cudaEventRecord(event, stream);
-								cudaEventSynchronize(event);
-#else
-								cudaStreamSynchronize(stream);
-#endif
-								h2 = -v_jmin[0] - min;
 								// continue search
-								continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, size);
+								continueSearchJMin_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], i, jmin, min, size);
 							}
 							// find minimum
 							if (temp_storage_bytes[t] == 0)
@@ -933,7 +954,7 @@ namespace lap
 									}
 									// propagate h2
 #pragma omp barrier
-								// continue search
+									// continue search
 									continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, h2, size);
 								}
 								else
@@ -953,7 +974,7 @@ namespace lap
 									}
 									// propagate h2
 #pragma omp barrier
-								// continue search
+									// continue search
 									continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, size);
 								}
 								// find minimum

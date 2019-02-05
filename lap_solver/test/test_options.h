@@ -33,6 +33,7 @@ public:
 	bool run_geometric_disjoint_cached;
 	bool run_integer;
 	std::vector<std::string> images;
+	std::vector<int> devices;
 
 	int runs;
 public:
@@ -167,6 +168,10 @@ public:
 			else if (!strcmp(argv[i], "-integer"))
 			{
 				run_integer = true;
+			}
+			else if (!strcmp(argv[i], "-device"))
+			{
+				devices.push_back(atoi(argv[++i]));
 			}
 			else if (!strcmp(argv[i], "-omp"))
 			{
