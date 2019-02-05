@@ -11,12 +11,12 @@ SET(CMAKE_C_COMPILER gcc)
 
 # Release Mode
 if (${CUDA_FOUND})
-SET(CUDA_PROPAGATE_HOST_FLAGS "OFF")
-endif
+  SET(CUDA_PROPAGATE_HOST_FLAGS "OFF")
+endif (${CUDA_FOUND})
 SET(CMAKE_CXX_FLAGS "-Wall -O3 -Wfatal-errors -fstrict-aliasing -m64 -std=c++11 -fopenmp -flto -march=native")
 if (${CUDA_FOUND})
-SET(CUDA_NVCC_FLAGS "-arch=sm_52 --ptxas-options=-v -Xcompiler -Wall -O3 -std=c++11 -Xcompiler -fopenmp")
-endif
+  SET(CUDA_NVCC_FLAGS "-arch=sm_52 --ptxas-options=-v -Xcompiler -Wall -O3 -std=c++11 -Xcompiler -fopenmp")
+endif (${CUDA_FOUND})
 
 # Define where your executables should be put
 SET(EXECUTABLE_OUTPUT_PATH ${MyProject_BINARY_DIR})
@@ -26,19 +26,19 @@ SET(test_cpu_SRCS
 	../test/test_cpu.cpp
 )
 if (${CUDA_FOUND})
-SET(test_gpu_SRCS
-        ../test/test_gpu.cu
+  SET(test_gpu_SRCS
+          ../test/test_gpu.cu
 )
-endif
+endif (${CUDA_FOUND})
 
 # Include directories
 include_directories(../)
 if (${CUDA_FOUND})
-include_directories(../cub-1.8.0/)
-endif
+  include_directories(../cub-1.8.0/)
+endif (${CUDA_FOUND})
 
 # this command creates your executable from the files specified in MyProject_SRCS
 ADD_EXECUTABLE(test_cpu ${test_cpu_SRCS})
 if (${CUDA_FOUND})
-CUDA_ADD_EXECUTABLE(test_gpu ${test_gpu_SRCS})
-endif
+  CUDA_ADD_EXECUTABLE(test_gpu ${test_gpu_SRCS})
+endif (${CUDA_FOUND})
