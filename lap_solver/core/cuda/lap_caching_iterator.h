@@ -32,7 +32,7 @@ namespace lap
 					// entries potentially vary between GPUs
 					cache[t].setSize((int)std::min((long long) dim2, max_memory / size), dim);
 					cudaSetDevice(ws.device[t]);
-					cudaMalloc(&(rows[t]), cache[t].getEntries() * size * sizeof(TC));
+					cudaMalloc(&(rows[t]), (long long)cache[t].getEntries() * (long long)size * sizeof(TC));
 				}
 			}
 

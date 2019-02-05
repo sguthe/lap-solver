@@ -10,6 +10,9 @@
 #ifndef LAP_ROWS_SCANNED
 # define LAP_CUDA_LOCAL_ROWSOL
 #endif
+//#define LAP_CUDA_EVENT_SYNC
+// should only be enabled for testing purposes
+#define LAP_CUDA_ALLOW_WDDM
 
 #include "../lap.h"
 
@@ -531,7 +534,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 					dim3 block_size, grid_size;
 					block_size.x = 256;
 					grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
-					getCostRow_lowRank_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_vec[t], rank, x, start, end, N);
+					getCostRow_lowRank_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_vec[t], (int)rank, x, start, end, N);
 				};
 
 				lap::cuda::RowCostFunction<C, decltype(get_cost_row)> costFunction(get_cost_row);
@@ -559,7 +562,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 						dim3 block_size, grid_size;
 						block_size.x = 256;
 						grid_size.x = (N + block_size.x - 1) / block_size.x;
-						getCost_lowRank_kernel<<<grid_size, block_size>>>(d_row, d_vec[0], rank, d_rowsol, N);
+						getCost_lowRank_kernel<<<grid_size, block_size>>>(d_row, d_vec[0], (int)rank, d_rowsol, N);
 						cudaMemcpy(row, d_row, N * sizeof(C), cudaMemcpyDeviceToHost);
 						cudaFree(d_row);
 						cudaFree(d_rowsol);

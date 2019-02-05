@@ -13,6 +13,9 @@ namespace lap
 			std::pair<int, int> *part;
 			std::vector<int> device;
 			std::vector<cudaStream_t> stream;
+#ifdef LAP_CUDA_EVENT_SYNC
+			std::vector<cudaEvent_t> event;
+#endif
 		public:
 			Worksharing(int size, int multiple)
 			{
@@ -21,6 +24,33 @@ namespace lap
 				cudaDeviceProp deviceProp;
 				cudaGetDeviceCount(&device_count);
 
+#ifndef LAP_CUDA_ALLOW_WDDM
+				bool allow_wddm = false;
+				bool done_searching = false;
+
+				while (!done_searching)
+				{
+					for (int current_device = 0; ((current_device < device_count) && ((int)device.size() < max_devices)); current_device++)
+					{
+						cudaGetDeviceProperties(&deviceProp, current_device);
+
+						// If this GPU is not running on Compute Mode prohibited, then we can add it to the list
+						if (deviceProp.computeMode != cudaComputeModeProhibited)
+						{
+							if ((allow_wddm) || (deviceProp.tccDriver)) device.push_back(current_device);
+						}
+					}
+					if (device.empty())
+					{
+						if (allow_wddm) done_searching = true;
+						else allow_wddm = true;
+					}
+					else
+					{
+						done_searching = true;
+					}
+				}
+#else
 				for (int current_device = 0; ((current_device < device_count) && ((int)device.size() < max_devices)); current_device++)
 				{
 					cudaGetDeviceProperties(&deviceProp, current_device);
@@ -31,6 +61,7 @@ namespace lap
 						device.push_back(current_device);
 					}
 				}
+#endif
 
 				if (device.size() == 0)
 				{
@@ -56,10 +87,16 @@ namespace lap
 					else part[p].second = size;
 				}
 				stream.resize(devices);
+#ifdef LAP_CUDA_EVENT_SYNC
+				event.resize(devices);
+#endif
 				for (int t = 0; t < devices; t++)
 				{
 					cudaSetDevice(device[t]);
 					cudaStreamCreate(&stream[t]);
+#ifdef LAP_CUDA_EVENT_SYNC
+					cudaEventCreateWithFlags(&event[t], cudaEventDisableTiming);
+#endif
 				}
 			}
 			~Worksharing()
@@ -70,6 +107,9 @@ namespace lap
 				{
 					cudaSetDevice(device[t]);
 					cudaStreamDestroy(stream[t]);
+#ifdef LAP_CUDA_EVENT_SYNC
+					cudaEventDestroy(event[t]);
+#endif
 				}
 			}
 			int find(int x)
