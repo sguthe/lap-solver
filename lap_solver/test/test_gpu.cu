@@ -12,7 +12,7 @@
 #endif
 //#define LAP_CUDA_EVENT_SYNC
 // should only be enabled for testing purposes
-#define LAP_CUDA_ALLOW_WDDM
+//#define LAP_CUDA_ALLOW_WDDM
 
 #include "../lap.h"
 
