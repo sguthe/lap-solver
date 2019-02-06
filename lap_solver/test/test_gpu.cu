@@ -4,15 +4,14 @@
 //#define LAP_DEBUG
 //#define LAP_NO_MEM_DEBUG
 //#define LAP_ROWS_SCANNED
-// at least under linux with 8 GPUs this is bad
-//#define LAP_CUDA_AVOID_MEMCPY
 // these two don't work together at the moment
 #ifndef LAP_ROWS_SCANNED
 # define LAP_CUDA_LOCAL_ROWSOL
 #endif
-//#define LAP_CUDA_EVENT_SYNC
 // should only be enabled for testing purposes
 //#define LAP_CUDA_ALLOW_WDDM
+// enable one thread per GPU
+#define LAP_CUDA_OPENMP
 
 #include "../lap.h"
 
@@ -26,6 +25,7 @@
 template <class C> void testSanityCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent);
 template <class C> void testGeometricCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool epsilon, bool disjoint, std::string name_C, std::vector<int> &devs, bool silent);
 template <class C> void testRandomLowRankCached(long long min_cached, long long max_cached, long long max_memory, long long min_rank, long long max_rank, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent);
+template <class C> void testInteger(long long min_tab, long long max_tab, long long max_memory, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent);
 
 int main(int argc, char* argv[])
 {
@@ -95,16 +95,16 @@ int main(int argc, char* argv[])
 	{
 		if (opt.use_double)
 		{
-			//if (opt.use_single) testInteger<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, false, std::string("double"));
-			//if (opt.use_epsilon) testInteger<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, true, std::string("double"));
+			if (opt.use_single) testInteger<double>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, false, std::string("double"), opt.devices, opt.silent);
+			if (opt.use_epsilon) testInteger<double>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, true, std::string("double"), opt.devices, opt.silent);
 		}
 		if (opt.use_float)
 		{
-			//if (opt.use_single) testInteger<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, false, std::string("float"));
-			//if (opt.use_epsilon) testInteger<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, true, std::string("float"));
+			if (opt.use_single) testInteger<float>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, false, std::string("float"), opt.devices, opt.silent);
+			if (opt.use_epsilon) testInteger<float>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, true, std::string("float"), opt.devices, opt.silent);
 		}
-		//if (opt.use_single) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, false, std::string("long long"));
-		//if (opt.use_epsilon) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, true, std::string("long long"));
+		if (opt.use_single) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, false, std::string("long long"), opt.devices, opt.silent);
+		if (opt.use_epsilon) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, true, std::string("long long"), opt.devices, opt.silent);
 	}
 
 	return 0;
@@ -223,7 +223,7 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			// different cache size, so always use SLRU
 			lap::cuda::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(C), costFunction, ws);
 			lap::displayTime(start_time, "setup complete", std::cout);
-			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C>(N, N, iterator, step));
+			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C, C>(N, N, iterator, step));
 
 			lap::cuda::solve<C, C>(N, costFunction, iterator, rowsol);
 
@@ -369,7 +369,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			// different cache size, so always use SLRU
 			lap::cuda::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(C), costFunction, ws);
 			lap::displayTime(start_time, "setup complete", std::cout);
-			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C>(N, N, iterator, step));
+			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C, C>(N, N, iterator, step));
 
 			lap::cuda::solve<C, C>(N, costFunction, iterator, rowsol);
 
@@ -542,7 +542,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				// different cache size, so always use SLRU
 				lap::cuda::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(C), costFunction, ws);
 				lap::displayTime(start_time, "setup complete", std::cout);
-				if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C>(N, N, iterator, step));
+				if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C, C>(N, N, iterator, step));
 
 				lap::cuda::solve<C, C>(N, costFunction, iterator, rowsol);
 
@@ -587,3 +587,72 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 	}
 }
 
+template <class C>
+void testInteger(long long min_tab, long long max_tab, long long max_memory, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent)
+{
+	// random costs (directly supply cost matrix)
+	for (int range = 0; range < 3; range++)
+	{
+		for (long long NN = min_tab * min_tab; NN <= max_tab * max_tab; NN <<= 1)
+		{
+			for (int r = 0; r < runs; r++)
+			{
+				int N = (int)floor(sqrt((double)NN));
+
+				std::cout << "Integer";
+				std::cout << "<" << name_C << " ";
+				if (range == 0) std::cout << "1/10n";
+				else if (range == 1) std::cout << "n";
+				else std::cout << "10n";
+				std::cout << "> " << N << "x" << N << " table";
+				if (epsilon) std::cout << " with epsilon scaling";
+				std::cout << std::endl;
+
+				int n;
+				if (range == 0) n = N / 10;
+				else if (range == 1) n = N;
+				else n = 10 * N;
+				std::uniform_int_distribution<int> distribution(0, n);
+				std::mt19937_64 generator(1234);
+
+				auto start_time = std::chrono::high_resolution_clock::now();
+
+				auto get_cost = [&distribution, &generator](int x, int y) -> int
+				{
+					return distribution(generator);
+				};
+
+				lap::cuda::Worksharing ws(N, 256, devs, silent);
+				int num_enabled = (int)ws.device.size();
+
+				int step = (int)N / (int)std::min((long long)N, (long long)((num_enabled * max_memory) / (sizeof(C) * N)));
+
+				int *rowsol = new int[N];
+
+				lap::SimpleCostFunction<int, decltype(get_cost)> cpuCostFunction(get_cost);
+				lap::TableCost<int> costMatrix(N, N, cpuCostFunction);
+
+				// cost function (copy data from table)
+				auto get_cost_row = [&costMatrix](int *d_row, int t, cudaStream_t stream, int x, int start, int end)
+				{
+					cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(int), cudaMemcpyHostToDevice, stream);
+				};
+
+				lap::cuda::RowCostFunction<int, decltype(get_cost_row)> costFunction(get_cost_row);
+
+				// different cache size, so always use SLRU
+				lap::cuda::CachingIterator<C, int, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(int), costFunction, ws);
+				lap::displayTime(start_time, "setup complete", std::cout);
+				if (epsilon) costFunction.setInitialEpsilon((int)lap::cuda::guessEpsilon<C, int>(N, N, iterator, step));
+
+				lap::cuda::solve<C, int>(N, costFunction, iterator, rowsol);
+
+				std::stringstream ss;
+				ss << "cost = " << lap::cost<C>(N, N, costMatrix, rowsol);
+				lap::displayTime(start_time, ss.str().c_str(), std::cout);
+
+				delete[] rowsol;
+			}
+		}
+	}
+}

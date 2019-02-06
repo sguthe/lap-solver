@@ -36,7 +36,7 @@ namespace lap
 	template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol);
 	template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
 	template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
-	template <class SC, class I> SC guessEpsilon(int x_size, int y_size, I& iterator, int step = 1);
+	template <class SC, class I> SC guessEpsilon(int x_size, int y_size, I& iterator, int step);
 
 	// Cost functions, including tabulated costs
 	template <class TC, typename GETCOST> class SimpleCostFunction;
@@ -63,7 +63,7 @@ namespace lap
 		template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol);
 		template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
 		template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
-		template <class SC, class I> SC guessEpsilon(int x_size, int y_size, I& iterator, int step = 1);
+		template <class SC, class I> SC guessEpsilon(int x_size, int y_size, I& iterator, int step);
 
 		// Cost functions, including tabulated costs
 		template <class TC, typename GETCOST> class SimpleCostFunction;
@@ -82,9 +82,9 @@ namespace lap
 		// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
 		template <class SC, class TC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol);
 		template <class SC, class TC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol);
-		template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
-		template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
-		template <class SC, class I> SC guessEpsilon(int x_size, int y_size, I& iterator, int step = 1);
+//		template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
+//		template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
+		template <class SC, class TC, class I> SC guessEpsilon(int x_size, int y_size, I& iterator, int step);
 
 		// Iterator classes used for accessing the cost functions
 		template <class SC, class TC, class CF> class DirectIterator;

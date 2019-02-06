@@ -13,9 +13,6 @@ namespace lap
 			std::pair<int, int> *part;
 			std::vector<int> device;
 			std::vector<cudaStream_t> stream;
-#ifdef LAP_CUDA_EVENT_SYNC
-			std::vector<cudaEvent_t> event;
-#endif
 		public:
 			Worksharing(int size, int multiple, std::vector<int> &devs, bool silent)
 			{
@@ -113,16 +110,10 @@ namespace lap
 					else part[p].second = size;
 				}
 				stream.resize(devices);
-#ifdef LAP_CUDA_EVENT_SYNC
-				event.resize(devices);
-#endif
 				for (int t = 0; t < devices; t++)
 				{
 					cudaSetDevice(device[t]);
 					cudaStreamCreate(&stream[t]);
-#ifdef LAP_CUDA_EVENT_SYNC
-					cudaEventCreateWithFlags(&event[t], cudaEventDisableTiming);
-#endif
 				}
 			}
 			~Worksharing()
@@ -133,9 +124,6 @@ namespace lap
 				{
 					cudaSetDevice(device[t]);
 					cudaStreamDestroy(stream[t]);
-#ifdef LAP_CUDA_EVENT_SYNC
-					cudaEventDestroy(event[t]);
-#endif
 				}
 			}
 			int find(int x)

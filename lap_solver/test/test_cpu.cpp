@@ -129,7 +129,7 @@ void solveTableOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bo
 	lap::displayTime(start_time, "setup complete", std::cout);
 
 	// estimating epsilon should be part of solve time
-	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator));
+	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator, 1));
 	lap::omp::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
 
 	std::stringstream ss;
@@ -148,7 +148,7 @@ void solveTable(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
 	// estimating epsilon should be part of solve time
-	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::guessEpsilon<SC>(N1, N2, iterator));
+	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::guessEpsilon<SC>(N1, N2, iterator, 1));
 	lap::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
 
 	std::stringstream ss;
