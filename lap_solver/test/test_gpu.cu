@@ -223,7 +223,7 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			// different cache size, so always use SLRU
 			lap::cuda::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(C), costFunction, ws);
 			lap::displayTime(start_time, "setup complete", std::cout);
-			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C, C>(N, N, iterator, step));
+			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C, C>(N, N, iterator));
 
 			lap::cuda::solve<C, C>(N, costFunction, iterator, rowsol);
 
@@ -369,7 +369,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			// different cache size, so always use SLRU
 			lap::cuda::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(C), costFunction, ws);
 			lap::displayTime(start_time, "setup complete", std::cout);
-			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C, C>(N, N, iterator, step));
+			if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C, C>(N, N, iterator));
 
 			lap::cuda::solve<C, C>(N, costFunction, iterator, rowsol);
 
@@ -542,7 +542,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				// different cache size, so always use SLRU
 				lap::cuda::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(C), costFunction, ws);
 				lap::displayTime(start_time, "setup complete", std::cout);
-				if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C, C>(N, N, iterator, step));
+				if (epsilon) costFunction.setInitialEpsilon(lap::cuda::guessEpsilon<C, C>(N, N, iterator));
 
 				lap::cuda::solve<C, C>(N, costFunction, iterator, rowsol);
 
@@ -643,7 +643,7 @@ void testInteger(long long min_tab, long long max_tab, long long max_memory, int
 				// different cache size, so always use SLRU
 				lap::cuda::CachingIterator<C, int, decltype(costFunction), lap::CacheSLRU> iterator(N, N, max_memory / sizeof(int), costFunction, ws);
 				lap::displayTime(start_time, "setup complete", std::cout);
-				if (epsilon) costFunction.setInitialEpsilon((int)lap::cuda::guessEpsilon<C, int>(N, N, iterator, step));
+				if (epsilon) costFunction.setInitialEpsilon((int)lap::cuda::guessEpsilon<C, int>(N, N, iterator));
 
 				lap::cuda::solve<C, int>(N, costFunction, iterator, rowsol);
 

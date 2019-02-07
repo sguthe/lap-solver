@@ -204,10 +204,11 @@ namespace lap
 	}
 
 	template <class SC, class I>
-	SC guessEpsilon(int x_size, int y_size, I& iterator, int step)
+	SC guessEpsilon(int x_size, int y_size, I& iterator)
 	{
 		SC epsilon(0);
-		for (int x = 0; x < x_size; x += step)
+		// reverse order to avoid cachethrashing
+		for (int x = x_size - 1; x >= 0; --x)
 		{
 			const auto *tt = iterator.getRow(x);
 			SC min_cost, max_cost;
@@ -220,7 +221,7 @@ namespace lap
 			}
 			epsilon += max_cost - min_cost;
 		}
-		return (epsilon / SC(10 * (x_size + step - 1) / step));
+		return epsilon / (SC(10) * SC(x_size));
 	}
 
 #if defined(__GNUC__)

@@ -14,7 +14,7 @@ namespace lap
 	namespace cuda
 	{
 		template <class SC, class TC, class I>
-		SC guessEpsilon(int x_size, int y_size, I& iterator, int step = 1)
+		SC guessEpsilon(int x_size, int y_size, I& iterator)
 		{
 			SC epsilon(0);
 			int devices = (int)iterator.ws.device.size();
@@ -24,7 +24,7 @@ namespace lap
 #endif
 			TC* minmax_cost;
 			TC** d_out;
-			cudaMallocHost(&minmax_cost, 2 * (x_size / step) * devices * sizeof(TC));
+			cudaMallocHost(&minmax_cost, 2 * x_size * devices * sizeof(TC));
 			lapAlloc(d_out, devices, __FILE__, __LINE__);
 			memset(minmax_cost, 0, 2 * sizeof(TC) * devices);
 			memset(d_out, 0, sizeof(TC*) * devices);
@@ -41,26 +41,26 @@ namespace lap
 				cudaSetDevice(iterator.ws.device[t]);
 				int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 				cudaStream_t stream = iterator.ws.stream[t];
-				for (int x = step * ((x_size - 1) / step); x >= 0; x -= step)
+				cudaMalloc(&(d_out[t]), 2 * x_size * sizeof(TC));
+				for (int x = x_size - 1; x >= 0; --x)
 				{
 					auto tt = iterator.getRow(t, x);
 					if (temp_storage_bytes[t] == 0)
 					{
-						cudaMalloc(&(d_out[t]), 2 * (x_size / step) * sizeof(TC));
 						size_t temp_size(0);
 						cub::DeviceReduce::Min(d_temp_storage[t], temp_size, tt, d_out[t], num_items, stream);
 						cub::DeviceReduce::Max(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t], num_items, stream);
 						temp_storage_bytes[t] = std::max(temp_storage_bytes[t], temp_size);
 						cudaMalloc(&(d_temp_storage[t]), 2 * temp_storage_bytes[t]);
 					}
-					cub::DeviceReduce::Min(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t] + 2 * (x / step), num_items, stream);
-					cub::DeviceReduce::Max(d_temp_storage[t] + temp_storage_bytes[t], temp_storage_bytes[t], tt, d_out[t] + 2 * (x / step) + 1, num_items, stream);
+					cub::DeviceReduce::Min(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t] + 2 * x, num_items, stream);
+					cub::DeviceReduce::Max(d_temp_storage[t] + temp_storage_bytes[t], temp_storage_bytes[t], tt, d_out[t] + 2 * x + 1, num_items, stream);
 				}
-				cudaMemcpyAsync(&(minmax_cost[2 * t *  (x_size / step)]), d_out[t], 2 * (x_size / step) * sizeof(TC), cudaMemcpyDeviceToHost, stream);
+				cudaMemcpyAsync(&(minmax_cost[2 * t * x_size]), d_out[t], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
 				cudaStreamSynchronize(stream);
 			}
 #else
-			for (int x = step * ((x_size - 1) / step); x >= 0; x -= step)
+			for (int x = x_size - 1; x >= 0; --x)
 			{
 				for (int t = 0; t < devices; t++)
 				{
@@ -70,39 +70,39 @@ namespace lap
 					auto tt = iterator.getRow(t, x);
 					if (temp_storage_bytes[t] == 0)
 					{
-						cudaMalloc(&(d_out[t]), 2 * (x_size / step) * sizeof(TC));
+						cudaMalloc(&(d_out[t]), 2 * x_size * sizeof(TC));
 						size_t temp_size(0);
 						cub::DeviceReduce::Min(d_temp_storage[t], temp_size, tt, d_out[t], num_items, stream);
 						cub::DeviceReduce::Max(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t], num_items, stream);
 						temp_storage_bytes[t] = std::max(temp_storage_bytes[t], temp_size);
 						cudaMalloc(&(d_temp_storage[t]), 2 * temp_storage_bytes[t]);
 					}
-					cub::DeviceReduce::Min(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t] + 2 * (x / step), num_items, stream);
-					cub::DeviceReduce::Max(d_temp_storage[t] + temp_storage_bytes[t], temp_storage_bytes[t], tt, d_out[t] + 2 * (x / step) + 1, num_items, stream);
+					cub::DeviceReduce::Min(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t] + 2 * x, num_items, stream);
+					cub::DeviceReduce::Max(d_temp_storage[t] + temp_storage_bytes[t], temp_storage_bytes[t], tt, d_out[t] + 2 * x + 1, num_items, stream);
 				}
 			}
 			for (int t = 0; t < devices; t++)
 			{
 				cudaSetDevice(iterator.ws.device[t]);
 				cudaStream_t stream = iterator.ws.stream[t];
-				cudaMemcpyAsync(&(minmax_cost[2 * t *  (x_size / step)]), d_out[t], 2 * (x_size / step) * sizeof(TC), cudaMemcpyDeviceToHost, stream);
+				cudaMemcpyAsync(&(minmax_cost[2 * t * x_size]), d_out[t], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
 			}
 			for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
 #endif
-			for (int x = 0; x < x_size; x += step)
+			for (int x = 0; x < x_size; x++)
 			{
 				SC min_cost, max_cost;
 				for (int t = 0; t < devices; t++)
 				{
 					if (t == 0)
 					{
-						min_cost = (SC)minmax_cost[2 * t *  (x_size / step) + 2 * (x / step)];
-						max_cost = (SC)minmax_cost[2 * t *  (x_size / step) + 2 * (x / step) + 1];
+						min_cost = (SC)minmax_cost[2 * (t * x_size + x)];
+						max_cost = (SC)minmax_cost[2 * (t * x_size + x) + 1];
 					}
 					else
 					{
-						max_cost = std::max(max_cost, (SC)minmax_cost[2 * t *  (x_size / step) + 2 * (x / step)]);
-						min_cost = std::min(min_cost, (SC)minmax_cost[2 * t *  (x_size / step) + 2 * (x / step) + 1]);
+						max_cost = std::max(max_cost, (SC)minmax_cost[2 * (t * x_size + x)]);
+						min_cost = std::min(min_cost, (SC)minmax_cost[2 * (t * x_size + x) + 1]);
 					}
 				}
 				epsilon += max_cost - min_cost;
@@ -122,7 +122,7 @@ namespace lap
 #ifdef LAP_CUDA_OPENMP
 			omp_set_num_threads(old_threads);
 #endif
-			return (epsilon / SC(10 * (x_size + step - 1) / step));
+			return epsilon / (SC(10) * SC(x_size));
 		}
 
 		template <class SC>

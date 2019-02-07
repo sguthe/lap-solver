@@ -6,22 +6,22 @@ namespace lap
 {
 	namespace omp
 	{
+		// y-size is not actually used in this function
 		template <class SC, class I>
-		SC guessEpsilon(int x_size, int y_size, I& iterator, int step)
+		SC guessEpsilon(int x_size, int y_size, I& iterator)
 		{
 			SC epsilon(0);
-			int x_count = x_size / step;
 			SC *min_cost;
 			SC *max_cost;
-			lapAlloc(min_cost, omp_get_max_threads() * x_count, __FILE__, __LINE__);
-			lapAlloc(max_cost, omp_get_max_threads() * x_count, __FILE__, __LINE__);
+			lapAlloc(min_cost, omp_get_max_threads() * x_size, __FILE__, __LINE__);
+			lapAlloc(max_cost, omp_get_max_threads() * x_size, __FILE__, __LINE__);
 #pragma omp parallel
 			{
 				int t = omp_get_thread_num();
-				for (int x = 0; x < x_size; x += step)
+				// reverse order to avoid cachethrashing
+				for (int x = x_size - 1; x >= 0; --x)
 				{
-					int xx = x / step;
-					const auto *tt = iterator.getRow(t, x);
+					auto *tt = iterator.getRow(t, x);
 					SC min_cost_l, max_cost_l;
 					min_cost_l = max_cost_l = (SC)tt[0];
 					for (int y = 1; y < iterator.ws.part[t].second - iterator.ws.part[t].first; y++)
@@ -30,31 +30,31 @@ namespace lap
 						min_cost_l = std::min(min_cost_l, cost_l);
 						max_cost_l = std::max(max_cost_l, cost_l);
 					}
-					min_cost[xx + x_count * t] = min_cost_l;
-					max_cost[xx + x_count * t] = max_cost_l;
+					min_cost[x + x_size * t] = min_cost_l;
+					max_cost[x + x_size * t] = max_cost_l;
 				}
 #pragma omp barrier
 #pragma omp for
-				for (int x = 0; x < x_count; x++)
+				for (int x = 0; x < x_size; x++)
 				{
 					SC max_c = max_cost[x];
 					SC min_c = min_cost[x];
 					for (int xx = 0; xx < omp_get_max_threads(); xx++)
 					{
-						max_c = std::max(max_c, max_cost[x + x_count * xx]);
-						min_c = std::min(min_c, min_cost[x + x_count * xx]);
+						max_c = std::max(max_c, max_cost[x + x_size * xx]);
+						min_c = std::min(min_c, min_cost[x + x_size * xx]);
 					}
 					max_cost[x] = max_c;
 					min_cost[x] = min_c;
 				}
 			}
-			for (int x = 0; x < x_count; x++)
+			for (int x = 0; x < x_size; x++)
 			{
 				epsilon += max_cost[x] - min_cost[x];
 			}
 			lapFree(min_cost);
 			lapFree(max_cost);
-			return (epsilon / SC(10 * (x_size + step - 1) / step));
+			return epsilon / (SC(10) * SC(x_size));
 		}
 
 		template <class SC, class CF, class I>

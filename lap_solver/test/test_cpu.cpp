@@ -128,8 +128,8 @@ void solveTableOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bo
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
-	// estimating epsilon should be part of solve time
-	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator, 1));
+	// estimating epsilon
+	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator));
 	lap::omp::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
 
 	std::stringstream ss;
@@ -147,8 +147,8 @@ void solveTable(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool 
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
-	// estimating epsilon should be part of solve time
-	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::guessEpsilon<SC>(N1, N2, iterator, 1));
+	// estimating epsilon
+	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::guessEpsilon<SC>(N1, N2, iterator));
 	lap::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
 
 	std::stringstream ss;
@@ -169,8 +169,8 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 
 		lap::displayTime(start_time, "setup complete", std::cout);
 
-		// estimating epsilon should be part of solve time
-		if (epsilon) costFunction.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator, (int)(N1 / entries)));
+		// estimating epsilon
+		if (epsilon) costFunction.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator));
 		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol);
 	}
 	else
@@ -179,8 +179,8 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 
 		lap::displayTime(start_time, "setup complete", std::cout);
 
-		// estimating epsilon should be part of solve time
-		if (epsilon) costFunction.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator, (int)(N1 / entries)));
+		// estimating epsilon
+		if (epsilon) costFunction.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator));
 		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol);
 	}
 
@@ -201,7 +201,8 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 
 		lap::displayTime(start_time, "setup complete", std::cout);
 
-		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
+		// estimating epsilon
+		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator));
 		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol);
 	}
 	else
@@ -210,7 +211,8 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 
 		lap::displayTime(start_time, "setup complete", std::cout);
 
-		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator, (int)(N1 / entries)));
+		// estimating epsilon
+		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator));
 		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol);
 	}
 
@@ -451,13 +453,19 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 
 				// The following matrix will have at most the seletcted rank.
 				C *vec = new C[N * rank];
+				C max_vec;
+				C min_vec;
 				for (long long i = 0; i < rank; i++)
 				{
 					for (long long j = 0; j < N; j++) vec[i * N + j] = distribution(generator);
+					max_vec = vec[i * N];
+					for (long long j = 1; j < N; j++) max_vec = std::max(max_vec, vec[i * N + j]);
+					min_vec = vec[i * N];
+					for (long long j = 1; j < N; j++) min_vec = std::min(min_vec, vec[i * N + j]);
 				}
 
 				// cost function
-				auto get_cost = [&vec, &N, &rank](int x, int y) -> C
+				auto get_cost = [&vec, &N, &rank, &max_vec](int x, int y) -> C
 				{
 					C sum(0);
 					for (long long k = 0; k < rank; k++)
