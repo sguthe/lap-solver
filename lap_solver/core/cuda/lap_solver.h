@@ -649,15 +649,16 @@ namespace lap
 							jmin = jmin_taken;
 							unassignedfound = false;
 						}
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#else
+						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#endif
 
 						while (!unassignedfound)
 						{
-							// mark last column scanned (single device)
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
 							cudaStreamSynchronize(stream);
-#else
-							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
 #endif
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
 #ifdef LAP_CUDA_LOCAL_ROWSOL
@@ -722,6 +723,11 @@ namespace lap
 								jmin = jmin_taken;
 								unassignedfound = false;
 							}
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#else
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#endif
 						}
 
 						// update column prices. can increase or decrease
@@ -892,20 +898,23 @@ namespace lap
 							}
 #pragma omp barrier
 
+							// mark last column scanned (single device)
+							if ((jmin >= start) && (jmin < end))
+							{
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#else
+								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#endif
+							}
 							while (!unassignedfound)
 							{
-								// mark last column scanned (single device)
-								if ((jmin >= start) && (jmin < end))
-								{
-#ifdef LAP_CUDA_LOCAL_ROWSOL
-									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
-									cudaStreamSynchronize(stream);
-#else
-									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
-#endif
-								}
 								// update 'distances' between freerow and all unscanned columns, via next scanned column.
 #ifdef LAP_CUDA_LOCAL_ROWSOL
+								if ((jmin >= start) && (jmin < end))
+								{
+									cudaStreamSynchronize(stream);
+								}
 #pragma omp barrier
 								int i = host_min_private[iterator.ws.find(jmin)].colsol_take;
 #else
@@ -1003,6 +1012,14 @@ namespace lap
 										jmin = jmin_taken;
 										unassignedfound = false;
 									}
+								}
+								if ((jmin >= start) && (jmin < end))
+								{
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#else
+									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#endif
 								}
 #pragma omp barrier
 							}
@@ -1186,23 +1203,24 @@ namespace lap
 							unassignedfound = false;
 						}
 
+						// mark last column scanned (single device)
+						{
+							int t = iterator.ws.find(jmin);
+							cudaSetDevice(iterator.ws.device[t]);
+							int start = iterator.ws.part[t].first;
+							cudaStream_t stream = iterator.ws.stream[t];
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#else
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#endif
+						}
+
 						while (!unassignedfound)
 						{
-							// mark last column scanned (single device)
-							{
-								int t = iterator.ws.find(jmin);
-								cudaSetDevice(iterator.ws.device[t]);
-								int start = iterator.ws.part[t].first;
-								cudaStream_t stream = iterator.ws.stream[t];
-#ifdef LAP_CUDA_LOCAL_ROWSOL
-								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
-								cudaStreamSynchronize(stream);
-#else
-								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
-#endif
-							}
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
 #ifdef LAP_CUDA_LOCAL_ROWSOL
+							cudaStreamSynchronize(iterator.ws.stream[iterator.ws.find(jmin)]);
 							int i = host_min_private[iterator.ws.find(jmin)].colsol_take;
 #else
 							int i = colsol[jmin];
@@ -1338,6 +1356,18 @@ namespace lap
 							{
 								jmin = jmin_taken;
 								unassignedfound = false;
+							}
+							// mark last column scanned (single device)
+							{
+								int t = iterator.ws.find(jmin);
+								cudaSetDevice(iterator.ws.device[t]);
+								int start = iterator.ws.part[t].first;
+								cudaStream_t stream = iterator.ws.stream[t];
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#else
+								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+#endif
 							}
 						}
 
