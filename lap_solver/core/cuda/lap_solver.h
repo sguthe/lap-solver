@@ -92,18 +92,12 @@ namespace lap
 			for (int x = 0; x < x_size; x++)
 			{
 				SC min_cost, max_cost;
-				for (int t = 0; t < devices; t++)
+				min_cost = (SC)minmax_cost[2 * x];
+				max_cost = (SC)minmax_cost[2 * x + 1];
+				for (int t = 1; t < devices; t++)
 				{
-					if (t == 0)
-					{
-						min_cost = (SC)minmax_cost[2 * (t * x_size + x)];
-						max_cost = (SC)minmax_cost[2 * (t * x_size + x) + 1];
-					}
-					else
-					{
-						max_cost = std::max(max_cost, (SC)minmax_cost[2 * (t * x_size + x)]);
-						min_cost = std::min(min_cost, (SC)minmax_cost[2 * (t * x_size + x) + 1]);
-					}
+					max_cost = std::max(max_cost, (SC)minmax_cost[2 * (t * x_size + x)]);
+					min_cost = std::min(min_cost, (SC)minmax_cost[2 * (t * x_size + x) + 1]);
 				}
 				epsilon += max_cost - min_cost;
 			}
