@@ -137,11 +137,11 @@ void solveCachingCUDA(TP &start_time, int N1, int N2, RCF &get_cost_row, CF &get
 template <class SC, class TC, class CF, class TP>
 void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon)
 {
-	lap::SimpleCostFunction<int, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu);
-	lap::TableCost<int> costMatrix(N1, N2, cpuCostFunction);
+	lap::SimpleCostFunction<TC, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu);
+	lap::TableCost<TC> costMatrix(N1, N2, cpuCostFunction);
 
 	// cost function (copy data from table)
-	auto get_cost_row = [&costMatrix](int *d_row, int t, cudaStream_t stream, int x, int start, int end)
+	auto get_cost_row = [&costMatrix](TC *d_row, int t, cudaStream_t stream, int x, int start, int end)
 	{
 		cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(int), cudaMemcpyHostToDevice, stream);
 	};
@@ -157,7 +157,7 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	// different cache size, so always use SLRU
 	lap::cuda::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costFunction, ws);
 	lap::displayTime(start_time, "setup complete", std::cout);
-	if (epsilon) costFunction.setInitialEpsilon((int)lap::cuda::guessEpsilon<SC, TC>(N1, N2, iterator));
+	if (epsilon) costFunction.setInitialEpsilon((TC)lap::cuda::guessEpsilon<SC, TC>(N1, N2, iterator));
 
 	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol);
 
@@ -644,7 +644,7 @@ template <class C> void testRandom(long long min_tab, long long max_tab, long lo
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
 
 			delete[] rowsol;
 		}
@@ -687,7 +687,7 @@ template <class C> void testSanity(long long min_tab, long long max_tab, long lo
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
 
 			bool passed = true;
 			for (long long i = 0; (passed) && (i < N); i++)
@@ -768,7 +768,7 @@ template <class C> void testGeometric(long long min_tab, long long max_tab, long
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
 
 			delete[] tab_s;
 			delete[] tab_t;
@@ -825,7 +825,7 @@ template <class C> void testRandomLowRank(long long min_tab, long long max_tab, 
 
 				lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-				solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
+				solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
 
 				delete[] vec;
 				delete[] rowsol;
