@@ -82,5 +82,8 @@
     <ClInclude Include="..\..\core\cuda\lap_solver.h">
       <Filter>core\cuda</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\test\image.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

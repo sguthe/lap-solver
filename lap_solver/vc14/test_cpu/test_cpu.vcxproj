@@ -165,6 +165,7 @@
     <ClInclude Include="..\..\core\omp\lap_solver.h" />
     <ClInclude Include="..\..\core\omp\lap_worksharing.h" />
     <ClInclude Include="..\..\lap.h" />
+    <ClInclude Include="..\..\test\image.h" />
     <ClInclude Include="..\..\test\test_options.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
