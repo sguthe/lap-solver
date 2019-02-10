@@ -31,6 +31,7 @@
     <ClInclude Include="..\..\core\omp\lap_direct_iterator.h" />
     <ClInclude Include="..\..\core\omp\lap_solver.h" />
     <ClInclude Include="..\..\lap.h" />
+    <ClInclude Include="..\..\test\image.h" />
     <ClInclude Include="..\..\test\test_options.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

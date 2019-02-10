@@ -1617,6 +1617,28 @@ namespace lap
 #else
 			lapFree(tt);
 #endif
+			// set device back to first one
+			cudaSetDevice(iterator.ws.device[0]);
+		}
+
+		template <class SC, class CF>
+		SC cost(int dim, int dim2, CF &costfunc, int *rowsol, cudaStream_t stream)
+		{
+			SC my_cost(0);
+			SC *row = new SC[dim2];
+			int *d_rowsol;
+			SC *d_row;
+			cudaMalloc(&d_rowsol, dim2 * sizeof(int));
+			cudaMalloc(&d_row, dim2 * sizeof(SC));
+			cudaMemcpyAsync(d_rowsol, rowsol, dim2 * sizeof(int), cudaMemcpyHostToDevice, stream);
+			costfunc.getCost(d_row, 0, d_rowsol, dim2);
+			cudaMemcpyAsync(row, d_row, dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+			cudaFree(d_row);
+			cudaFree(d_rowsol);
+			cudaStreamSynchronize(stream);
+			for (int i = 0; i < dim2; i++) my_cost += row[i];
+			delete[] row;
+			return my_cost;
 		}
 
 		// shortcut for square problems
@@ -1624,6 +1646,13 @@ namespace lap
 		void solve(int dim, CF &costfunc, I &iterator, int *rowsol)
 		{
 			lap::cuda::solve<SC, TC>(dim, dim, costfunc, iterator, rowsol);
+		}
+
+		// shortcut for square problems
+		template <class SC, class CF>
+		SC cost(int dim, CF &costfunc, int *rowsol, cudaStream_t stream)
+		{
+			return lap::cuda::cost<SC, CF>(dim, dim, costfunc, rowsol, stream);
 		}
 	}
 }

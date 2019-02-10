@@ -10,8 +10,8 @@
 
 #include <random>
 #include <string>
-#include <fstream>
 #include "test_options.h"
+#include "image.h"
 
 template <class C> void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
 template <class C> void testSanity(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
@@ -765,49 +765,6 @@ void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool 
 		}
 	}
 }
-
-class PPMImage
-{
-public:
-	int width, height, max_val;
-	unsigned char *raw;
-public:
-	PPMImage(std::string &fname) : width(0), height(0), max_val(0), raw(0)
-	{
-		std::ifstream in(fname.c_str(), std::ios::in | std::ios::binary);
-		if (in.is_open()) {
-			std::string line;
-
-			std::getline(in, line);
-			if (line != "P6") {
-				std::cout << "\"" << fname << "\" in not a ppm P6 file." << std::endl;
-				exit(-1);
-			}
-			do std::getline(in, line); while (line[0] == '#');
-			{
-				std::stringstream sline(line);
-				sline >> width;
-				sline >> height;
-			}
-			std::getline(in, line);
-			{
-				std::stringstream sline(line);
-				sline >> max_val;
-			}
-
-			raw = new unsigned char[width * height * 3];
-
-			in.read((char *)raw, width * height * 3);
-		}
-		else
-		{
-			std::cout << "Can't open \"" << fname << "\"" << std::endl;
-			exit(-1);
-		}
-		in.close();
-	}
-	~PPMImage() { delete[] raw; }
-};
 
 template <class C> void testImages(std::vector<std::string> &images, long long max_memory, int runs, bool omp, bool epsilon, std::string name_C)
 {

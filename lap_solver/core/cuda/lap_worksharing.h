@@ -1,7 +1,9 @@
 #pragma once
 #include <utility>
 #include <vector>
+#include <iostream>
 #include <cuda.h>
+#include <cuda_runtime.h>
 
 namespace lap
 {
