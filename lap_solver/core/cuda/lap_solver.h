@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <cub/cub.cuh>
 #ifdef LAP_CUDA_OPENMP
 #include <omp.h>
 #endif
@@ -13,6 +12,116 @@ namespace lap
 {
 	namespace cuda
 	{
+		__device__ __forceinline__ float atomicMinExt(float *addr, float value) {
+			float old;
+			old = (value >= 0) ? __int_as_float(atomicMin((int *)addr, __float_as_int(value))) :
+				__uint_as_float(atomicMax((unsigned int *)addr, __float_as_uint(value)));
+			return old;
+		}
+
+		__device__ __forceinline__ float atomicMaxExt(float *addr, float value) {
+			float old;
+			old = (value >= 0) ? __int_as_float(atomicMax((int *)addr, __float_as_int(value))) :
+				__uint_as_float(atomicMin((unsigned int *)addr, __float_as_uint(value)));
+			return old;
+		}
+
+		__device__ __forceinline__ double atomicMinExt(double *addr, double value) {
+			double old;
+			old = (value >= 0) ? __longlong_as_double(atomicMin((long long *)addr, __double_as_longlong(value))) :
+				__longlong_as_double(atomicMax((unsigned long long *)addr, (unsigned long long)__double_as_longlong(value)));
+			return old;
+		}
+
+		__device__ __forceinline__ double atomicMaxExt(double *addr, double value) {
+			double old;
+			old = (value >= 0) ? __longlong_as_double(atomicMax((long long *)addr, __double_as_longlong(value))) :
+				__longlong_as_double(atomicMin((unsigned long long *)addr, (unsigned long long)__double_as_longlong(value)));
+			return old;
+		}
+
+		__device__ __forceinline__ int atomicMinExt(int *addr, int value) {
+			return atomicMin(addr, value);
+		}
+
+		__device__ __forceinline__ int atomicMaxExt(int *addr, int value) {
+			return atomicMax(addr, value);
+		}
+
+		__device__ __forceinline__ long long atomicMinExt(long long *addr, long long value) {
+			return atomicMin(addr, value);
+		}
+
+		__device__ __forceinline__ long long atomicMaxExt(long long *addr, long long value) {
+			return atomicMax(addr, value);
+		}
+
+		template <class TC>
+		__global__ void initMinMax_kernel(TC *minmax, TC min, TC max, int size)
+		{
+			int x = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (x >= size) return;
+			x += x;
+			minmax[x++] = min;
+			minmax[x] = max;
+		}
+
+		template <class TC, class TC_IN>
+		__global__ void minMax_kernel(TC *minmax, TC_IN *in, int size)
+		{
+			int x = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (x >= size) return;
+			TC v = in[x];
+			atomicMinExt(&(minmax[0]), v);
+			atomicMaxExt(&(minmax[1]), v);
+		}
+
+		template <class TC, class TC_IN>
+		__global__ void minMax4_kernel(TC *minmax, TC_IN *in, int size)
+		{
+			int x = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (x >= size) return;
+			TC v_min, v_max;
+			v_min = v_max = in[x];
+			for (int i = 0; i < 3; i++)
+			{
+				x += blockDim.x * gridDim.x;
+				if (x < size)
+				{
+					TC v = in[x];
+					if (v < v_min) v_min = v;
+					else if (v > v_max) v_max = v;
+				}
+			}
+
+			atomicMinExt(&(minmax[0]), v_min);
+			atomicMaxExt(&(minmax[1]), v_max);
+		}
+
+		template <class C, class C_IN>
+		__global__ void min4_kernel(C *min, C_IN *in, int size)
+		{
+			int x = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (x >= size) return;
+			C v_min;
+			v_min = in[x];
+			for (int i = 0; i < 3; i++)
+			{
+				x += blockDim.x * gridDim.x;
+				if (x < size)
+				{
+					C v = in[x];
+					if (v < v_min) v_min = v;
+				}
+			}
+
+			atomicMinExt(&(min[0]), v_min);
+		}
+
 		template <class SC, class TC, class I>
 		SC guessEpsilon(int x_size, int y_size, I& iterator)
 		{
@@ -28,90 +137,107 @@ namespace lap
 			lapAlloc(d_out, devices, __FILE__, __LINE__);
 			memset(minmax_cost, 0, 2 * sizeof(TC) * devices);
 			memset(d_out, 0, sizeof(TC*) * devices);
-			TC** d_temp_storage;
-			size_t *temp_storage_bytes;
-			lapAlloc(d_temp_storage, devices, __FILE__, __LINE__);
-			lapAlloc(temp_storage_bytes, devices, __FILE__, __LINE__);
-			memset(d_temp_storage, 0, sizeof(TC*) * devices);
-			memset(temp_storage_bytes, 0, sizeof(size_t) * devices);
-#ifdef LAP_CUDA_OPENMP
-#pragma omp parallel for
-			for (int t = 0; t < devices; t++)
+			if (devices == 1)
 			{
-				cudaSetDevice(iterator.ws.device[t]);
-				int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
-				cudaStream_t stream = iterator.ws.stream[t];
-				cudaMalloc(&(d_out[t]), 2 * x_size * sizeof(TC));
+				cudaSetDevice(iterator.ws.device[0]);
+				int num_items = iterator.ws.part[0].second - iterator.ws.part[0].first;
+				cudaStream_t stream = iterator.ws.stream[0];
+				cudaMalloc(&(d_out[0]), 2 * x_size * sizeof(TC));
+				dim3 block_size, grid_size, grid_size4;
+				block_size.x = 256;
+				grid_size.x = (x_size + block_size.x - 1) / block_size.x;
+				grid_size4.x = (num_items + block_size.x * 4 - 1) / (block_size.x * 4);
+				initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[0], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), x_size);
 				for (int x = x_size - 1; x >= 0; --x)
 				{
-					auto tt = iterator.getRow(t, x);
-					if (temp_storage_bytes[t] == 0)
-					{
-						size_t temp_size(0);
-						cub::DeviceReduce::Min(d_temp_storage[t], temp_size, tt, d_out[t], num_items, stream);
-						cub::DeviceReduce::Max(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t], num_items, stream);
-						temp_storage_bytes[t] = std::max(temp_storage_bytes[t], temp_size);
-						cudaMalloc(&(d_temp_storage[t]), 2 * temp_storage_bytes[t]);
-					}
-					cub::DeviceReduce::Min(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t] + 2 * x, num_items, stream);
-					cub::DeviceReduce::Max(d_temp_storage[t] + temp_storage_bytes[t], temp_storage_bytes[t], tt, d_out[t] + 2 * x + 1, num_items, stream);
+					auto tt = iterator.getRow(0, x);
+					minMax4_kernel<<<grid_size4, block_size, 0, stream>>>(d_out[0] + 2 * x, tt, num_items);
 				}
-				cudaMemcpyAsync(&(minmax_cost[2 * t * x_size]), d_out[t], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
+				cudaMemcpyAsync(minmax_cost, d_out[0], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
 				cudaStreamSynchronize(stream);
+				for (int x = 0; x < x_size; x++)
+				{
+					SC min_cost, max_cost;
+					min_cost = (SC)minmax_cost[2 * x];
+					max_cost = (SC)minmax_cost[2 * x + 1];
+					epsilon += max_cost - min_cost;
+				}
 			}
-#else
-			for (int x = x_size - 1; x >= 0; --x)
+			else
 			{
+#ifdef LAP_CUDA_OPENMP
+#pragma omp parallel for
 				for (int t = 0; t < devices; t++)
 				{
 					cudaSetDevice(iterator.ws.device[t]);
 					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					cudaStream_t stream = iterator.ws.stream[t];
-					auto tt = iterator.getRow(t, x);
-					if (temp_storage_bytes[t] == 0)
+					cudaMalloc(&(d_out[t]), 2 * x_size * sizeof(TC));
+					dim3 block_size, grid_size, grid_size4;
+					block_size.x = 256;
+					grid_size.x = (x_size + block_size.x - 1) / block_size.x;
+					grid_size4.x = (num_items + block_size.x * 4 - 1) / (block_size.x * 4);
+					initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[t], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), x_size);
+					for (int x = x_size - 1; x >= 0; --x)
 					{
-						cudaMalloc(&(d_out[t]), 2 * x_size * sizeof(TC));
-						size_t temp_size(0);
-						cub::DeviceReduce::Min(d_temp_storage[t], temp_size, tt, d_out[t], num_items, stream);
-						cub::DeviceReduce::Max(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t], num_items, stream);
-						temp_storage_bytes[t] = std::max(temp_storage_bytes[t], temp_size);
-						cudaMalloc(&(d_temp_storage[t]), 2 * temp_storage_bytes[t]);
+						auto tt = iterator.getRow(t, x);
+						minMax4_kernel<<<grid_size4, block_size, 0, stream>>>(d_out[t] + 2 * x, tt, num_items);
 					}
-					cub::DeviceReduce::Min(d_temp_storage[t], temp_storage_bytes[t], tt, d_out[t] + 2 * x, num_items, stream);
-					cub::DeviceReduce::Max(d_temp_storage[t] + temp_storage_bytes[t], temp_storage_bytes[t], tt, d_out[t] + 2 * x + 1, num_items, stream);
+					cudaMemcpyAsync(&(minmax_cost[2 * t * x_size]), d_out[t], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
+					cudaError_t err = cudaStreamSynchronize(stream);
+					if (err != 0)
+					{
+						std::cout << err << std::endl;
+					}
 				}
-			}
-			for (int t = 0; t < devices; t++)
-			{
-				cudaSetDevice(iterator.ws.device[t]);
-				cudaStream_t stream = iterator.ws.stream[t];
-				cudaMemcpyAsync(&(minmax_cost[2 * t * x_size]), d_out[t], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
-			}
-			for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
-#endif
-			for (int x = 0; x < x_size; x++)
-			{
-				SC min_cost, max_cost;
-				min_cost = (SC)minmax_cost[2 * x];
-				max_cost = (SC)minmax_cost[2 * x + 1];
-				for (int t = 1; t < devices; t++)
+#else
+				for (int t = 0; t < devices; t++)
 				{
-					max_cost = std::max(max_cost, (SC)minmax_cost[2 * (t * x_size + x)]);
-					min_cost = std::min(min_cost, (SC)minmax_cost[2 * (t * x_size + x) + 1]);
+					cudaSetDevice(iterator.ws.device[t]);
+					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
+					cudaStream_t stream = iterator.ws.stream[t];
+					cudaMalloc(&(d_out[t]), 2 * x_size * sizeof(TC));
+					dim3 block_size, grid_size;
+					block_size.x = 256;
+					grid_size.x = (x_size + block_size.x - 1) / block_size.x;
+					initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[t], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), x_size);
 				}
-				epsilon += max_cost - min_cost;
+				for (int x = x_size - 1; x >= 0; --x)
+				{
+					for (int t = 0; t < devices; t++)
+					{
+						cudaSetDevice(iterator.ws.device[t]);
+						int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
+						cudaStream_t stream = iterator.ws.stream[t];
+						auto tt = iterator.getRow(t, x);
+						dim3 block_size, grid_size4;
+						block_size.x = 256;
+						grid_size4.x = (num_items + block_size.x * 4 - 1) / (block_size.x * 4);
+						minMax4_kernel<<<grid_size4, block_size, 0, stream>>>(d_out[t] + 2 * x, tt, num_items);
+					}
+				}
+				for (int t = 0; t < devices; t++)
+				{
+					cudaSetDevice(iterator.ws.device[t]);
+					cudaStream_t stream = iterator.ws.stream[t];
+					cudaMemcpyAsync(&(minmax_cost[2 * t * x_size]), d_out[t], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
+				}
+				for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
+#endif
+				for (int x = 0; x < x_size; x++)
+				{
+					SC min_cost, max_cost;
+					min_cost = (SC)minmax_cost[2 * x];
+					max_cost = (SC)minmax_cost[2 * x + 1];
+					for (int t = 1; t < devices; t++)
+					{
+						max_cost = std::max(max_cost, (SC)minmax_cost[2 * (t * x_size + x)]);
+						min_cost = std::min(min_cost, (SC)minmax_cost[2 * (t * x_size + x) + 1]);
+					}
+					epsilon += max_cost - min_cost;
+				}
 			}
 			cudaFreeHost(minmax_cost);
-			for (int t = 0; t < devices; t++)
-			{
-				if (temp_storage_bytes[t] != 0)
-				{
-					cudaFree(d_out[t]);
-					cudaFree(d_temp_storage[t]);
-				}
-			}
-			lapFree(d_temp_storage);
-			lapFree(temp_storage_bytes);
 			lapFree(d_out);
 #ifdef LAP_CUDA_OPENMP
 			omp_set_num_threads(old_threads);
@@ -137,8 +263,9 @@ namespace lap
 		};
 
 		template <class SC>
-		__global__ void initializeMin_kernel(min_struct<SC> *s, int dim2)
+		__global__ void initializeMin_kernel(min_struct<SC> *s, SC min, int dim2)
 		{
+			s->min = min;
 			s->jmin_free = dim2;
 			s->jmin_taken = dim2;
 		}
@@ -586,9 +713,10 @@ namespace lap
 					int size = end - start;
 					cudaStream_t stream = iterator.ws.stream[t];
 
-					dim3 block_size, grid_size;
+					dim3 block_size, grid_size, grid_size4;
 					block_size.x = 256;
 					grid_size.x = (size + block_size.x - 1) / block_size.x;
+					grid_size4.x = (size + block_size.x * 4 - 1) / (block_size.x * 4);
 
 					for (int f = 0; f < dim2; f++)
 					{
@@ -597,17 +725,12 @@ namespace lap
 						cudaMemcpyAsync(colsol_private[t], &(colsol[start]), sizeof(int) * size, cudaMemcpyHostToDevice, stream);
 #endif
 						// initialize Search
-						initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+						initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 						if (f < dim)
 							initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
 						else
 							initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
-						if (temp_storage_bytes[t] == 0)
-						{
-							cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
-							cudaMalloc(&(temp_storage[t]), temp_storage_bytes[t]);
-						}
-						cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
+						min4_kernel<<<grid_size4, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
 						// min is now set so we need to find the correspoding minima for free and taken columns
 						findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 						cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
@@ -665,24 +788,19 @@ namespace lap
 								// get row
 								auto tt = iterator.getRow(t, i);
 								// initialize Search
-								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 								// continue search
 								continueSearchJMin_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, jmin, min, size);
 							}
 							else
 							{
 								// initialize Search
-								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 								// continue search
 								continueSearchJMin_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], i, jmin, min, size);
 							}
 							// find minimum
-							if (temp_storage_bytes[t] == 0)
-							{
-								cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
-								cudaMalloc(&(temp_storage[t]), temp_storage_bytes[t]);
-							}
-							cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
+							min4_kernel<<<grid_size4, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
 							// min is now set so we need to find the correspoding minima for free and taken columns
 							findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 							cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
@@ -815,9 +933,10 @@ namespace lap
 						int size = end - start;
 						cudaStream_t stream = iterator.ws.stream[t];
 
-						dim3 block_size, grid_size;
+						dim3 block_size, grid_size, grid_size4;
 						block_size.x = 256;
 						grid_size.x = (size + block_size.x - 1) / block_size.x;
+						grid_size4.x = (size + block_size.x * 4 - 1) / (block_size.x * 4);
 
 						for (int f = 0; f < dim2; f++)
 						{
@@ -826,17 +945,12 @@ namespace lap
 							cudaMemcpyAsync(colsol_private[t], &(colsol[start]), sizeof(int) * size, cudaMemcpyHostToDevice, stream);
 #endif
 							// initialize Search
-							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 							if (f < dim)
 								initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
 							else
 								initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
-							if (temp_storage_bytes[t] == 0)
-							{
-								cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
-								cudaMalloc(&(temp_storage[t]), temp_storage_bytes[t]);
-							}
-							cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
+							min4_kernel<<<grid_size4, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
 							// min is now set so we need to find the correspoding minima for free and taken columns
 							findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 							cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
@@ -919,7 +1033,7 @@ namespace lap
 									// get row
 									auto tt = iterator.getRow(t, i);
 									// initialize Search
-									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									// single device
 									if ((jmin >= start) && (jmin < end))
 									{
@@ -936,7 +1050,7 @@ namespace lap
 								else
 								{
 									// initialize Search
-									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									if ((jmin >= start) && (jmin < end))
 									{
 										cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
@@ -949,12 +1063,7 @@ namespace lap
 									continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, size);
 								}
 								// find minimum
-								if (temp_storage_bytes[t] == 0)
-								{
-									cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
-									cudaMalloc(&(temp_storage[t]), temp_storage_bytes[t]);
-								}
-								cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
+								min4_kernel<<<grid_size4, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
 								// min is now set so we need to find the correspoding minima for free and taken columns
 								findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
@@ -1127,25 +1236,21 @@ namespace lap
 							int end = iterator.ws.part[t].second;
 							int size = end - start;
 							cudaStream_t stream = iterator.ws.stream[t];
-							dim3 block_size, grid_size;
+							dim3 block_size, grid_size, grid_size4;
 							block_size.x = 256;
 							grid_size.x = (size + block_size.x - 1) / block_size.x;
+							grid_size4.x = (size + block_size.x * 4 - 1) / (block_size.x * 4);
 #ifndef LAP_CUDA_LOCAL_ROWSOL
 							// upload colsol to devices
 							cudaMemcpyAsync(colsol_private[t], &(colsol[start]), sizeof(int) * size, cudaMemcpyHostToDevice, stream);
 #endif
 							// initialize Search
-							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 							if (f < dim)
 								initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
 							else
 								initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
-							if (temp_storage_bytes[t] == 0)
-							{
-								cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
-								cudaMalloc(&(temp_storage[t]), temp_storage_bytes[t]);
-							}
-							cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
+							min4_kernel<<<grid_size4, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
 							// min is now set so we need to find the correspoding minima for free and taken columns
 							findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 							cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
@@ -1234,7 +1339,7 @@ namespace lap
 									// get row
 									tt[t] = iterator.getRow(t, i);
 									// initialize Search
-									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									if ((jmin >= start) && (jmin < end))
 									{
 										cudaMemcpyAsync(tt_jmin, &(tt[t][jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
@@ -1280,7 +1385,7 @@ namespace lap
 									block_size.x = 256;
 									grid_size.x = (size + block_size.x - 1) / block_size.x;
 									// initialize Search
-									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], dim2);
+									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									// continue search
 									continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, size);
 								}
@@ -1292,16 +1397,12 @@ namespace lap
 								int end = iterator.ws.part[t].second;
 								int size = end - start;
 								cudaStream_t stream = iterator.ws.stream[t];
-								dim3 block_size, grid_size;
+								dim3 block_size, grid_size, grid_size4;
 								block_size.x = 256;
 								grid_size.x = (size + block_size.x - 1) / block_size.x;
+								grid_size4.x = (size + block_size.x * 4 - 1) / (block_size.x * 4);
 								// find minimum
-								if (temp_storage_bytes[t] == 0)
-								{
-									cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
-									cudaMalloc(&(temp_storage[t]), temp_storage_bytes[t]);
-								}
-								cub::DeviceReduce::Min(temp_storage[t], temp_storage_bytes[t], d_private[t], &(min_private[t]->min), size, stream);
+								min4_kernel<<<grid_size4, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
 								// min is now set so we need to find the correspoding minima for free and taken columns
 								findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);

@@ -143,7 +143,7 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	// cost function (copy data from table)
 	auto get_cost_row = [&costMatrix](TC *d_row, int t, cudaStream_t stream, int x, int start, int end)
 	{
-		cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(int), cudaMemcpyHostToDevice, stream);
+		cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
 	};
 
 	// cost function
