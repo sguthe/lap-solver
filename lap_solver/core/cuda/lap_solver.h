@@ -89,26 +89,6 @@ namespace lap
 			atomicMaxExt(&(minmax[1]), v_max);
 		}
 
-		template <class C, class C_IN>
-		__global__ void min_kernel(C *min, C_IN *in, int size)
-		{
-			int x = threadIdx.x + blockIdx.x * blockDim.x;
-
-			if (x >= size) return;
-			C v_min;
-			v_min = in[x];
-			x += blockDim.x * gridDim.x;
-#pragma unroll 4
-			while (x < size)
-			{
-				C v = in[x];
-				if (v < v_min) v_min = v;
-				x += blockDim.x * gridDim.x;
-			}
-
-			atomicMinExt(&(min[0]), v_min);
-		}
-
 		template <class SC, class TC, class I>
 		SC guessEpsilon(int x_size, int y_size, I& iterator)
 		{
@@ -258,99 +238,167 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__global__ void initializeSearch_kernel(SC *v, SC *d, TC *tt, char *colactive, int *pred, int f, int size)
+		__global__ void initializeSearchMin_kernel(SC *min, SC *v, SC *d, TC *tt, char *colactive, int *pred, int f, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
-			if (j >= size) return;
 
+			if (j >= size) return;
+			SC v_min;
 			colactive[j] = 1;
 			pred[j] = f;
-			d[j] = tt[j] - v[j];
+			d[j] = v_min = tt[j] - v[j];
+			j += blockDim.x * gridDim.x;
+#pragma unroll 4
+			while (j < size)
+			{
+				SC v0;
+				colactive[j] = 1;
+				pred[j] = f;
+				d[j] = v0 = tt[j] - v[j];
+				if (v0 < v_min) v_min = v0;
+				j += blockDim.x * gridDim.x;
+			}
+
+			atomicMinExt(&(min[0]), v_min);
 		}
 
 		template <class SC, class TC>
-		__global__ void continueSearch_kernel(SC *v, SC *d, TC *tt, char *colactive, int *pred, int i, SC h2, int size)
+		__global__ void continueSearchMin_kernel(SC *min, SC *v, SC *d, TC *tt, char *colactive, int *pred, int i, SC h2, SC max, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
-			if (j >= size) return;
 
-			if (colactive[j] != 0)
+			if (j >= size) return;
+			SC v_min = max;
+
+#pragma unroll 4
+			while (j < size)
 			{
-				SC v2 = tt[j] - v[j] - h2;
-				SC h = d[j];
-				if (v2 < h)
+				if (colactive[j] != 0)
 				{
-					pred[j] = i;
-					d[j] = v2;
+					SC h = d[j];
+					SC v2 = tt[j] - v[j] - h2;
+					if (v2 < h)
+					{
+						pred[j] = i;
+						d[j] = h = v2;
+					}
+					if (h < v_min) v_min = h;
 				}
+				j += blockDim.x * gridDim.x;
 			}
+
+			atomicMinExt(&(min[0]), v_min);
 		}
 
 		template <class SC>
-		__global__ void initializeSearch_kernel(SC *v, SC *d, char *colactive, int *pred, int f, int size)
+		__global__ void initializeSearchMin_kernel(SC *min, SC *v, SC *d, char *colactive, int *pred, int f, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
-			if (j >= size) return;
 
+			if (j >= size) return;
+			SC v_min;
 			colactive[j] = 1;
 			pred[j] = f;
-			d[j] = -v[j];
+			d[j] = v_min = -v[j];
+			j += blockDim.x * gridDim.x;
+#pragma unroll 4
+			while (j < size)
+			{
+				SC v0;
+				colactive[j] = 1;
+				pred[j] = f;
+				d[j] = v0 = -v[j];
+				if (v0 < v_min) v_min = v0;
+				j += blockDim.x * gridDim.x;
+			}
+
+			atomicMinExt(&(min[0]), v_min);
 		}
 
 		template <class SC>
-		__global__ void continueSearch_kernel(SC *v, SC *d, char *colactive, int *pred, int i, SC h2, int size)
+		__global__ void continueSearchMin_kernel(SC *min, SC *v, SC *d, char *colactive, int *pred, int i, SC h2, SC max, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
-			if (j >= size) return;
 
-			if (colactive[j] != 0)
+			if (j >= size) return;
+			SC v_min = max;
+
+#pragma unroll 4
+			while (j < size)
 			{
-				SC v2 = -v[j] - h2;
-				SC h = d[j];
-				if (v2 < h)
+				if (colactive[j] != 0)
 				{
-					pred[j] = i;
-					d[j] = v2;
+					SC h = d[j];
+					SC v2 = -v[j] - h2;
+					if (v2 < h)
+					{
+						pred[j] = i;
+						d[j] = h = v2;
+					}
+					if (h < v_min) v_min = h;
 				}
+				j += blockDim.x * gridDim.x;
 			}
+
+			atomicMinExt(&(min[0]), v_min);
 		}
 
 		template <class SC, class TC>
-		__global__ void continueSearchJMin_kernel(SC *v, SC *d, TC *tt, char *colactive, int *pred, int i, int jmin, SC min, int size)
+		__global__ void continueSearchJMinMin_kernel(SC *min_val, SC *v, SC *d, TC *tt, char *colactive, int *pred, int i, int jmin, SC min, SC max, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
-			if (j >= size) return;
 
-			if (colactive[j] != 0)
+			if (j >= size) return;
+			SC v_min = max;
+			SC h2 = tt[jmin] - v[jmin] - min;
+
+#pragma unroll 4
+			while (j < size)
 			{
-				SC h2 = tt[jmin] - v[jmin] - min;
-				SC v2 = tt[j] - v[j] - h2;
-				SC h = d[j];
-				if (v2 < h)
+				if (colactive[j] != 0)
 				{
-					pred[j] = i;
-					d[j] = v2;
+					SC h = d[j];
+					SC v2 = tt[j] - v[j] - h2;
+					if (v2 < h)
+					{
+						pred[j] = i;
+						d[j] = h = v2;
+					}
+					if (h < v_min) v_min = h;
 				}
+				j += blockDim.x * gridDim.x;
 			}
+
+			atomicMinExt(&(min_val[0]), v_min);
 		}
 
 		template <class SC>
-		__global__ void continueSearchJMin_kernel(SC *v, SC *d, char *colactive, int *pred, int i, int jmin, SC min, int size)
+		__global__ void continueSearchJMinMin_kernel(SC *min_val, SC *v, SC *d, char *colactive, int *pred, int i, int jmin, SC min, SC max, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
-			if (j >= size) return;
 
-			if (colactive[j] != 0)
+			if (j >= size) return;
+			SC v_min = max;
+			SC h2 = -v[jmin] - min;
+
+#pragma unroll 4
+			while (j < size)
 			{
-				SC h2 = -v[jmin] - min;
-				SC v2 = -v[j] - h2;
-				SC h = d[j];
-				if (v2 < h)
+				if (colactive[j] != 0)
 				{
-					pred[j] = i;
-					d[j] = v2;
+					SC h = d[j];
+					SC v2 = -v[j] - h2;
+					if (v2 < h)
+					{
+						pred[j] = i;
+						d[j] = h = v2;
+					}
+					if (h < v_min) v_min = h;
 				}
+				j += blockDim.x * gridDim.x;
 			}
+
+			atomicMinExt(&(min_val[0]), v_min);
 		}
 
 		template <class SC>
@@ -713,12 +761,11 @@ namespace lap
 #endif
 						// initialize Search
 						initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+						// start search and find minimum value
 						if (f < dim)
-							initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
+							initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
 						else
-							initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
-						// find minimum
-						min_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
+							initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
 						// min is now set so we need to find the correspoding minima for free and taken columns
 						findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 						cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
@@ -771,24 +818,20 @@ namespace lap
 #else
 							int i = colsol[jmin];
 #endif
+							// initialize Search
+							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 							if (f < dim)
 							{
 								// get row
 								auto tt = iterator.getRow(t, i);
-								// initialize Search
-								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 								// continue search
-								continueSearchJMin_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, jmin, min, size);
+								continueSearchJMinMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, jmin, min, std::numeric_limits<SC>::max(), size);
 							}
 							else
 							{
-								// initialize Search
-								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 								// continue search
-								continueSearchJMin_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], i, jmin, min, size);
+								continueSearchJMinMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], i, jmin, min, std::numeric_limits<SC>::max(), size);
 							}
-							// find minimum
-							min_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
 							// min is now set so we need to find the correspoding minima for free and taken columns
 							findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 							cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
@@ -934,11 +977,11 @@ namespace lap
 #endif
 							// initialize Search
 							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+							// start search and find minimum value
 							if (f < dim)
-								initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
+								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
 							else
-								initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
-							min_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
+								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
 							// min is now set so we need to find the correspoding minima for free and taken columns
 							findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 							cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
@@ -1016,12 +1059,12 @@ namespace lap
 #else
 								int i = colsol[jmin];
 #endif
+								// initialize Search
+								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 								if (f < dim)
 								{
 									// get row
 									auto tt = iterator.getRow(t, i);
-									// initialize Search
-									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									// single device
 									if ((jmin >= start) && (jmin < end))
 									{
@@ -1033,12 +1076,10 @@ namespace lap
 									// propagate h2
 #pragma omp barrier
 									// continue search
-									continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, h2, size);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], tt, colactive_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size);
 								}
 								else
 								{
-									// initialize Search
-									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									if ((jmin >= start) && (jmin < end))
 									{
 										cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
@@ -1048,10 +1089,8 @@ namespace lap
 									// propagate h2
 #pragma omp barrier
 									// continue search
-									continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, size);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size);
 								}
-								// find minimum
-								min_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
 								// min is now set so we need to find the correspoding minima for free and taken columns
 								findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
@@ -1234,11 +1273,11 @@ namespace lap
 #endif
 							// initialize Search
 							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+							// start search and find minimum value
 							if (f < dim)
-								initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
+								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, size);
 							else
-								initializeSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
-							min_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
+								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
 							// min is now set so we need to find the correspoding minima for free and taken columns
 							findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 							cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
@@ -1344,11 +1383,12 @@ namespace lap
 									int end = iterator.ws.part[t].second;
 									int size = end - start;
 									cudaStream_t stream = iterator.ws.stream[t];
-									dim3 block_size, grid_size;
+									dim3 block_size, grid_size, grid_size_min;
 									block_size.x = 256;
 									grid_size.x = (size + block_size.x - 1) / block_size.x;
+									grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[t]);
 									// continue search
-									continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], tt[t], colactive_private[t], pred_private[t], i, h2, size);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], tt[t], colactive_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size);
 								}
 							}
 							else
@@ -1369,13 +1409,14 @@ namespace lap
 									int end = iterator.ws.part[t].second;
 									int size = end - start;
 									cudaStream_t stream = iterator.ws.stream[t];
-									dim3 block_size, grid_size;
+									dim3 block_size, grid_size, grid_size_min;
 									block_size.x = 256;
 									grid_size.x = (size + block_size.x - 1) / block_size.x;
+									grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[t]);
 									// initialize Search
 									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									// continue search
-									continueSearch_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, size);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size);
 								}
 							}
 							for (int t = 0; t < devices; t++)
@@ -1385,12 +1426,9 @@ namespace lap
 								int end = iterator.ws.part[t].second;
 								int size = end - start;
 								cudaStream_t stream = iterator.ws.stream[t];
-								dim3 block_size, grid_size, grid_size_min;
+								dim3 block_size, grid_size;
 								block_size.x = 256;
 								grid_size.x = (size + block_size.x - 1) / block_size.x;
-								grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[t]);
-								// find minimum
-								min_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), d_private[t], size);
 								// min is now set so we need to find the correspoding minima for free and taken columns
 								findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
