@@ -15,6 +15,8 @@ namespace lap
 			std::pair<int, int> *part;
 			std::vector<int> device;
 			std::vector<cudaStream_t> stream;
+			std::vector<int> sm_count;
+			std::vector<int> threads_per_sm;
 		public:
 			Worksharing(int size, int multiple, std::vector<int> &devs, bool silent)
 			{
@@ -44,6 +46,8 @@ namespace lap
 								{
 									if (!silent) lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
 									device.push_back(current_device);
+									sm_count.push_back(deviceProp.multiProcessorCount);
+									threads_per_sm.push_back(deviceProp.maxThreadsPerMultiProcessor);
 								}
 							}
 						}
@@ -67,6 +71,8 @@ namespace lap
 						{
 							if (!silent) lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
 							device.push_back(current_device);
+							sm_count.push_back(deviceProp.multiProcessorCount);
+							threads_per_sm.push_back(deviceProp.maxThreadsPerMultiProcessor);
 						}
 					}
 #endif
@@ -84,6 +90,8 @@ namespace lap
 						{
 							if (!silent) lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
 							device.push_back(current_device);
+							sm_count.push_back(deviceProp.multiProcessorCount);
+							threads_per_sm.push_back(deviceProp.maxThreadsPerMultiProcessor);
 						}
 					}
 				}
