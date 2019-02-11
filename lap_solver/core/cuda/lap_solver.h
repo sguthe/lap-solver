@@ -56,6 +56,57 @@ namespace lap
 			return atomicMax(addr, value);
 		}
 
+		template <class C>
+		__device__ __forceinline__ void atomicMinWarp(C *addr, C value)
+		{
+			int laneId = threadIdx.x & 0x1f;
+			C value2 = __shfl_xor_sync(0xffffffff, value, 1, 32);
+			if (value2 < value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 2, 32);
+			if (value2 < value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 4, 32);
+			if (value2 < value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 8, 32);
+			if (value2 < value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 16, 32);
+			if (value2 < value) value = value2;
+			if (laneId == 0) atomicMinExt(&(addr[0]), value);
+		}
+
+		template <class C>
+		__device__ __forceinline__ void atomicMinWarp(C *addr, C value, C invalid)
+		{
+			int laneId = threadIdx.x & 0x1f;
+			C value2 = __shfl_xor_sync(0xffffffff, value, 1, 32);
+			if (value2 < value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 2, 32);
+			if (value2 < value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 4, 32);
+			if (value2 < value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 8, 32);
+			if (value2 < value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 16, 32);
+			if (value2 < value) value = value2;
+			if ((laneId == 0) && (value != invalid)) atomicMinExt(&(addr[0]), value);
+		}
+
+		template <class C>
+		__device__ __forceinline__ void atomicMaxWarp(C *addr, C value)
+		{
+			int laneId = threadIdx.x & 0x1f;
+			C value2 = __shfl_xor_sync(0xffffffff, value, 1, 32);
+			if (value2 > value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 2, 32);
+			if (value2 > value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 4, 32);
+			if (value2 > value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 8, 32);
+			if (value2 > value) value = value2;
+			value2 = __shfl_xor_sync(0xffffffff, value, 16, 32);
+			if (value2 > value) value = value2;
+			if (laneId == 0) atomicMaxExt(&(addr[0]), value);
+		}
+
 		template <class TC>
 		__global__ void initMinMax_kernel(TC *minmax, TC min, TC max, int size)
 		{
@@ -85,8 +136,8 @@ namespace lap
 				x += blockDim.x * gridDim.x;
 			}
 
-			atomicMinExt(&(minmax[0]), v_min);
-			atomicMaxExt(&(minmax[1]), v_max);
+			atomicMinWarp(&(minmax[0]), v_min);
+			atomicMaxWarp(&(minmax[1]), v_max);
 		}
 
 		template <class SC, class TC, class I>
@@ -259,7 +310,7 @@ namespace lap
 				j += blockDim.x * gridDim.x;
 			}
 
-			atomicMinExt(&(min[0]), v_min);
+			atomicMinWarp(&(min[0]), v_min);
 		}
 
 		template <class SC, class TC>
@@ -287,7 +338,7 @@ namespace lap
 				j += blockDim.x * gridDim.x;
 			}
 
-			atomicMinExt(&(min[0]), v_min);
+			atomicMinWarp(&(min[0]), v_min);
 		}
 
 		template <class SC>
@@ -312,7 +363,7 @@ namespace lap
 				j += blockDim.x * gridDim.x;
 			}
 
-			atomicMinExt(&(min[0]), v_min);
+			atomicMinWarp(&(min[0]), v_min);
 		}
 
 		template <class SC>
@@ -340,7 +391,7 @@ namespace lap
 				j += blockDim.x * gridDim.x;
 			}
 
-			atomicMinExt(&(min[0]), v_min);
+			atomicMinWarp(&(min[0]), v_min);
 		}
 
 		template <class SC, class TC>
@@ -369,7 +420,7 @@ namespace lap
 				j += blockDim.x * gridDim.x;
 			}
 
-			atomicMinExt(&(min_val[0]), v_min);
+			atomicMinWarp(&(min_val[0]), v_min);
 		}
 
 		template <class SC>
@@ -398,7 +449,7 @@ namespace lap
 				j += blockDim.x * gridDim.x;
 			}
 
-			atomicMinExt(&(min_val[0]), v_min);
+			atomicMinWarp(&(min_val[0]), v_min);
 		}
 
 		template <class SC>
@@ -407,11 +458,27 @@ namespace lap
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j + start >= end) return;
 
-			if (d[j] == s->min)
+			int jmin_free = end;
+			int jmin_taken = end;
+
+#pragma unroll 4
+			while ((j + start < end) && ((jmin_free == end) || (jmin_taken == end)))
 			{
-				if (colsol[j] < 0) atomicMin(&(s->jmin_free), j + start);
-				else atomicMin(&(s->jmin_taken), j + start);
+				if (d[j] == s->min)
+				{
+					if (colsol[j] < 0)
+					{
+						if (jmin_free == end) jmin_free = j + start;
+					}
+					else
+					{
+						if (jmin_taken == end) jmin_taken = j + start;
+					}
+				}
+				j += blockDim.x * gridDim.x;
 			}
+			atomicMinWarp(&(s->jmin_free), jmin_free, end);
+			atomicMinWarp(&(s->jmin_taken), jmin_taken, end);
 		}
 
 		template <class SC>
@@ -760,7 +827,7 @@ namespace lap
 						else
 							initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
 						// min is now set so we need to find the correspoding minima for free and taken columns
-						findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
+						findMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 						cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
 						cudaStreamSynchronize(stream);
 #ifndef LAP_QUIET
@@ -826,7 +893,7 @@ namespace lap
 								continueSearchJMinMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], i, jmin, min, std::numeric_limits<SC>::max(), size);
 							}
 							// min is now set so we need to find the correspoding minima for free and taken columns
-							findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
+							findMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 							cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
 							cudaStreamSynchronize(stream);
 #ifndef LAP_QUIET
@@ -976,7 +1043,7 @@ namespace lap
 							else
 								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
 							// min is now set so we need to find the correspoding minima for free and taken columns
-							findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
+							findMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 							cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
 							cudaStreamSynchronize(stream);
 #pragma omp barrier
@@ -1085,7 +1152,7 @@ namespace lap
 									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size);
 								}
 								// min is now set so we need to find the correspoding minima for free and taken columns
-								findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
+								findMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
 								cudaStreamSynchronize(stream);
 #pragma omp barrier
@@ -1272,7 +1339,7 @@ namespace lap
 							else
 								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], f, size);
 							// min is now set so we need to find the correspoding minima for free and taken columns
-							findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
+							findMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 							cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
 						}
 						for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
@@ -1423,7 +1490,7 @@ namespace lap
 								block_size.x = 256;
 								grid_size.x = (size + block_size.x - 1) / block_size.x;
 								// min is now set so we need to find the correspoding minima for free and taken columns
-								findMin_kernel<<<grid_size, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
+								findMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], d_private[t], colsol_private[t], start, end);
 								cudaMemcpyAsync(&(host_min_private[t]), min_private[t], sizeof(min_struct<SC>), cudaMemcpyDeviceToHost, stream);
 							}
 							for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
