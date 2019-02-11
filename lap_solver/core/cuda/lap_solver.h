@@ -415,19 +415,15 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__ void setColInactive_kernel(char *colactive, SC *d, SC *d2, SC max, int jmin)
+		__global__ void setColInactive_kernel(char *colactive, int jmin)
 		{
 			colactive[jmin] = 0;
-			d2[jmin] = d[jmin];
-			d[jmin] = max;
 		}
 
 		template <class SC>
-		__global__ void setColInactive_kernel(char *colactive, SC *d, SC *d2, min_struct<SC> *s, int *colsol, SC max, int jmin)
+		__global__ void setColInactive_kernel(char *colactive, min_struct<SC> *s, int *colsol, int jmin)
 		{
 			colactive[jmin] = 0;
-			d2[jmin] = d[jmin];
-			d[jmin] = max;
 			s->colsol_take = colsol[jmin];
 		}
 
@@ -596,7 +592,6 @@ namespace lap
 			char **colactive_private;
 			int **pred_private;
 			SC **d_private;
-			SC **d2_private;
 			int **colsol_private;
 #ifdef LAP_CUDA_LOCAL_ROWSOL
 			int **rowsol_private;
@@ -609,7 +604,6 @@ namespace lap
 			lapAlloc(colactive_private, devices, __FILE__, __LINE__);
 			lapAlloc(pred_private, devices, __FILE__, __LINE__);
 			lapAlloc(d_private, devices, __FILE__, __LINE__);
-			lapAlloc(d2_private, devices, __FILE__, __LINE__);
 			lapAlloc(colsol_private, devices, __FILE__, __LINE__);
 #ifdef LAP_CUDA_LOCAL_ROWSOL
 			lapAlloc(rowsol_private, devices, __FILE__, __LINE__);
@@ -628,7 +622,6 @@ namespace lap
 				cudaMalloc(&(min_private[t]), sizeof(min_struct<SC>));
 				cudaMalloc(&(colactive_private[t]), sizeof(char) * size);
 				cudaMalloc(&(d_private[t]), sizeof(SC) * size);
-				cudaMalloc(&(d2_private[t]), sizeof(SC) * size);
 				cudaMalloc(&(v_private[t]), sizeof(SC) * size);
 				temp_storage[t] = 0;
 				temp_storage_bytes[t] = 0;
@@ -802,9 +795,9 @@ namespace lap
 							unassignedfound = false;
 						}
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
 #else
-						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 #endif
 
 						while (!unassignedfound)
@@ -867,9 +860,9 @@ namespace lap
 								unassignedfound = false;
 							}
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
 #else
-							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 #endif
 						}
 
@@ -880,11 +873,11 @@ namespace lap
 #endif
 						if (epsilon > SC(0))
 						{
-							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d2_private[t], epsilon, size);
+							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], epsilon, size);
 						}
 						else
 						{
-							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d2_private[t], size);
+							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
 						}
 						// synchronization only required due to copy
 #ifndef LAP_CUDA_LOCAL_ROWSOL
@@ -1041,9 +1034,9 @@ namespace lap
 							if ((jmin >= start) && (jmin < end))
 							{
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
 #else
-								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 #endif
 							}
 							while (!unassignedfound)
@@ -1146,9 +1139,9 @@ namespace lap
 								if ((jmin >= start) && (jmin < end))
 								{
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
 #else
-									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 #endif
 								}
 #pragma omp barrier
@@ -1161,11 +1154,11 @@ namespace lap
 #endif
 							if (epsilon > SC(0))
 							{
-								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d2_private[t], epsilon, size);
+								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], epsilon, size);
 							}
 							else
 							{
-								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d2_private[t], size);
+								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
 							}
 							// synchronization only required due to copy
 #ifndef LAP_CUDA_LOCAL_ROWSOL
@@ -1336,9 +1329,9 @@ namespace lap
 							int start = iterator.ws.part[t].first;
 							cudaStream_t stream = iterator.ws.stream[t];
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
 #else
-							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 #endif
 						}
 
@@ -1485,9 +1478,9 @@ namespace lap
 								int start = iterator.ws.part[t].first;
 								cudaStream_t stream = iterator.ws.stream[t];
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], &(host_min_private[t]), colsol_private[t], std::numeric_limits<SC>::max(), jmin - start);
+								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
 #else
-								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], d_private[t], d2_private[t], std::numeric_limits<SC>::max(), jmin - start);
+								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 #endif
 							}
 						}
@@ -1509,11 +1502,11 @@ namespace lap
 #endif
 							if (epsilon > SC(0))
 							{
-								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d2_private[t], epsilon, size);
+								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], epsilon, size);
 							}
 							else
 							{
-								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d2_private[t], size);
+								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
 							}
 							// synchronization only required due to copy
 						}
