@@ -212,11 +212,7 @@ namespace lap
 						minMax_kernel<<<grid_size_min, block_size, 0, stream>>>(d_out[t] + 2 * x, tt, std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), num_items);
 					}
 					cudaMemcpyAsync(&(minmax_cost[2 * t * x_size]), d_out[t], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
-					cudaError_t err = cudaStreamSynchronize(stream);
-					if (err != 0)
-					{
-						std::cout << err << std::endl;
-					}
+					udaStreamSynchronize(stream);
 				}
 #else
 				for (int t = 0; t < devices; t++)
