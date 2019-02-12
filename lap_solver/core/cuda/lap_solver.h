@@ -180,8 +180,8 @@ namespace lap
 				dim3 block_size, grid_size, grid_size_min;
 				block_size.x = 256;
 				grid_size.x = (x_size + block_size.x - 1) / block_size.x;
-				grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] * 
-					std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (4u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+				grid_size_min.x = std::min((num_items + block_size.x - 1) / block_size.x, (unsigned int)iterator.ws.sm_count[0] *
+					std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (4u * (unsigned int)iterator.ws.sm_count[0])), 1u));
 				initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[0], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), x_size);
 				for (int x = x_size - 1; x >= 0; --x)
 				{
@@ -211,8 +211,8 @@ namespace lap
 					dim3 block_size, grid_size, grid_size_min;
 					block_size.x = 256;
 					grid_size.x = (x_size + block_size.x - 1) / block_size.x;
-					grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] *
-						std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (4u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+					grid_size_min.x = std::min((num_items + block_size.x - 1) / block_size.x, (unsigned int)iterator.ws.sm_count[t] *
+						std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (4u * (unsigned int)iterator.ws.sm_count[t])), 1u));
 					initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[t], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), x_size);
 					for (int x = x_size - 1; x >= 0; --x)
 					{
@@ -248,8 +248,8 @@ namespace lap
 						auto tt = iterator.getRow(t, x);
 						dim3 block_size, grid_size_min;
 						block_size.x = 256;
-						grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] *
-							std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (4u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+						grid_size_min.x = std::min((num_items + block_size.x - 1) / block_size.x, (unsigned int)iterator.ws.sm_count[t] *
+							std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (4u * (unsigned int)iterator.ws.sm_count[t])), 1u));
 						minMax_kernel<<<grid_size_min, block_size, 0, stream>>>(d_out[t] + 2 * x, tt, num_items);
 					}
 				}
@@ -268,8 +268,8 @@ namespace lap
 					max_cost = (SC)minmax_cost[2 * x + 1];
 					for (int t = 1; t < devices; t++)
 					{
-						max_cost = std::max(max_cost, (SC)minmax_cost[2 * (t * x_size + x)]);
-						min_cost = std::min(min_cost, (SC)minmax_cost[2 * (t * x_size + x) + 1]);
+						min_cost = std::min(min_cost, (SC)minmax_cost[2 * (t * x_size + x)]);
+						max_cost = std::max(max_cost, (SC)minmax_cost[2 * (t * x_size + x) + 1]);
 					}
 					epsilon += max_cost - min_cost;
 				}
@@ -1214,6 +1214,7 @@ namespace lap
 										unassignedfound = false;
 									}
 								}
+#pragma omp barrier
 								if ((jmin >= start) && (jmin < end))
 								{
 #ifdef LAP_CUDA_LOCAL_ROWSOL
