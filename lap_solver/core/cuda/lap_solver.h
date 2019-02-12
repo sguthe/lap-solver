@@ -12,48 +12,40 @@ namespace lap
 {
 	namespace cuda
 	{
-		__device__ __forceinline__ float atomicMinExt(float *addr, float value) {
-			float old;
-			old = (value >= 0) ? __int_as_float(atomicMin((int *)addr, __float_as_int(value))) :
-				__uint_as_float(atomicMax((unsigned int *)addr, __float_as_uint(value)));
-			return old;
+		__device__ __forceinline__ void atomicMinExt(float *addr, float value) {
+			if (value >= 0) atomicMin((int *)addr, __float_as_int(value));
+			else atomicMax((unsigned int *)addr, __float_as_uint(value));
 		}
 
-		__device__ __forceinline__ float atomicMaxExt(float *addr, float value) {
-			float old;
-			old = (value >= 0) ? __int_as_float(atomicMax((int *)addr, __float_as_int(value))) :
-				__uint_as_float(atomicMin((unsigned int *)addr, __float_as_uint(value)));
-			return old;
+		__device__ __forceinline__ void atomicMaxExt(float *addr, float value) {
+			if (value >= 0) atomicMax((int *)addr, __float_as_int(value));
+			else atomicMin((unsigned int *)addr, __float_as_uint(value));
 		}
 
-		__device__ __forceinline__ double atomicMinExt(double *addr, double value) {
-			double old;
-			old = (value >= 0) ? __longlong_as_double(atomicMin((long long *)addr, __double_as_longlong(value))) :
-				__longlong_as_double(atomicMax((unsigned long long *)addr, (unsigned long long)__double_as_longlong(value)));
-			return old;
+		__device__ __forceinline__ void atomicMinExt(double *addr, double value) {
+			if (value >= 0) atomicMin((long long *)addr, __double_as_longlong(value));
+			else atomicMax((unsigned long long *)addr, (unsigned long long)__double_as_longlong(value));
 		}
 
-		__device__ __forceinline__ double atomicMaxExt(double *addr, double value) {
-			double old;
-			old = (value >= 0) ? __longlong_as_double(atomicMax((long long *)addr, __double_as_longlong(value))) :
-				__longlong_as_double(atomicMin((unsigned long long *)addr, (unsigned long long)__double_as_longlong(value)));
-			return old;
+		__device__ __forceinline__ void atomicMaxExt(double *addr, double value) {
+			if (value >= 0) atomicMax((long long *)addr, __double_as_longlong(value));
+			else atomicMin((unsigned long long *)addr, (unsigned long long)__double_as_longlong(value));
 		}
 
-		__device__ __forceinline__ int atomicMinExt(int *addr, int value) {
-			return atomicMin(addr, value);
+		__device__ __forceinline__ void atomicMinExt(int *addr, int value) {
+			atomicMin(addr, value);
 		}
 
-		__device__ __forceinline__ int atomicMaxExt(int *addr, int value) {
-			return atomicMax(addr, value);
+		__device__ __forceinline__ void atomicMaxExt(int *addr, int value) {
+			atomicMax(addr, value);
 		}
 
-		__device__ __forceinline__ long long atomicMinExt(long long *addr, long long value) {
-			return atomicMin(addr, value);
+		__device__ __forceinline__ void atomicMinExt(long long *addr, long long value) {
+			atomicMin(addr, value);
 		}
 
-		__device__ __forceinline__ long long atomicMaxExt(long long *addr, long long value) {
-			return atomicMax(addr, value);
+		__device__ __forceinline__ void atomicMaxExt(long long *addr, long long value) {
+			atomicMax(addr, value);
 		}
 
 		template <class C>
@@ -143,7 +135,7 @@ namespace lap
 			TC v_min, v_max;
 			v_min = min;
 			v_max = max;
-#pragma unroll 4
+#pragma unroll 8
 			while (x < size)
 			{
 				TC v = in[x];
@@ -181,7 +173,7 @@ namespace lap
 				block_size.x = 256;
 				grid_size.x = (x_size + block_size.x - 1) / block_size.x;
 				grid_size_min.x = std::min((num_items + block_size.x - 1) / block_size.x, (unsigned int)iterator.ws.sm_count[0] *
-					std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (4u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+					std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
 				initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[0], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), x_size);
 				for (int x = x_size - 1; x >= 0; --x)
 				{
@@ -212,7 +204,7 @@ namespace lap
 					block_size.x = 256;
 					grid_size.x = (x_size + block_size.x - 1) / block_size.x;
 					grid_size_min.x = std::min((num_items + block_size.x - 1) / block_size.x, (unsigned int)iterator.ws.sm_count[t] *
-						std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (4u * (unsigned int)iterator.ws.sm_count[t])), 1u));
+						std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (8u * (unsigned int)iterator.ws.sm_count[t])), 1u));
 					initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[t], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), x_size);
 					for (int x = x_size - 1; x >= 0; --x)
 					{
@@ -249,7 +241,7 @@ namespace lap
 						dim3 block_size, grid_size_min;
 						block_size.x = 256;
 						grid_size_min.x = std::min((num_items + block_size.x - 1) / block_size.x, (unsigned int)iterator.ws.sm_count[t] *
-							std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (4u * (unsigned int)iterator.ws.sm_count[t])), 1u));
+							std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (8u * (unsigned int)iterator.ws.sm_count[t])), 1u));
 						minMax_kernel<<<grid_size_min, block_size, 0, stream>>>(d_out[t] + 2 * x, tt, num_items);
 					}
 				}
@@ -314,7 +306,7 @@ namespace lap
 
 			SC v_min = max;
 
-#pragma unroll 4
+#pragma unroll 8
 			while (j < size)
 			{
 				SC v0;
@@ -335,14 +327,16 @@ namespace lap
 
 			SC v_min = max;
 
-#pragma unroll 4
+#pragma unroll 8
 			while (j < size)
 			{
-				if (colactive[j] != 0)
+				SC h = d[j];
+				SC v2 = tt[j] - v[j] - h2;
+				bool is_active = (colactive[j] != 0);
+				bool is_smaller = (v2 < h);
+				if (is_active)
 				{
-					SC h = d[j];
-					SC v2 = tt[j] - v[j] - h2;
-					if (v2 < h)
+					if (is_smaller)
 					{
 						pred[j] = i;
 						d[j] = h = v2;
@@ -362,7 +356,7 @@ namespace lap
 
 			SC v_min = max;
 
-#pragma unroll 4
+#pragma unroll 8
 			while (j < size)
 			{
 				SC v0;
@@ -383,14 +377,16 @@ namespace lap
 
 			SC v_min = max;
 
-#pragma unroll 4
+#pragma unroll 8
 			while (j < size)
 			{
-				if (colactive[j] != 0)
+				SC h = d[j];
+				SC v2 = -v[j] - h2;
+				bool is_active = (colactive[j] != 0);
+				bool is_smaller = (v2 < h);
+				if (is_active)
 				{
-					SC h = d[j];
-					SC v2 = -v[j] - h2;
-					if (v2 < h)
+					if (is_smaller)
 					{
 						pred[j] = i;
 						d[j] = h = v2;
@@ -411,14 +407,16 @@ namespace lap
 			SC v_min = max;
 			SC h2 = tt[jmin] - v[jmin] - min;
 
-#pragma unroll 4
+#pragma unroll 8
 			while (j < size)
 			{
-				if (colactive[j] != 0)
+				SC h = d[j];
+				SC v2 = tt[j] - v[j] - h2;
+				bool is_active = (colactive[j] != 0);
+				bool is_smaller = (v2 < h);
+				if (is_active)
 				{
-					SC h = d[j];
-					SC v2 = tt[j] - v[j] - h2;
-					if (v2 < h)
+					if (is_smaller)
 					{
 						pred[j] = i;
 						d[j] = h = v2;
@@ -439,14 +437,16 @@ namespace lap
 			SC v_min = max;
 			SC h2 = -v[jmin] - min;
 
-#pragma unroll 4
+#pragma unroll 8
 			while (j < size)
 			{
-				if (colactive[j] != 0)
+				SC h = d[j];
+				SC v2 = -v[j] - h2;
+				bool is_active = (colactive[j] != 0);
+				bool is_smaller = (v2 < h);
+				if (is_active)
 				{
-					SC h = d[j];
-					SC v2 = -v[j] - h2;
-					if (v2 < h)
+					if (is_smaller)
 					{
 						pred[j] = i;
 						d[j] = h = v2;
@@ -466,22 +466,23 @@ namespace lap
 
 			int jmin_free = end;
 			int jmin_taken = end;
+			SC min = s->min;
 
-#pragma unroll 4
+#pragma unroll 8
 			while ((j + start < end) && ((jmin_free == end) || (jmin_taken == end)))
 			{
-				if (colactive[j] != 0)
+				bool is_min = (d[j] == min);
+				bool is_active = (colactive[j] != 0);
+				bool is_free = (colsol[j] < 0);
+				if (is_min && is_active)
 				{
-					if (d[j] == s->min)
+					if (is_free)
 					{
-						if (colsol[j] < 0)
-						{
-							if (jmin_free == end) jmin_free = j + start;
-						}
-						else
-						{
-							if (jmin_taken == end) jmin_taken = j + start;
-						}
+						if (jmin_free == end) jmin_free = j + start;
+					}
+					else
+					{
+						if (jmin_taken == end) jmin_taken = j + start;
 					}
 				}
 				j += blockDim.x * gridDim.x;
@@ -501,6 +502,25 @@ namespace lap
 		{
 			colactive[jmin] = 0;
 			s->colsol_take = colsol[jmin];
+		}
+
+		template <class SC>
+		__global__ void setColInactiveInitializeMin_kernel(char *colactive, int jmin, min_struct<SC> *s, SC min, int dim2)
+		{
+			colactive[jmin] = 0;
+			s->min = min;
+			s->jmin_free = dim2;
+			s->jmin_taken = dim2;
+		}
+
+		template <class SC>
+		__global__ void setColInactiveInitializeMin_kernel(char *colactive, min_struct<SC> *s, int *colsol, int jmin, min_struct<SC> *s2, SC min, int dim2)
+		{
+			colactive[jmin] = 0;
+			s->colsol_take = colsol[jmin];
+			s2->min = min;
+			s2->jmin_free = dim2;
+			s2->jmin_taken = dim2;
 		}
 
 		template <class SC>
@@ -821,7 +841,9 @@ namespace lap
 					block_size.x = 256;
 					grid_size.x = (size + block_size.x - 1) / block_size.x;
 					grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] *
-						std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (4u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+						std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+
+					initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 
 					for (int f = 0; f < dim2; f++)
 					{
@@ -830,7 +852,7 @@ namespace lap
 						cudaMemcpyAsync(colsol_private[t], &(colsol[start]), sizeof(int) * size, cudaMemcpyHostToDevice, stream);
 #endif
 						// initialize Search
-						initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+//						initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 						// start search and find minimum value
 						if (f < dim)
 							initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size);
@@ -872,9 +894,11 @@ namespace lap
 							unassignedfound = false;
 						}
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
+//						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
+						setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start, min_private[t], std::numeric_limits<SC>::max(), dim2);
 #else
-						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+//						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+						setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start, min_private[t], std::numeric_limits<SC>::max(), dim2);
 #endif
 
 						while (!unassignedfound)
@@ -889,7 +913,7 @@ namespace lap
 							int i = colsol[jmin];
 #endif
 							// initialize Search
-							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+//							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 							if (f < dim)
 							{
 								// get row
@@ -937,9 +961,11 @@ namespace lap
 								unassignedfound = false;
 							}
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
+//							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
+							setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start, min_private[t], std::numeric_limits<SC>::max(), dim2);
 #else
-							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+//							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+							setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start, min_private[t], std::numeric_limits<SC>::max(), dim2);
 #endif
 						}
 
@@ -1038,7 +1064,9 @@ namespace lap
 						block_size.x = 256;
 						grid_size.x = (size + block_size.x - 1) / block_size.x;
 						grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] *
-							std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (4u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+							std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+
+						initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 
 						for (int f = 0; f < dim2; f++)
 						{
@@ -1047,7 +1075,7 @@ namespace lap
 							cudaMemcpyAsync(colsol_private[t], &(colsol[start]), sizeof(int) * size, cudaMemcpyHostToDevice, stream);
 #endif
 							// initialize Search
-							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+//							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 							// start search and find minimum value
 							if (f < dim)
 								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size);
@@ -1112,10 +1140,16 @@ namespace lap
 							if ((jmin >= start) && (jmin < end))
 							{
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
+//								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
+								setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start, min_private[t], std::numeric_limits<SC>::max(), dim2);
 #else
-								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+//								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+								setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start, min_private[t], std::numeric_limits<SC>::max(), dim2);
 #endif
+							}
+							else
+							{
+								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 							}
 							while (!unassignedfound)
 							{
@@ -1131,7 +1165,7 @@ namespace lap
 								int i = colsol[jmin];
 #endif
 								// initialize Search
-								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+//								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 								if (f < dim)
 								{
 									// get row
@@ -1218,10 +1252,16 @@ namespace lap
 								if ((jmin >= start) && (jmin < end))
 								{
 #ifdef LAP_CUDA_LOCAL_ROWSOL
-									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
+//									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
+									setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start, min_private[t], std::numeric_limits<SC>::max(), dim2);
 #else
-									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+//									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+									setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start, min_private[t], std::numeric_limits<SC>::max(), dim2);
 #endif
+								}
+								else
+								{
+									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 								}
 #pragma omp barrier
 							}
@@ -1326,6 +1366,12 @@ namespace lap
 						cudaStreamSynchronize(stream);
 					} // end of #pragma omp parallel
 #else
+					for (int t = 0; t < devices; t++)
+					{
+						cudaSetDevice(iterator.ws.device[t]);
+						cudaStream_t stream = iterator.ws.stream[t];
+						initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+					}
 					for (int f = 0; f < dim2; f++)
 					{
 						for (int t = 0; t < devices; t++)
@@ -1339,13 +1385,13 @@ namespace lap
 							block_size.x = 256;
 							grid_size.x = (size + block_size.x - 1) / block_size.x;
 							grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] *
-								std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (4u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+								std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
 #ifndef LAP_CUDA_LOCAL_ROWSOL
 							// upload colsol to devices
 							cudaMemcpyAsync(colsol_private[t], &(colsol[start]), sizeof(int) * size, cudaMemcpyHostToDevice, stream);
 #endif
 							// initialize Search
-							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+//							initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 							// start search and find minimum value
 							if (f < dim)
 								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size);
@@ -1402,6 +1448,7 @@ namespace lap
 							unassignedfound = false;
 						}
 
+#if 0
 						// mark last column scanned (single device)
 						{
 							int t = iterator.ws.find(jmin);
@@ -1414,6 +1461,26 @@ namespace lap
 							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 #endif
 						}
+#else
+						for (int t = 0; t < devices; t++)
+						{
+							cudaSetDevice(iterator.ws.device[t]);
+							int start = iterator.ws.part[t].first;
+							cudaStream_t stream = iterator.ws.stream[t];
+							if ((jmin >= start) && (jmin < end))
+							{
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+								setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
+#else
+								setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+#endif
+							}
+							else
+							{
+								initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+							}
+						}
+#endif
 
 						while (!unassignedfound)
 						{
@@ -1439,7 +1506,7 @@ namespace lap
 									// get row
 									tt[t] = iterator.getRow(t, i);
 									// initialize Search
-									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+//									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									if ((jmin >= start) && (jmin < end))
 									{
 										cudaMemcpyAsync(tt_jmin, &(tt[t][jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
@@ -1460,7 +1527,7 @@ namespace lap
 									block_size.x = 256;
 									grid_size.x = (size + block_size.x - 1) / block_size.x;
 									grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] *
-										std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (4u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+										std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
 									// continue search
 									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], tt[t], colactive_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size);
 								}
@@ -1487,9 +1554,9 @@ namespace lap
 									block_size.x = 256;
 									grid_size.x = (size + block_size.x - 1) / block_size.x;
 									grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] *
-										std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (4u * (unsigned int)iterator.ws.sm_count[0])), 1u));
+										std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
 									// initialize Search
-									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+//									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									// continue search
 									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(&(min_private[t]->min), v_private[t], d_private[t], colactive_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size);
 								}
@@ -1553,6 +1620,7 @@ namespace lap
 								jmin = jmin_taken;
 								unassignedfound = false;
 							}
+#if 0
 							// mark last column scanned (single device)
 							{
 								int t = iterator.ws.find(jmin);
@@ -1565,6 +1633,26 @@ namespace lap
 								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 #endif
 							}
+#else
+							for (int t = 0; t < devices; t++)
+							{
+								cudaSetDevice(iterator.ws.device[t]);
+								int start = iterator.ws.part[t].first;
+								cudaStream_t stream = iterator.ws.stream[t];
+								if ((jmin >= start) && (jmin < end))
+								{
+#ifdef LAP_CUDA_LOCAL_ROWSOL
+									setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], &(host_min_private[t]), colsol_private[t], jmin - start);
+#else
+									setColInactiveInitializeMin_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+#endif
+								}
+								else
+								{
+									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
+								}
+							}
+#endif
 						}
 
 						// update column prices. can increase or decrease
