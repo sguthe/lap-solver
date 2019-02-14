@@ -4,10 +4,6 @@
 //#define LAP_DEBUG
 //#define LAP_NO_MEM_DEBUG
 //#define LAP_ROWS_SCANNED
-// these two don't work together at the moment
-#ifndef LAP_ROWS_SCANNED
-# define LAP_CUDA_LOCAL_ROWSOL
-#endif
 // should only be enabled for testing purposes
 //#define LAP_CUDA_ALLOW_WDDM
 // enable one thread per GPU
