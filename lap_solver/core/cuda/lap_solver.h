@@ -567,7 +567,16 @@ namespace lap
 				SC c_min = min[j];
 				int c_jmin = jmin[j];
 				int c_colsol = colsol[j];
-				if ((c_min < v_min) || ((c_min == v_min) && (c_colsol < 0) && (v_colsol >= 0)))
+				bool is_better = (c_min < v_min);
+				if (c_jmin < v_jmin)
+				{
+					is_better = is_better || ((c_min == v_min) && ((c_colsol < 0) || (v_colsol >= 0)));
+				}
+				else
+				{
+					is_better = is_better || ((c_min == v_min) && (c_colsol < 0) && (v_colsol >= 0));
+				}
+				if (is_better)
 				{
 					v_min = c_min;
 					v_jmin = c_jmin;
