@@ -316,7 +316,7 @@ namespace lap
 				SC v0;
 				colactive[j] = 1;
 				pred[j] = f;
-				d[j] = v0 = tt[j] - v[j];
+				d[j] = v0 = (SC)tt[j] - v[j];
 				int c_colsol = colsol[j];
 				if ((v0 < v_min) || ((v0 == v_min) && (c_colsol < 0) && (v_colsol >= 0)))
 				{
@@ -351,7 +351,7 @@ namespace lap
 			while (j < size)
 			{
 				SC h = d[j];
-				SC v2 = tt[j] - v[j] - h2;
+				SC v2 = (SC)tt[j] - v[j] - h2;
 				bool is_active = (colactive[j] != 0);
 				bool is_smaller = (v2 < h);
 				if (is_active)
@@ -469,14 +469,14 @@ namespace lap
 
 			SC v_min = max;
 			int v_jmin = dim2;
-			SC h2 = tt[jmin] - v[jmin] - min;
+			SC h2 = (SC)tt[jmin] - v[jmin] - min;
 			int v_colsol = 0;
 
 #pragma unroll 8
 			while (j < size)
 			{
 				SC h = d[j];
-				SC v2 = tt[j] - v[j] - h2;
+				SC v2 = (SC)tt[j] - v[j] - h2;
 				bool is_active = (colactive[j] != 0);
 				bool is_smaller = (v2 < h);
 				if (is_active)
@@ -945,8 +945,6 @@ namespace lap
 							unassignedfound = false;
 						}
 
-						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
-
 #ifdef LAP_CUDA_COMPARE_CPU
 						{
 							cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream);
@@ -974,6 +972,8 @@ namespace lap
 							}
 						}
 #endif
+
+						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 
 						while (!unassignedfound)
 						{
@@ -1022,8 +1022,6 @@ namespace lap
 								unassignedfound = false;
 							}
 
-							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
-
 #ifdef LAP_CUDA_COMPARE_CPU
 							{
 								cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream);
@@ -1045,12 +1043,14 @@ namespace lap
 										}
 									}
 								}
-								if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
+								if ((min_tmp != min_n) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
 								{
-									std::cout << "continueSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+									std::cout << "continueSearch: " << min_n << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
 								}
 							}
 #endif
+
+							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 						}
 
 						// update column prices. can increase or decrease
@@ -1160,11 +1160,6 @@ namespace lap
 								}
 							}
 #pragma omp barrier
-							// mark last column scanned (single device)
-							if ((jmin >= start) && (jmin < end))
-							{
-								setColInactive_kernel << <1, 1, 0, iterator.ws.stream[t] >> > (colactive_private[t], jmin - start);
-							}
 #ifdef LAP_CUDA_COMPARE_CPU
 							{
 								cudaMemcpyAsync(&(d_tmp[start]), d_private[t], size * sizeof(SC), cudaMemcpyDeviceToHost, stream);
@@ -1196,6 +1191,11 @@ namespace lap
 								}
 							}
 #endif
+							// mark last column scanned (single device)
+							if ((jmin >= start) && (jmin < end))
+							{
+								setColInactive_kernel << <1, 1, 0, iterator.ws.stream[t] >> > (colactive_private[t], jmin - start);
+							}
 							while (!unassignedfound)
 							{
 								// update 'distances' between freerow and all unscanned columns, via next scanned column.
@@ -1276,11 +1276,6 @@ namespace lap
 									}
 								}
 #pragma omp barrier
-								// mark last column scanned (single device)
-								if ((jmin >= start) && (jmin < end))
-								{
-									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
-								}
 #ifdef LAP_CUDA_COMPARE_CPU
 								{
 									cudaMemcpyAsync(&(d_tmp[start]), d_private[t], size * sizeof(SC), cudaMemcpyDeviceToHost, stream);
@@ -1305,13 +1300,18 @@ namespace lap
 												}
 											}
 										}
-										if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
+										if ((min_tmp != min_n) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
 										{
-											std::cout << "continueSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+											std::cout << "continueSearch: " << min_n << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
 										}
 									}
 								}
 #endif
+								// mark last column scanned (single device)
+								if ((jmin >= start) && (jmin < end))
+								{
+									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+								}
 							}
 
 							// update column prices. can increase or decrease
@@ -1641,9 +1641,9 @@ namespace lap
 										}
 									}
 								}
-								if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
+								if ((min_tmp != min_n) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
 								{
-									std::cout << "continueSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+									std::cout << "continueSearch: " << min_n << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
 								}
 							}
 #endif
