@@ -970,7 +970,7 @@ namespace lap
 							}
 							if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
 							{
-								std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+								std::cout << "initializeSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
 							}
 						}
 #endif
@@ -1047,7 +1047,7 @@ namespace lap
 								}
 								if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
 								{
-									std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+									std::cout << "continueSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
 								}
 							}
 #endif
@@ -1191,7 +1191,7 @@ namespace lap
 									}
 									if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
 									{
-										std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+										std::cout << "initializeSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
 									}
 								}
 							}
@@ -1307,7 +1307,7 @@ namespace lap
 										}
 										if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
 										{
-											std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+											std::cout << "continueSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
 										}
 									}
 								}
@@ -1473,7 +1473,7 @@ namespace lap
 							}
 							if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
 							{
-								std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+								std::cout << "initializeSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
 							}
 						}
 #endif
@@ -1643,7 +1643,7 @@ namespace lap
 								}
 								if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
 								{
-									std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+									std::cout << "continueSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
 								}
 							}
 #endif
