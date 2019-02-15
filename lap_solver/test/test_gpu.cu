@@ -8,6 +8,7 @@
 //#define LAP_CUDA_ALLOW_WDDM
 // enable one thread per GPU
 #define LAP_CUDA_OPENMP
+#define LAP_CUDA_COMPARE_CPU
 
 #include "../lap.h"
 

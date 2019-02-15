@@ -740,6 +740,15 @@ namespace lap
 			std::vector<SC> eps_list;
 #endif
 
+#ifdef LAP_CUDA_COMPARE_CPU
+			SC *d_tmp;
+			unsigned char *colactive_tmp;
+			int *colsol_tmp;
+			lapAlloc(d_tmp, dim2, __FILE__, __LINE__);
+			lapAlloc(colactive_tmp, dim2, __FILE__, __LINE__);
+			lapAlloc(colsol_tmp, dim2, __FILE__, __LINE__);
+#endif
+
 			// used for copying
 			min_struct<SC> *host_min_private;
 			reset_struct *host_reset;
@@ -938,6 +947,34 @@ namespace lap
 
 						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 
+#ifdef LAP_CUDA_COMPARE_CPU
+						{
+							cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+							cudaMemcpyAsync(colactive_tmp, colactive_private[t], dim2 * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
+							cudaMemcpyAsync(colsol_tmp, colsol_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
+							cudaStreamSynchronize(stream);
+							SC min_tmp = std::numeric_limits<SC>::max();
+							int jmin_tmp = dim2;
+							int colsol_old_tmp = 0;
+							for (int j = 0; j < dim2; j++)
+							{
+								if (colactive_tmp[j] != 0)
+								{
+									if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_tmp[j] < 0) && (colsol_old_tmp >= 0)))
+									{
+										min_tmp = d_tmp[j];
+										jmin_tmp = j;
+										colsol_old_tmp = colsol_tmp[j];
+									}
+								}
+							}
+							if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
+							{
+								std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+							}
+						}
+#endif
+
 						while (!unassignedfound)
 						{
 							int i = colsol_old;
@@ -986,6 +1023,34 @@ namespace lap
 							}
 
 							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+
+#ifdef LAP_CUDA_COMPARE_CPU
+							{
+								cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+								cudaMemcpyAsync(colactive_tmp, colactive_private[t], dim2 * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
+								cudaMemcpyAsync(colsol_tmp, colsol_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
+								cudaStreamSynchronize(stream);
+								SC min_tmp = std::numeric_limits<SC>::max();
+								int jmin_tmp = dim2;
+								int colsol_old_tmp = 0;
+								for (int j = 0; j < dim2; j++)
+								{
+									if (colactive_tmp[j] != 0)
+									{
+										if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_tmp[j] < 0) && (colsol_old_tmp >= 0)))
+										{
+											min_tmp = d_tmp[j];
+											jmin_tmp = j;
+											colsol_old_tmp = colsol_tmp[j];
+										}
+									}
+								}
+								if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
+								{
+									std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+								}
+							}
+#endif
 						}
 
 						// update column prices. can increase or decrease
@@ -1045,11 +1110,11 @@ namespace lap
 						{
 							// start search and find minimum value
 							if (f < dim)
-								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
+								initializeSearchMin_kernel << <grid_size_min, block_size, 0, stream >> > (min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 							else
-								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
+								initializeSearchMin_kernel << <grid_size_min, block_size, 0, stream >> > (min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 							// min is now set so we need to find the correspoding minima for free and taken columns
-							findMin_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), grid_size_min.x * (block_size.x >> 5), dim2);
+							findMin_kernel << <1, 32, 0, stream >> > (&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), grid_size_min.x * (block_size.x >> 5), dim2);
 							cudaStreamSynchronize(stream);
 #pragma omp barrier
 #pragma omp master
@@ -1098,8 +1163,39 @@ namespace lap
 							// mark last column scanned (single device)
 							if ((jmin >= start) && (jmin < end))
 							{
-								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+								setColInactive_kernel << <1, 1, 0, iterator.ws.stream[t] >> > (colactive_private[t], jmin - start);
 							}
+#ifdef LAP_CUDA_COMPARE_CPU
+							{
+								cudaMemcpyAsync(&(d_tmp[start]), d_private[t], size * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+								cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], size * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
+								cudaMemcpyAsync(&(colsol_tmp[start]), colsol_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
+								cudaStreamSynchronize(stream);
+#pragma omp barrier
+#pragma omp master
+								{
+									SC min_tmp = std::numeric_limits<SC>::max();
+									int jmin_tmp = dim2;
+									int colsol_old_tmp = 0;
+									for (int j = 0; j < dim2; j++)
+									{
+										if (colactive_tmp[j] != 0)
+										{
+											if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_tmp[j] < 0) && (colsol_old_tmp >= 0)))
+											{
+												min_tmp = d_tmp[j];
+												jmin_tmp = j;
+												colsol_old_tmp = colsol_tmp[j];
+											}
+										}
+									}
+									if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
+									{
+										std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+									}
+								}
+							}
+#endif
 							while (!unassignedfound)
 							{
 								// update 'distances' between freerow and all unscanned columns, via next scanned column.
@@ -1185,6 +1281,37 @@ namespace lap
 								{
 									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 								}
+#ifdef LAP_CUDA_COMPARE_CPU
+								{
+									cudaMemcpyAsync(&(d_tmp[start]), d_private[t], size * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+									cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], size * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
+									cudaMemcpyAsync(&(colsol_tmp[start]), colsol_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
+									cudaStreamSynchronize(stream);
+#pragma omp barrier
+#pragma omp master
+									{
+										SC min_tmp = std::numeric_limits<SC>::max();
+										int jmin_tmp = dim2;
+										int colsol_old_tmp = 0;
+										for (int j = 0; j < dim2; j++)
+										{
+											if (colactive_tmp[j] != 0)
+											{
+												if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_tmp[j] < 0) && (colsol_old_tmp >= 0)))
+												{
+													min_tmp = d_tmp[j];
+													jmin_tmp = j;
+													colsol_old_tmp = colsol_tmp[j];
+												}
+											}
+										}
+										if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
+										{
+											std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+										}
+									}
+								}
+#endif
 							}
 
 							// update column prices. can increase or decrease
@@ -1315,6 +1442,41 @@ namespace lap
 							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 						}
 
+#ifdef LAP_CUDA_COMPARE_CPU
+						{
+							for (int t = 0; t < devices; t++)
+							{
+								cudaSetDevice(iterator.ws.device[t]);
+								int start = iterator.ws.part[t].first;
+								int end = iterator.ws.part[t].second;
+								int size = end - start;
+								cudaStream_t stream = iterator.ws.stream[t];
+								cudaMemcpyAsync(&(d_tmp[start]), d_private[t], size * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+								cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], size * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
+								cudaMemcpyAsync(&(colsol_tmp[start]), colsol_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
+							}
+							for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
+							SC min_tmp = std::numeric_limits<SC>::max();
+							int jmin_tmp = dim2;
+							int colsol_old_tmp = 0;
+							for (int j = 0; j < dim2; j++)
+							{
+								if (colactive_tmp[j] != 0)
+								{
+									if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_tmp[j] < 0) && (colsol_old_tmp >= 0)))
+									{
+										min_tmp = d_tmp[j];
+										jmin_tmp = j;
+										colsol_old_tmp = colsol_tmp[j];
+									}
+								}
+							}
+							if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
+							{
+								std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+							}
+						}
+#endif
 						while (!unassignedfound)
 						{
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
@@ -1450,6 +1612,41 @@ namespace lap
 								cudaStream_t stream = iterator.ws.stream[t];
 								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 							}
+#ifdef LAP_CUDA_COMPARE_CPU
+							{
+								for (int t = 0; t < devices; t++)
+								{
+									cudaSetDevice(iterator.ws.device[t]);
+									int start = iterator.ws.part[t].first;
+									int end = iterator.ws.part[t].second;
+									int size = end - start;
+									cudaStream_t stream = iterator.ws.stream[t];
+									cudaMemcpyAsync(&(d_tmp[start]), d_private[t], size * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+									cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], size * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
+									cudaMemcpyAsync(&(colsol_tmp[start]), colsol_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
+								}
+								for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
+								SC min_tmp = std::numeric_limits<SC>::max();
+								int jmin_tmp = dim2;
+								int colsol_old_tmp = 0;
+								for (int j = 0; j < dim2; j++)
+								{
+									if (colactive_tmp[j] != 0)
+									{
+										if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_tmp[j] < 0) && (colsol_old_tmp >= 0)))
+										{
+											min_tmp = d_tmp[j];
+											jmin_tmp = j;
+											colsol_old_tmp = colsol_tmp[j];
+										}
+									}
+								}
+								if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
+								{
+									std::cout << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
+								}
+							}
+#endif
 						}
 
 						// update column prices. can increase or decrease
@@ -1654,6 +1851,11 @@ namespace lap
 			omp_set_num_threads(old_threads);
 #else
 			lapFree(tt);
+#endif
+#ifdef LAP_CUDA_COMPARE_CPU
+			lapFree(d_tmp);
+			lapFree(colactive_tmp);
+			lapFree(colsol_tmp);
 #endif
 			// set device back to first one
 			cudaSetDevice(iterator.ws.device[0]);
