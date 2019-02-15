@@ -79,6 +79,17 @@ namespace lap
 		}
 
 		template <class C>
+		__device__ __forceinline__ void minWarp8(C &value)
+		{
+			C value2 = __shfl_xor_sync(0xff, value, 1, 32);
+			if (value2 < value) value = value2;
+			value2 = __shfl_xor_sync(0xff, value, 2, 32);
+			if (value2 < value) value = value2;
+			value2 = __shfl_xor_sync(0xff, value, 4, 32);
+			if (value2 < value) value = value2;
+		}
+
+		template <class C>
 		__device__ __forceinline__ void atomicMinWarp(C *addr, C value)
 		{
 			int laneId = threadIdx.x & 0x1f;
@@ -130,6 +141,28 @@ namespace lap
 			minWarp(index);
 			int first = __ffs(__ballot_sync(0xffffffff, old_index == index)) - 1;
 			old = __shfl_sync(0xffffffff, old, first, 32);
+		}
+
+		template <class C>
+		__device__ __forceinline__ void minWarpIndex8(C &value, int &index, int &old)
+		{
+			C old_val = value;
+			minWarp8(value);
+			bool active = ((old < 0) && (old_val == value));
+			int mask = __ballot_sync(0xff, active);
+			if (mask == 0)
+			{
+				active = (old_val == value);
+				mask = __ballot_sync(0xff, active);
+			}
+			int old_index = index;
+			if (!active)
+			{
+				index = 0x7fffffff;
+			}
+			minWarp8(index);
+			int first = __ffs(__ballot_sync(0xff, old_index == index)) - 1;
+			old = __shfl_sync(0xff, old, first, 32);
 		}
 
 		template <class TC>
@@ -553,7 +586,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__ void findMin_kernel(min_struct<SC> *s, SC *min, int *jmin, int *colsol, SC max, int size, int dim2)
+		__global__ void findMinSmall_kernel(min_struct<SC> *s, SC *min, int *jmin, int *colsol, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x;
 
@@ -561,7 +594,109 @@ namespace lap
 			int v_jmin = dim2;
 			int v_colsol = 0;
 
-#pragma unroll 8
+			if (j < size)
+			{
+				SC c_min = min[j];
+				int c_jmin = jmin[j];
+				int c_colsol = colsol[j];
+				bool is_better = (c_min < v_min);
+				if (c_jmin < v_jmin)
+				{
+					is_better = is_better || ((c_min == v_min) && ((c_colsol < 0) || (v_colsol >= 0)));
+				}
+				else
+				{
+					is_better = is_better || ((c_min == v_min) && (c_colsol < 0) && (v_colsol >= 0));
+				}
+				if (is_better)
+				{
+					v_min = c_min;
+					v_jmin = c_jmin;
+					v_colsol = c_colsol;
+				}
+				j += blockDim.x;
+			}
+			minWarpIndex(v_min, v_jmin, v_colsol);
+			if (threadIdx.x == 0)
+			{
+				s->min = v_min;
+				s->jmin = v_jmin;
+				s->colsol = v_colsol;
+			}
+		}
+
+		template <class SC>
+		__global__ void findMinMedium_kernel(min_struct<SC> *s, SC *min, int *jmin, int *colsol, SC max, int size, int dim2)
+		{
+			// 256 threads in 8 warps
+			__shared__ SC b_min[8];
+			__shared__ int b_jmin[8];
+			__shared__ int b_colsol[8];
+
+			int j = threadIdx.x;
+
+			SC v_min = max;
+			int v_jmin = dim2;
+			int v_colsol = 0;
+
+			if (j < size)
+			{
+				SC c_min = min[j];
+				int c_jmin = jmin[j];
+				int c_colsol = colsol[j];
+				bool is_better = (c_min < v_min);
+				if (c_jmin < v_jmin)
+				{
+					is_better = is_better || ((c_min == v_min) && ((c_colsol < 0) || (v_colsol >= 0)));
+				}
+				else
+				{
+					is_better = is_better || ((c_min == v_min) && (c_colsol < 0) && (v_colsol >= 0));
+				}
+				if (is_better)
+				{
+					v_min = c_min;
+					v_jmin = c_jmin;
+					v_colsol = c_colsol;
+				}
+				j += blockDim.x;
+			}
+			minWarpIndex(v_min, v_jmin, v_colsol);
+			if ((threadIdx.x & 0x1f) == 0)
+			{
+				int bidx = threadIdx.x >> 5;
+				b_min[bidx] = v_min;
+				b_jmin[bidx] = v_jmin;
+				b_colsol[bidx] = v_colsol;
+			}
+			__syncthreads();
+			if (threadIdx.x >= 8) return;
+			v_min = b_min[threadIdx.x];
+			v_jmin = b_jmin[threadIdx.x];
+			v_colsol = b_colsol[threadIdx.x];
+			minWarpIndex8(v_min, v_jmin, v_colsol);
+			if (threadIdx.x == 0)
+			{
+				s->min = v_min;
+				s->jmin = v_jmin;
+				s->colsol = v_colsol;
+			}
+		}
+
+		template <class SC>
+		__global__ void findMinLarge_kernel(min_struct<SC> *s, SC *min, int *jmin, int *colsol, SC max, int size, int dim2)
+		{
+			// 1024 threads in 32 warps
+			__shared__ SC b_min[32];
+			__shared__ int b_jmin[32];
+			__shared__ int b_colsol[32];
+
+			int j = threadIdx.x;
+
+			SC v_min = max;
+			int v_jmin = dim2;
+			int v_colsol = 0;
+
 			while (j < size)
 			{
 				SC c_min = min[j];
@@ -586,6 +721,19 @@ namespace lap
 			}
 			minWarpIndex(v_min, v_jmin, v_colsol);
 			if ((threadIdx.x & 0x1f) == 0)
+			{
+				int bidx = threadIdx.x >> 5;
+				b_min[bidx] = v_min;
+				b_jmin[bidx] = v_jmin;
+				b_colsol[bidx] = v_colsol;
+			}
+			__syncthreads();
+			if (threadIdx.x >= 32) return;
+			v_min = b_min[threadIdx.x];
+			v_jmin = b_jmin[threadIdx.x];
+			v_colsol = b_colsol[threadIdx.x];
+			minWarpIndex(v_min, v_jmin, v_colsol);
+			if (threadIdx.x == 0)
 			{
 				s->min = v_min;
 				s->jmin = v_jmin;
@@ -913,7 +1061,10 @@ namespace lap
 						else
 							initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 						// min is now set so we need to find the correspoding minima for free and taken columns
-						findMin_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), grid_size_min.x * (block_size.x >> 5), dim2);
+						int min_count = grid_size_min.x * (block_size.x >> 5);
+						if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+						else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+						else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 						cudaStreamSynchronize(stream);
 #ifndef LAP_QUIET
 						if (f < dim) total_rows++; else total_virtual++;
@@ -991,7 +1142,9 @@ namespace lap
 								continueSearchJMinMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, jmin, min, std::numeric_limits<SC>::max(), size, dim2);
 							}
 							// min is now set so we need to find the correspoding minima for free and taken columns
-							findMin_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), grid_size_min.x * (block_size.x >> 5), dim2);
+							if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+							else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+							else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							cudaStreamSynchronize(stream);
 #ifndef LAP_QUIET
 							if (i < dim) total_rows++; else total_virtual++;
@@ -1114,7 +1267,10 @@ namespace lap
 							else
 								initializeSearchMin_kernel << <grid_size_min, block_size, 0, stream >> > (min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 							// min is now set so we need to find the correspoding minima for free and taken columns
-							findMin_kernel << <1, 32, 0, stream >> > (&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), grid_size_min.x * (block_size.x >> 5), dim2);
+							int min_count = grid_size_min.x * (block_size.x >> 5);
+							if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+							else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+							else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							cudaStreamSynchronize(stream);
 #pragma omp barrier
 #pragma omp master
@@ -1231,7 +1387,10 @@ namespace lap
 									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size, dim2);
 								}
 								// min is now set so we need to find the correspoding minima for free and taken columns
-								findMin_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), grid_size_min.x * (block_size.x >> 5), dim2);
+								int min_count = grid_size_min.x * (block_size.x >> 5);
+								if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+								else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+								else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 								cudaStreamSynchronize(stream);
 #pragma omp barrier
 #pragma omp master
@@ -1392,7 +1551,10 @@ namespace lap
 							else
 								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 							// min is now set so we need to find the correspoding minima for free and taken columns
-							findMin_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), grid_size_min.x * (block_size.x >> 5), dim2);
+							int min_count = grid_size_min.x * (block_size.x >> 5);
+							if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+							else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+							else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 						}
 						for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
 #ifndef LAP_QUIET
@@ -1562,7 +1724,10 @@ namespace lap
 								grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] *
 									std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
 								// min is now set so we need to find the correspoding minima for free and taken columns
-								findMin_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), grid_size_min.x * (block_size.x >> 5), dim2);
+								int min_count = grid_size_min.x * (block_size.x >> 5);
+								if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+								else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
+								else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							}
 							for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
 #ifndef LAP_QUIET
