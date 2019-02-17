@@ -315,7 +315,7 @@ namespace lap
 #ifdef LAP_CUDA_OPENMP
 			omp_set_num_threads(old_threads);
 #endif
-			return epsilon / (SC(10) * SC(x_size));
+			return epsilon / (SC(8) * SC(x_size));
 		}
 
 		template <class SC>
@@ -1207,7 +1207,7 @@ namespace lap
 						}
 
 						// update column prices. can increase or decrease
-						if (epsilon > SC(0))
+						if ((epsilon > SC(0)) && (f + 1 < dim2))
 						{
 							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], epsilon, size);
 						}
@@ -1474,7 +1474,7 @@ namespace lap
 							}
 
 							// update column prices. can increase or decrease
-							if (epsilon > SC(0))
+							if ((epsilon > SC(0)) && (f + 1 < dim2))
 							{
 								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], epsilon, size);
 							}
@@ -1826,7 +1826,7 @@ namespace lap
 							dim3 block_size, grid_size;
 							block_size.x = 256;
 							grid_size.x = (size + block_size.x - 1) / block_size.x;
-							if (epsilon > SC(0))
+							if ((epsilon > SC(0)) && (f + 1 < dim2))
 							{
 								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], epsilon, size);
 							}

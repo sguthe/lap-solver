@@ -54,7 +54,7 @@ namespace lap
 			}
 			lapFree(min_cost);
 			lapFree(max_cost);
-			return epsilon / (SC(10) * SC(x_size));
+			return epsilon / (SC(8) * SC(x_size));
 		}
 
 		template <class SC, class CF, class I>

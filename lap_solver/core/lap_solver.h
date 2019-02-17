@@ -221,7 +221,7 @@ namespace lap
 			}
 			epsilon += max_cost - min_cost;
 		}
-		return epsilon / (SC(10) * SC(x_size));
+		return epsilon / (SC(8) * SC(x_size));
 	}
 
 #if defined(__GNUC__)
