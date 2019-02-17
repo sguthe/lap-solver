@@ -207,19 +207,28 @@ namespace lap
 	SC guessEpsilon(int x_size, int y_size, I& iterator)
 	{
 		SC epsilon(0);
+		SC *min_cost;
+		SC *max_cost;
+		lapAlloc(min_cost, x_size, __FILE__, __LINE__);
+		lapAlloc(max_cost, x_size, __FILE__, __LINE__);
 		// reverse order to avoid cachethrashing
 		for (int x = x_size - 1; x >= 0; --x)
 		{
 			const auto *tt = iterator.getRow(x);
-			SC min_cost, max_cost;
-			min_cost = max_cost = (SC)tt[0];
+			SC min_cost_l, max_cost_l;
+			min_cost_l = max_cost_l = (SC)tt[0];
 			for (int y = 1; y < y_size; y++)
 			{
 				SC cost_l = (SC)tt[y];
-				min_cost = std::min(min_cost, cost_l);
-				max_cost = std::max(max_cost, cost_l);
+				min_cost_l = std::min(min_cost_l, cost_l);
+				max_cost_l = std::max(max_cost_l, cost_l);
 			}
-			epsilon += max_cost - min_cost;
+			max_cost[x] = max_cost_l;
+			min_cost[x] = min_cost_l;
+		}
+		for (int x = 0; x < x_size; x++)
+		{
+			epsilon += max_cost[x] - min_cost[x];
 		}
 		return epsilon / (SC(8) * SC(x_size));
 	}
