@@ -201,6 +201,7 @@ namespace lap
 		SC guessEpsilon(int x_size, int y_size, I& iterator)
 		{
 			SC epsilon(0);
+			SC min_epsilon(0);
 			int devices = (int)iterator.ws.device.size();
 #ifdef LAP_CUDA_OPENMP
 			int old_threads = omp_get_max_threads();
@@ -236,7 +237,9 @@ namespace lap
 					SC min_cost, max_cost;
 					min_cost = (SC)minmax_cost[2 * x];
 					max_cost = (SC)minmax_cost[2 * x + 1];
-					epsilon += max_cost - min_cost;
+					//epsilon += max_cost - min_cost;
+					epsilon = std::max(epsilon, max_cost - min_cost);
+					min_epsilon = std::min(min_epsilon, max_cost - min_cost);
 				}
 			}
 			else
@@ -307,7 +310,9 @@ namespace lap
 						min_cost = std::min(min_cost, (SC)minmax_cost[2 * (t * x_size + x)]);
 						max_cost = std::max(max_cost, (SC)minmax_cost[2 * (t * x_size + x) + 1]);
 					}
-					epsilon += max_cost - min_cost;
+					//epsilon += max_cost - min_cost;
+					epsilon = std::max(epsilon, max_cost - min_cost);
+					min_epsilon = std::min(min_epsilon, max_cost - min_cost);
 				}
 			}
 			cudaFreeHost(minmax_cost);
@@ -315,7 +320,8 @@ namespace lap
 #ifdef LAP_CUDA_OPENMP
 			omp_set_num_threads(old_threads);
 #endif
-			return epsilon / (SC(8) * SC(x_size));
+			//return epsilon / (SC(8) * SC(x_size));
+			return (epsilon + min_epsilon) / SC(16);
 		}
 
 		template <class SC>
