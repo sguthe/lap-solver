@@ -228,9 +228,11 @@ namespace lap
 		}
 		for (int x = 0; x < x_size; x++)
 		{
-			epsilon += max_cost[x] - min_cost[x];
+			//epsilon += max_cost[x] - min_cost[x];
+			epsilon = std::max(epsilon, max_cost[x] - min_cost[x]);
 		}
 		return epsilon / (SC(8) * SC(x_size));
+		return epsilon / SC(8);
 	}
 
 #if defined(__GNUC__)

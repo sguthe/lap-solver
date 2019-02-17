@@ -50,11 +50,13 @@ namespace lap
 			}
 			for (int x = 0; x < x_size; x++)
 			{
-				epsilon += max_cost[x] - min_cost[x];
+				//epsilon += max_cost[x] - min_cost[x];
+				epsilon = std::max(epsilon, max_cost[x] - min_cost[x]);
 			}
 			lapFree(min_cost);
 			lapFree(max_cost);
-			return epsilon / (SC(8) * SC(x_size));
+			//return epsilon / (SC(8) * SC(x_size));
+			return epsilon / SC(8);
 		}
 
 		template <class SC, class CF, class I>
