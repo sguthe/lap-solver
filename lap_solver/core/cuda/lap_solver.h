@@ -384,7 +384,7 @@ namespace lap
 			while (j < size)
 			{
 				SC h = d[j];
-				SC v2 = ((SC)tt[j] - v[j]) - h2;
+				SC v2 = (SC)tt[j] - v[j] - h2;
 				bool is_active = (colactive[j] != 0);
 				bool is_smaller = (v2 < h);
 				if (is_active)
@@ -502,14 +502,14 @@ namespace lap
 
 			SC v_min = max;
 			int v_jmin = dim2;
-			SC h2 = ((SC)tt[jmin] - v[jmin]) - min;
+			SC h2 = (SC)tt[jmin] - v[jmin] - min;
 			int v_colsol = 0;
 
 #pragma unroll 8
 			while (j < size)
 			{
 				SC h = d[j];
-				SC v2 = ((SC)tt[j] - v[j]) - h2;
+				SC v2 = (SC)tt[j] - v[j] - h2;
 				bool is_active = (colactive[j] != 0);
 				bool is_smaller = (v2 < h);
 				if (is_active)

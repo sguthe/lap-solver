@@ -462,7 +462,6 @@ namespace lap
 		SC *d;
 		int *colsol;
 		SC *v;
-		//SC *u;
 
 #ifdef LAP_DEBUG
 		std::vector<SC *> v_list;
@@ -495,19 +494,11 @@ namespace lap
 		bool allow_reset = true;
 
 		memset(v, 0, dim2 * sizeof(SC));
-//		memset(u, 0, dim2 * sizeof(SC));
 
 		unsigned long long count = 0ULL;
 		while (epsilon >= SC(0))
 		{
 			getNextEpsilon(epsilon, epsilon_lower, last_avg, first, allow_reset, v, dim2);
-#if 0
-			if (!first)
-			{
-				// use current solution to update u
-				getDual(dim, dim2, iterator.costfunc, rowsol, u, v);
-			}
-#endif
 			SC total = SC(0);
 			count = 0;
 #ifndef LAP_QUIET
@@ -617,12 +608,12 @@ namespace lap
 					if (i < dim)
 					{
 						auto tt = iterator.getRow(i);
-						SC h2 = (tt[jmin] - v[jmin]) - min;
+						SC h2 = tt[jmin] - v[jmin] - min;
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
 							{
-								SC v2 = (tt[j] - v[j]) - h2;
+								SC v2 = tt[j] - v[j] - h2;
 								SC h = d[j];
 								if (v2 < h)
 								{
