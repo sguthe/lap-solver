@@ -229,7 +229,6 @@ namespace lap
 								u = -v[start];
 								for (int j = start + 1; j < end; j++)
 								{
-									int j_local = j - start;
 									u = std::min(u, -v[j]);
 								}
 								min_private[t] = u;
@@ -364,7 +363,6 @@ namespace lap
 									u = -v[start];
 									for (int j = start + 1; j < end; j++)
 									{
-										int j_local = j - start;
 										u = std::min(u, -v[j]);
 									}
 									min_private[t] = u;
