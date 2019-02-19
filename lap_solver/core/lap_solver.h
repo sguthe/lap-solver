@@ -324,7 +324,7 @@ namespace lap
 					else
 					{
 						SC min_v = v[0];
-						for (int i = 1; i < dim2; i++) min_v = std::max(min_v, v[i]);
+						for (int i = 1; i < dim2; i++) min_v = std::min(min_v, v[i]);
 						for (int i = 0; i < dim2; i++) v[i] -= min_v;
 						epsilon = std::max(SC(epsilon / 64.0), next);
 						allow_reset = false;
