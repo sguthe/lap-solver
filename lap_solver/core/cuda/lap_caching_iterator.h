@@ -13,10 +13,10 @@ namespace lap
 		protected:
 			int dim, dim2;
 			long long max_memory;
-			CF &costfunc;
 			TC** rows;
 			CACHE* cache;
 		public:
+			CF &costfunc;
 			Worksharing &ws;
 
 		public:

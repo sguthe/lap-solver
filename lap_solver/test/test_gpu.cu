@@ -16,6 +16,7 @@
 #include <string>
 #include "test_options.h"
 #include "image.h"
+#include <iomanip>
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -127,7 +128,7 @@ void solveCachingCUDA(TP &start_time, int N1, int N2, RCF &get_cost_row, CF &get
 	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol);
 
 	std::stringstream ss;
-	ss << "cost = " << lap::cuda::cost<SC>(N1, N2, costFunction, rowsol, ws.stream[0]);
+	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cuda::cost<SC>(N1, N2, costFunction, rowsol, ws.stream[0]);
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
@@ -159,7 +160,7 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol);
 
 	std::stringstream ss;
-	ss << "cost = " << lap::cost<SC>(N1, N2, costMatrix, rowsol);
+	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costMatrix, rowsol);
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
@@ -430,7 +431,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 				}
 				for (int i = 0; i < N; i++) my_cost += row[i];
 				delete[] row;
-				ss << "ground truth cost = " << my_cost;
+				ss << "ground truth cost = " << std::setprecision(std::numeric_limits<C>::max_digits10) << my_cost;
 			}
 			lap::displayTime(start_time, ss.str().c_str(), std::cout);
 
@@ -696,7 +697,7 @@ template <class C> void testSanity(long long min_tab, long long max_tab, long lo
 			else ss << "test failed: ";
 			C real_cost(0);
 			for (int i = 0; i < N; i++) real_cost += get_cost(i, i);
-			ss << "ground truth cost = " << real_cost;
+			ss << "ground truth cost = " << std::setprecision(std::numeric_limits<C>::max_digits10) << real_cost;
 			lap::displayTime(start_time, ss.str().c_str(), std::cout);
 
 			delete[] vec;

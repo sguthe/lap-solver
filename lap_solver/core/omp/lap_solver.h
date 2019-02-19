@@ -170,6 +170,7 @@ namespace lap
 				jmin = dim2;
 				min = std::numeric_limits<SC>::max();
 				SC h2_global;
+				SC u_global;
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
@@ -183,12 +184,31 @@ namespace lap
 						if (f < dim)
 						{
 							auto tt = iterator.getRow(t, f);
+							SC u;
+							{
+								u = (SC)tt[0] - v[start];
+								for (int j = start + 1; j < end; j++)
+								{
+									int j_local = j - start;
+									u = std::min(u, (SC)tt[j_local] - v[j]);
+								}
+								min_private[t] = u;
+							}
+#pragma omp barrier
+#pragma omp master
+							{
+								u = min_private[0];
+								for (int tt = 1; tt < omp_get_num_threads(); tt++) u = std::min(u, min_private[tt]);
+								u_global = u;
+							}
+#pragma omp barrier
+							u = u_global;
 							for (int j = start; j < end; j++)
 							{
 								int j_local = j - start;
 								colactive[j] = 1;
 								pred[j] = f;
-								SC h = d[j] = tt[j_local] - v[j];
+								SC h = d[j] = (tt[j_local] - v[j]) - u;
 								if (h < min_local)
 								{
 									// better
@@ -204,11 +224,31 @@ namespace lap
 						}
 						else
 						{
+							SC u;
+							{
+								u = -v[start];
+								for (int j = start + 1; j < end; j++)
+								{
+									int j_local = j - start;
+									u = std::min(u, -v[j]);
+								}
+								min_private[t] = u;
+							}
+#pragma omp barrier
+#pragma omp master
+							{
+								u = min_private[0];
+								for (int tt = 1; tt < omp_get_num_threads(); tt++) u = std::min(u, min_private[tt]);
+								u_global = u;
+							}
+#pragma omp barrier
+							u = u_global;
+							min_local = std::numeric_limits<SC>::max();
 							for (int j = start; j < end; j++)
 							{
 								colactive[j] = 1;
 								pred[j] = f;
-								SC h = d[j] = -v[j];
+								SC h = d[j] = -v[j] - u;
 								if (h < min_local)
 								{
 									// better
@@ -267,8 +307,27 @@ namespace lap
 							if (i < dim)
 							{
 								auto tt = iterator.getRow(t, i);
+								SC u;
+								{
+									u = (SC)tt[0] - v[start];
+									for (int j = start + 1; j < end; j++)
+									{
+										int j_local = j - start;
+										u = std::min(u, (SC)tt[j_local] - v[j]);
+									}
+									min_private[t] = u;
+								}
+#pragma omp barrier
+#pragma omp master
+								{
+									u = min_private[0];
+									for (int tt = 1; tt < omp_get_num_threads(); tt++) u = std::min(u, min_private[tt]);
+									u_global = u;
+								}
+#pragma omp barrier
+								u = u_global;
 								SC h2;
-								if ((jmin >= start) && (jmin < end)) h2_global = h2 = tt[jmin - start] - v[jmin] - min;
+								if ((jmin >= start) && (jmin < end)) h2_global = h2 = (tt[jmin - start] - v[jmin]) - u - min;
 #pragma omp barrier
 								if ((jmin < start) || (jmin >= end)) h2 = h2_global;
 								for (int j = start; j < end; j++)
@@ -276,7 +335,7 @@ namespace lap
 									int j_local = j - start;
 									if (colactive[j] != 0)
 									{
-										SC v2 = tt[j_local] - v[j] - h2;
+										SC v2 = (tt[j_local] - v[j]) - u - h2;
 										SC h = d[j];
 										if (v2 < h)
 										{
@@ -300,12 +359,31 @@ namespace lap
 							}
 							else
 							{
-								SC h2 = -v[jmin] - min;
+								SC u;
+								{
+									u = -v[start];
+									for (int j = start + 1; j < end; j++)
+									{
+										int j_local = j - start;
+										u = std::min(u, -v[j]);
+									}
+									min_private[t] = u;
+								}
+#pragma omp barrier
+#pragma omp master
+								{
+									u = min_private[0];
+									for (int tt = 1; tt < omp_get_num_threads(); tt++) u = std::min(u, min_private[tt]);
+									u_global = u;
+								}
+#pragma omp barrier
+								u = u_global;
+								SC h2 = -v[jmin] - u - min;
 								for (int j = start; j < end; j++)
 								{
 									if (colactive[j] != 0)
 									{
-										SC v2 = -v[j] - h2;
+										SC v2 = -v[j] - u - h2;
 										SC h = d[j];
 										if (v2 < h)
 										{
@@ -502,40 +580,8 @@ namespace lap
 		SC cost(int dim, int dim2, CF &costfunc, int *rowsol)
 		{
 			SC total = SC(0);
-			if (costfunc.allEnabled())
-			{
-#pragma omp parallel
-				{
-					SC total_local = SC(0);
-#pragma omp for nowait schedule(static)
-					for (int i = 0; i < dim; i++) total_local += costfunc.getCost(i, rowsol[i]);
-#pragma omp critical
-					total += total_local;
-				}
-			}
-			else
-			{
-				int i = 0;
-#pragma omp parallel
-				{
-					SC total_local = SC(0);
-					if (costfunc.enabled(omp_get_thread_num()))
-					{
-						int i_local;
-						do
-						{
-#pragma omp critical
-							i_local = i++;
-							if (i_local < dim)
-							{
-								total_local += costfunc.getCost(i_local, rowsol[i_local]);
-							}
-						} while (i_local < dim);
-					}
-#pragma omp critical
-					total += total_local;
-				}
-			}
+#pragma omp parallel for reduction(+:total)
+			for (int i = 0; i < dim; i++) total += costfunc.getCost(i, rowsol[i]);
 			return total;
 		}
 

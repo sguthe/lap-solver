@@ -89,7 +89,7 @@ namespace lap
 		// Iterator classes used for accessing the cost functions
 		template <class SC, class TC, class CF> class DirectIterator;
 		template <class SC, class TC, class CF, class CACHE> class CachingIterator;
-	}
+}
 #endif
 }
 

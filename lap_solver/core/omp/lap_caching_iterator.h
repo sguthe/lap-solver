@@ -15,11 +15,11 @@ namespace lap
 		protected:
 			int dim, dim2;
 			int entries;
-			CF &costfunc;
 			TC** rows;
 			CACHE *cache;
 			bool *tc;
 		public:
+			CF &costfunc;
 			Worksharing &ws;
 
 		public:
@@ -37,7 +37,6 @@ namespace lap
 					cache[t].setSize(entries, dim);
 					lapAlloc(rows[t], entries * size, __FILE__, __LINE__);
 					// first touch
-					//memset(rows[t], 0, entries * size * sizeof(TC));
 					rows[t][0] = TC(0);
 				}
 			}
@@ -63,37 +62,7 @@ namespace lap
 				bool found = cache[t].find(idx, i);
 				if (!found)
 				{
-					// everyone will go in here since all intances of the cache hold the same information
-					if (costfunc.allEnabled())
-					{
-						costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, i, ws.part[t].first, ws.part[t].second);
-					}
-					else
-					{
-						tc[t] = costfunc.enabled(t);
-#pragma omp barrier
-						if (costfunc.enabled(t))
-						{
-							int t_local = t;
-							while (t_local < omp_get_max_threads())
-							{
-								int size_local = ws.part[t_local].second - ws.part[t_local].first;
-								costfunc.getCostRow(rows[t_local] + (long long)size_local * (long long)idx, i, ws.part[t_local].first, ws.part[t_local].second);
-								// find next
-#pragma omp critical
-								{
-									do
-									{
-										t_local++;
-										if (t_local >= omp_get_max_threads()) t_local = 0;
-									} while ((t_local != t) && (tc[t_local] == true));
-									if (t_local == t) t_local = omp_get_max_threads();
-									else tc[t_local] = true;
-								}
-							}
-						}
-#pragma omp barrier
-					}
+					costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, i, ws.part[t].first, ws.part[t].second);
 				}
 				return rows[t] + (long long)size * (long long)idx;
 			}

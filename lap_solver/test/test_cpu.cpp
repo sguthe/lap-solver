@@ -12,6 +12,7 @@
 #include <string>
 #include "test_options.h"
 #include "image.h"
+#include <iomanip>
 
 template <class C> void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
 template <class C> void testSanity(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
@@ -133,7 +134,7 @@ void solveTableOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bo
 	lap::omp::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
 
 	std::stringstream ss;
-	ss << "cost = " << lap::omp::cost<SC>(N1, N2, costMatrix, rowsol);
+	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::omp::cost<SC>(N1, N2, costMatrix, rowsol);
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 #endif
@@ -152,7 +153,7 @@ void solveTable(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool 
 	lap::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
 
 	std::stringstream ss;
-	ss << "cost = " << lap::cost<SC>(N1, N2, costMatrix, rowsol);
+	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costMatrix, rowsol);
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
@@ -185,7 +186,7 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 	}
 
 	std::stringstream ss;
-	ss << "cost = " << lap::omp::cost<SC>(N1, N2, costFunction, rowsol);
+	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::omp::cost<SC>(N1, N2, costFunction, rowsol);
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 #endif
@@ -217,7 +218,7 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 	}
 
 	std::stringstream ss;
-	ss << "cost = " << lap::cost<SC>(N1, N2, costFunction, rowsol);
+	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costFunction, rowsol);
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
@@ -355,7 +356,7 @@ void testSanity(long long min_tab, long long max_tab, int runs, bool omp, bool e
 			else ss << "test failed: ";
 			C real_cost(0);
 			for (int i = 0; i < N; i++) real_cost += get_cost(i, i);
-			ss << "ground truth cost = " << real_cost;
+			ss << "ground truth cost = " << std::setprecision(std::numeric_limits<C>::max_digits10) << real_cost;
 			lap::displayTime(start_time, ss.str().c_str(), std::cout);
 
 			delete[] vec;
@@ -420,7 +421,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			else ss << "test failed: ";
 			C real_cost(0);
 			for (int i = 0; i < N; i++) real_cost += get_cost(i, i);
-			ss << "ground truth cost = " << real_cost;
+			ss << "ground truth cost = " << std::setprecision(std::numeric_limits<C>::max_digits10) << real_cost;
 			lap::displayTime(start_time, ss.str().c_str(), std::cout);
 
 			delete[] rowsol;

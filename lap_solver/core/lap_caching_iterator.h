@@ -10,10 +10,10 @@ namespace lap
 	protected:
 		int dim, dim2;
 		int entries;
-		CF &costfunc;
 		TC* rows;
 		CACHE cache;
-
+	public:
+		CF &costfunc;
 	public:
 		CachingIterator(int dim, int dim2, int entries, CF &costfunc)
 			: dim(dim), dim2(dim2), entries(entries), costfunc(costfunc)

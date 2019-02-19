@@ -11,8 +11,8 @@ namespace lap
 		{
 		protected:
 			int dim, dim2;
-			CF &costfunc;
 		public:
+			CF &costfunc;
 			Worksharing &ws;
 
 		public:
