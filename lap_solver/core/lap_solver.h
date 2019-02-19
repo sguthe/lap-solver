@@ -303,14 +303,6 @@ namespace lap
 #endif
 					memset(v, 0, dim2 * sizeof(SC));
 				}
-				else
-				{
-					SC min_v = v[0];
-					SC max_v = v[0];
-					for (int i = 1; i < dim2; i++) if (v[i] < min_v) min_v = v[i]; else if (v[i] > max_v) max_v = v[i];
-					min_v = (min_v + max_v) / SC(2);
-					for (int i = 0; i < dim2; i++) v[i] -= min_v;
-				}
 				epsilon = SC(0);
 			}
 			else
@@ -331,11 +323,6 @@ namespace lap
 					}
 					else
 					{
-						SC min_v = v[0];
-						SC max_v = v[0];
-						for (int i = 1; i < dim2; i++) if (v[i] < min_v) min_v = v[i]; else if (v[i] > max_v) max_v = v[i];
-						min_v = (min_v + max_v) / SC(2);
-						for (int i = 0; i < dim2; i++) v[i] -= min_v;
 						epsilon = std::max(SC(epsilon / 64.0), next);
 						allow_reset = false;
 					}
@@ -566,27 +553,14 @@ namespace lap
 				// Dijkstra search
 				min = std::numeric_limits<SC>::max();
 				jmin = dim2;
-				SC u;
 				if (f < dim)
 				{
 					auto tt = iterator.getRow(f);
-#if 0
-					if (first)
-					{
-						SC cmin = (SC)tt[0];
-						for (int j = 1; j < dim2; j++) cmin = std::min(cmin, (SC)tt[j]);
-						u[f] = cmin;
-					}
-#endif
-					{
-						u = (SC)tt[0] - v[0];
-						for (int j = 1; j < dim2; j++) u = std::min(u, (SC)tt[j] - v[j]);
-					}
 					for (int j = 0; j < dim2; j++)
 					{
 						colactive[j] = 1;
 						pred[j] = f;
-						SC h = d[j] = (tt[j] - v[j]) - u;
+						SC h = d[j] = tt[j] - v[j];
 						if (h < min)
 						{
 							// better
@@ -602,15 +576,11 @@ namespace lap
 				}
 				else
 				{
-					{
-						u = -v[0];
-						for (int j = 1; j < dim2; j++) u = std::min(u, -v[j]);
-					}
 					for (int j = 0; j < dim2; j++)
 					{
 						colactive[j] = 1;
 						pred[j] = f;
-						SC h = d[j] = -v[j] - u;
+						SC h = d[j] = -v[j];
 						if (h < min)
 						{
 							// better
@@ -647,17 +617,12 @@ namespace lap
 					if (i < dim)
 					{
 						auto tt = iterator.getRow(i);
-						{
-							u = (SC)tt[0] - v[0];
-							for (int j = 1; j < dim2; j++) u = std::min(u, (SC)tt[j] - v[j]);
-						}
-
-						SC h2 = (tt[jmin] - v[jmin]) - u - min;
+						SC h2 = (tt[jmin] - v[jmin]);
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
 							{
-								SC v2 = (tt[j] - v[j]) - u - h2;
+								SC v2 = ((tt[j] - v[j]) - h2) + min;
 								SC h = d[j];
 								if (v2 < h)
 								{
@@ -681,17 +646,12 @@ namespace lap
 					}
 					else
 					{
-						{
-							u = (SC)-v[0];
-							for (int j = 1; j < dim2; j++) u = std::min(u, -v[j]);
-						}
-
-						SC h2 = -v[jmin] - u - min;
+						SC h2 = -v[jmin];
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
 							{
-								SC v2 = -v[j] - u - h2;
+								SC v2 = (-v[j] - h2) + min;
 								SC h = d[j];
 								if (v2 < h)
 								{

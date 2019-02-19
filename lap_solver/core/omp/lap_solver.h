@@ -170,7 +170,6 @@ namespace lap
 				jmin = dim2;
 				min = std::numeric_limits<SC>::max();
 				SC h2_global;
-				SC u_global;
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
@@ -184,31 +183,12 @@ namespace lap
 						if (f < dim)
 						{
 							auto tt = iterator.getRow(t, f);
-							SC u;
-							{
-								u = (SC)tt[0] - v[start];
-								for (int j = start + 1; j < end; j++)
-								{
-									int j_local = j - start;
-									u = std::min(u, (SC)tt[j_local] - v[j]);
-								}
-								min_private[t] = u;
-							}
-#pragma omp barrier
-#pragma omp master
-							{
-								u = min_private[0];
-								for (int tt = 1; tt < omp_get_num_threads(); tt++) u = std::min(u, min_private[tt]);
-								u_global = u;
-							}
-#pragma omp barrier
-							u = u_global;
 							for (int j = start; j < end; j++)
 							{
 								int j_local = j - start;
 								colactive[j] = 1;
 								pred[j] = f;
-								SC h = d[j] = (tt[j_local] - v[j]) - u;
+								SC h = d[j] = tt[j_local] - v[j];
 								if (h < min_local)
 								{
 									// better
@@ -224,30 +204,12 @@ namespace lap
 						}
 						else
 						{
-							SC u;
-							{
-								u = -v[start];
-								for (int j = start + 1; j < end; j++)
-								{
-									u = std::min(u, -v[j]);
-								}
-								min_private[t] = u;
-							}
-#pragma omp barrier
-#pragma omp master
-							{
-								u = min_private[0];
-								for (int tt = 1; tt < omp_get_num_threads(); tt++) u = std::min(u, min_private[tt]);
-								u_global = u;
-							}
-#pragma omp barrier
-							u = u_global;
 							min_local = std::numeric_limits<SC>::max();
 							for (int j = start; j < end; j++)
 							{
 								colactive[j] = 1;
 								pred[j] = f;
-								SC h = d[j] = -v[j] - u;
+								SC h = d[j] = -v[j];
 								if (h < min_local)
 								{
 									// better
@@ -305,28 +267,9 @@ namespace lap
 							min_local = std::numeric_limits<SC>::max();
 							if (i < dim)
 							{
-								auto tt = iterator.getRow(t, i);
-								SC u;
-								{
-									u = (SC)tt[0] - v[start];
-									for (int j = start + 1; j < end; j++)
-									{
-										int j_local = j - start;
-										u = std::min(u, (SC)tt[j_local] - v[j]);
-									}
-									min_private[t] = u;
-								}
-#pragma omp barrier
-#pragma omp master
-								{
-									u = min_private[0];
-									for (int tt = 1; tt < omp_get_num_threads(); tt++) u = std::min(u, min_private[tt]);
-									u_global = u;
-								}
-#pragma omp barrier
-								u = u_global;
 								SC h2;
-								if ((jmin >= start) && (jmin < end)) h2_global = h2 = (tt[jmin - start] - v[jmin]) - u - min;
+								auto tt = iterator.getRow(t, i);
+								if ((jmin >= start) && (jmin < end)) h2_global = h2 = (tt[jmin - start] - v[jmin]);
 #pragma omp barrier
 								if ((jmin < start) || (jmin >= end)) h2 = h2_global;
 								for (int j = start; j < end; j++)
@@ -334,7 +277,7 @@ namespace lap
 									int j_local = j - start;
 									if (colactive[j] != 0)
 									{
-										SC v2 = (tt[j_local] - v[j]) - u - h2;
+										SC v2 = ((tt[j_local] - v[j]) - h2) + min;
 										SC h = d[j];
 										if (v2 < h)
 										{
@@ -358,30 +301,12 @@ namespace lap
 							}
 							else
 							{
-								SC u;
-								{
-									u = -v[start];
-									for (int j = start + 1; j < end; j++)
-									{
-										u = std::min(u, -v[j]);
-									}
-									min_private[t] = u;
-								}
-#pragma omp barrier
-#pragma omp master
-								{
-									u = min_private[0];
-									for (int tt = 1; tt < omp_get_num_threads(); tt++) u = std::min(u, min_private[tt]);
-									u_global = u;
-								}
-#pragma omp barrier
-								u = u_global;
-								SC h2 = -v[jmin] - u - min;
+								SC h2 = -v[jmin];
 								for (int j = start; j < end; j++)
 								{
 									if (colactive[j] != 0)
 									{
-										SC v2 = -v[j] - u - h2;
+										SC v2 = (-v[j] - h2) + min;
 										SC h = d[j];
 										if (v2 < h)
 										{
@@ -435,7 +360,6 @@ namespace lap
 								}
 								min = std::max(min, min_n);
 								dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
-								h2_global = std::numeric_limits<SC>::infinity();
 							}
 #pragma omp barrier
 						}
