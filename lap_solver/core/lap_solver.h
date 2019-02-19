@@ -617,12 +617,12 @@ namespace lap
 					if (i < dim)
 					{
 						auto tt = iterator.getRow(i);
-						SC h2 = (tt[jmin] - v[jmin]);
+						SC h2 = (tt[jmin] - v[jmin]) - min;
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
 							{
-								SC v2 = ((tt[j] - v[j]) - h2) + min;
+								SC v2 = (tt[j] - v[j]) - h2;
 								SC h = d[j];
 								if (v2 < h)
 								{
@@ -646,12 +646,12 @@ namespace lap
 					}
 					else
 					{
-						SC h2 = -v[jmin];
+						SC h2 = -v[jmin] - min;
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
 							{
-								SC v2 = (-v[j] - h2) + min;
+								SC v2 = -v[j] - h2;
 								SC h = d[j];
 								if (v2 < h)
 								{
