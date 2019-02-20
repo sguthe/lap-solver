@@ -115,8 +115,9 @@ namespace lap
 
 			SC *min_private;
 			int *jmin_private;
-			lapAlloc(min_private, omp_get_max_threads(), __FILE__, __LINE__);
-			lapAlloc(jmin_private, omp_get_max_threads(), __FILE__, __LINE__);
+			// use << 3 to avoid false sharing
+			lapAlloc(min_private, omp_get_max_threads() << 3, __FILE__, __LINE__);
+			lapAlloc(jmin_private, omp_get_max_threads() << 3, __FILE__, __LINE__);
 
 #ifdef LAP_ROWS_SCANNED
 			unsigned long long *scancount;
@@ -223,8 +224,8 @@ namespace lap
 								}
 							}
 						}
-						min_private[t] = min_local;
-						jmin_private[t] = jmin_local;
+						min_private[t << 3] = min_local;
+						jmin_private[t << 3] = jmin_local;
 #pragma omp barrier
 #pragma omp master
 						{
@@ -242,15 +243,15 @@ namespace lap
 							jmin = jmin_private[0];
 							for (int tt = 1; tt < omp_get_num_threads(); tt++)
 							{
-								if (min_private[tt] < min)
+								if (min_private[tt << 3] < min)
 								{
 									// better than previous
-									min = min_private[tt];
-									jmin = jmin_private[tt];
+									min = min_private[tt  << 3];
+									jmin = jmin_private[tt << 3];
 								}
-								else if (min_private[tt] == min)
+								else if (min_private[tt << 3] == min)
 								{
-									if ((colsol[jmin] >= 0) && (colsol[jmin_private[tt]] < 0)) jmin = jmin_private[tt];
+									if ((colsol[jmin] >= 0) && (colsol[jmin_private[tt << 3]] < 0)) jmin = jmin_private[tt << 3];
 								}
 							}
 							unassignedfound = false;
@@ -328,8 +329,8 @@ namespace lap
 									}
 								}
 							}
-							min_private[t] = min_local;
-							jmin_private[t] = jmin_local;
+							min_private[t << 3] = min_local;
+							jmin_private[t << 3] = jmin_local;
 #pragma omp barrier
 #pragma omp master
 							{
@@ -347,15 +348,15 @@ namespace lap
 								jmin = jmin_private[0];
 								for (int tt = 1; tt < omp_get_num_threads(); tt++)
 								{
-									if (min_private[tt] < min_n)
+									if (min_private[tt << 3] < min_n)
 									{
 										// better than previous
-										min_n = min_private[tt];
-										jmin = jmin_private[tt];
+										min_n = min_private[tt << 3];
+										jmin = jmin_private[tt << 3];
 									}
-									else if (min_private[tt] == min_n)
+									else if (min_private[tt << 3] == min_n)
 									{
-										if ((colsol[jmin] >= 0) && (colsol[jmin_private[tt]] < 0)) jmin = jmin_private[tt];
+										if ((colsol[jmin] >= 0) && (colsol[jmin_private[tt << 3]] < 0)) jmin = jmin_private[tt << 3];
 									}
 								}
 								min = std::max(min, min_n);
