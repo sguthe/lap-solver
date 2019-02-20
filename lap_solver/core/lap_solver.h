@@ -240,6 +240,24 @@ namespace lap
         __inline__ __attribute__((always_inline))
 #endif
 
+	// fallback if no larger type has been implemented (only required for floating point numbers)
+	template <class C>
+	__forceinline C accurateSum(C a, C b, C c)
+	{
+		C r = a + b;
+		C t = r - a;
+		t -= b;
+		r += c - t;
+		return r;
+	}
+
+	template <> __forceinline char accurateSum(char a, char b, char c) { return a + b + c; }
+	template <> __forceinline short accurateSum(short a, short b, short c) { return a + b + c; }
+	template <> __forceinline int accurateSum(int a, int b, int c) { return a + b + c; }
+	template <> __forceinline long long accurateSum(long long a, long long b, long long c) { return a + b + c; }
+	template <> __forceinline float accurateSum(float a, float b, float c) { return (float)((double)a + (double)b + (double)c); }
+	template <> __forceinline double accurateSum(double a, double b, double c) { return (double)((long double)a + (long double)b + (long double)c); }
+
 	__forceinline void dijkstraCheck(int &endofpath, bool &unassignedfound, int jmin, int *colsol, char *colactive, int *colcomplete, int &completecount)
 	{
 		colactive[jmin] = 0;
@@ -608,12 +626,12 @@ namespace lap
 					if (i < dim)
 					{
 						auto tt = iterator.getRow(i);
-						SC h2 = tt[jmin] - v[jmin] - min;
+						SC h2 = accurateSum((SC)tt[jmin], -v[jmin], -min);
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
 							{
-								SC v2 = tt[j] - v[j] - h2;
+								SC v2 = accurateSum((SC)tt[j], -v[j], -h2);
 								SC h = d[j];
 								if (v2 < h)
 								{

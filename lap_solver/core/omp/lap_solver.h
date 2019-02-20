@@ -270,7 +270,7 @@ namespace lap
 							{
 								SC h2;
 								auto tt = iterator.getRow(t, i);
-								if ((jmin >= start) && (jmin < end)) h2_global = h2 = tt[jmin - start] - v[jmin] - min;
+								if ((jmin >= start) && (jmin < end)) h2_global = h2 = lap::accurateSum((SC)tt[jmin - start], -v[jmin], -min);
 #pragma omp barrier
 								if ((jmin < start) || (jmin >= end)) h2 = h2_global;
 								for (int j = start; j < end; j++)
@@ -278,7 +278,7 @@ namespace lap
 									int j_local = j - start;
 									if (colactive[j] != 0)
 									{
-										SC v2 = tt[j_local] - v[j] - h2;
+										SC v2 = lap::accurateSum((SC)tt[j_local], -v[j], -h2);
 										SC h = d[j];
 										if (v2 < h)
 										{
