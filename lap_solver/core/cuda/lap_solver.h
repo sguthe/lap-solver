@@ -315,7 +315,7 @@ namespace lap
 #ifdef LAP_CUDA_OPENMP
 			omp_set_num_threads(old_threads);
 #endif
-			return epsilon / (SC(10) * SC(x_size));
+			return epsilon / (SC(8) * SC(x_size));
 		}
 
 		template <class SC>
@@ -339,9 +339,9 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			SC v_min = max;
-			int v_jmin = dim2;
-			int v_colsol = 0;
+			SC t_min = max;
+			int t_jmin = dim2;
+			int t_colsol = 0;
 
 #pragma unroll 8
 			while (j < size)
@@ -351,40 +351,41 @@ namespace lap
 				pred[j] = f;
 				d[j] = v0 = (SC)tt[j] - v[j];
 				int c_colsol = colsol[j];
-				if ((v0 < v_min) || ((v0 == v_min) && (c_colsol < 0) && (v_colsol >= 0)))
+				if ((v0 < t_min) || ((v0 == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
 				{
-					v_min = v0;
-					v_jmin = j;
-					v_colsol = c_colsol;
+					t_min = v0;
+					t_jmin = j;
+					t_colsol = c_colsol;
 				}
 				j += blockDim.x * gridDim.x;
 			}
 
 
-			minWarpIndex(v_min, v_jmin, v_colsol);
+			minWarpIndex(t_min, t_jmin, t_colsol);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
 				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = v_min;
-				o_jmin[i] = v_jmin;
-				o_colsol[i] = v_colsol;
+				o_min[i] = t_min;
+				o_jmin[i] = t_jmin;
+				o_colsol[i] = t_colsol;
 			}
 		}
 
 		template <class SC, class TC>
-		__global__ void continueSearchMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, SC h2, SC max, int size, int dim2)
+		__global__ void continueSearchMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, SC tt_jmin, SC v_jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			SC v_min = max;
-			int v_jmin = dim2;
-			int v_colsol = 0;
+			SC t_min = max;
+			int t_jmin = dim2;
+			int t_colsol = 0;
 
 #pragma unroll 8
 			while (j < size)
 			{
 				SC h = d[j];
-				SC v2 = (SC)tt[j] - v[j] - h2;
+				//SC v2 = (SC)tt[j] - v[j] - h2;
+				SC v2 = ((SC)tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
 				bool is_active = (colactive[j] != 0);
 				bool is_smaller = (v2 < h);
 				if (is_active)
@@ -395,23 +396,23 @@ namespace lap
 						d[j] = h = v2;
 					}
 					int c_colsol = colsol[j];
-					if ((h < v_min) || ((h == v_min) && (c_colsol < 0) && (v_colsol >= 0)))
+					if ((h < t_min) || ((h == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
 					{
-						v_min = h;
-						v_jmin = j;
-						v_colsol = c_colsol;
+						t_min = h;
+						t_jmin = j;
+						t_colsol = c_colsol;
 					}
 				}
 				j += blockDim.x * gridDim.x;
 			}
 
-			minWarpIndex(v_min, v_jmin, v_colsol);
+			minWarpIndex(t_min, t_jmin, t_colsol);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
 				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = v_min;
-				o_jmin[i] = v_jmin;
-				o_colsol[i] = v_colsol;
+				o_min[i] = t_min;
+				o_jmin[i] = t_jmin;
+				o_colsol[i] = t_colsol;
 			}
 		}
 
@@ -420,9 +421,9 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			SC v_min = max;
-			int v_jmin = dim2;
-			int v_colsol = 0;
+			SC t_min = max;
+			int t_jmin = dim2;
+			int t_colsol = 0;
 
 #pragma unroll 8
 			while (j < size)
@@ -432,39 +433,40 @@ namespace lap
 				pred[j] = f;
 				d[j] = v0 = -v[j];
 				int c_colsol = colsol[j];
-				if ((v0 < v_min) || ((v0 == v_min) && (c_colsol < 0) && (v_colsol >= 0)))
+				if ((v0 < t_min) || ((v0 == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
 				{
-					v_min = v0;
-					v_jmin = j;
-					v_colsol = c_colsol;
+					t_min = v0;
+					t_jmin = j;
+					t_colsol = c_colsol;
 				}
 				j += blockDim.x * gridDim.x;
 			}
 
-			minWarpIndex(v_min, v_jmin, v_colsol);
+			minWarpIndex(t_min, t_jmin, t_colsol);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
 				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = v_min;
-				o_jmin[i] = v_jmin;
-				o_colsol[i] = v_colsol;
+				o_min[i] = t_min;
+				o_jmin[i] = t_jmin;
+				o_colsol[i] = t_colsol;
 			}
 		}
 
 		template <class SC>
-		__global__ void continueSearchMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC h2, SC max, int size, int dim2)
+		__global__ void continueSearchMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC v_jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			SC v_min = max;
-			int v_jmin = dim2;
-			int v_colsol = 0;
+			SC t_min = max;
+			int t_jmin = dim2;
+			int t_colsol = 0;
 
 #pragma unroll 8
 			while (j < size)
 			{
 				SC h = d[j];
-				SC v2 = -v[j] - h2;
+				//SC v2 = -v[j] - h2;
+				SC v2 = -(v[j] - v_jmin) + min;
 				bool is_active = (colactive[j] != 0);
 				bool is_smaller = (v2 < h);
 				if (is_active)
@@ -475,23 +477,23 @@ namespace lap
 						d[j] = h = v2;
 					}
 					int c_colsol = colsol[j];
-					if ((h < v_min) || ((h == v_min) && (c_colsol < 0) && (v_colsol >= 0)))
+					if ((h < t_min) || ((h == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
 					{
-						v_min = h;
-						v_jmin = j;
-						v_colsol = c_colsol;
+						t_min = h;
+						t_jmin = j;
+						t_colsol = c_colsol;
 					}
 				}
 				j += blockDim.x * gridDim.x;
 			}
 
-			minWarpIndex(v_min, v_jmin, v_colsol);
+			minWarpIndex(t_min, t_jmin, t_colsol);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
 				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = v_min;
-				o_jmin[i] = v_jmin;
-				o_colsol[i] = v_colsol;
+				o_min[i] = t_min;
+				o_jmin[i] = t_jmin;
+				o_colsol[i] = t_colsol;
 			}
 		}
 
@@ -500,16 +502,19 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			SC v_min = max;
-			int v_jmin = dim2;
-			SC h2 = (SC)tt[jmin] - v[jmin] - min;
-			int v_colsol = 0;
+			SC t_min = max;
+			int t_jmin = dim2;
+			//SC h2 = (SC)tt[jmin] - v[jmin] - min;
+			SC tt_jmin = (SC)tt[jmin];
+			SC v_jmin = v[jmin];
+			int t_colsol = 0;
 
 #pragma unroll 8
 			while (j < size)
 			{
 				SC h = d[j];
-				SC v2 = (SC)tt[j] - v[j] - h2;
+				//SC v2 = (SC)tt[j] - v[j] - h2;
+				SC v2 = ((SC)tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
 				bool is_active = (colactive[j] != 0);
 				bool is_smaller = (v2 < h);
 				if (is_active)
@@ -520,23 +525,23 @@ namespace lap
 						d[j] = h = v2;
 					}
 					int c_colsol = colsol[j];
-					if ((h < v_min) || ((h == v_min) && (c_colsol < 0) && (v_colsol >= 0)))
+					if ((h < t_min) || ((h == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
 					{
-						v_min = h;
-						v_jmin = j;
-						v_colsol = c_colsol;
+						t_min = h;
+						t_jmin = j;
+						t_colsol = c_colsol;
 					}
 				}
 				j += blockDim.x * gridDim.x;
 			}
 
-			minWarpIndex(v_min, v_jmin, v_colsol);
+			minWarpIndex(t_min, t_jmin, t_colsol);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
 				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = v_min;
-				o_jmin[i] = v_jmin;
-				o_colsol[i] = v_colsol;
+				o_min[i] = t_min;
+				o_jmin[i] = t_jmin;
+				o_colsol[i] = t_colsol;
 			}
 		}
 
@@ -545,16 +550,18 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			SC v_min = max;
-			int v_jmin = dim2;
-			SC h2 = -v[jmin] - min;
-			int v_colsol = 0;
+			SC t_min = max;
+			int t_jmin = dim2;
+			//SC h2 = -v[jmin] - min;
+			SC v_jmin = v[jmin];
+			int t_colsol = 0;
 
 #pragma unroll 8
 			while (j < size)
 			{
 				SC h = d[j];
-				SC v2 = -v[j] - h2;
+				//SC v2 = -v[j] - h2;
+				SC v2 = -(v[j] - v_jmin) + min;
 				bool is_active = (colactive[j] != 0);
 				bool is_smaller = (v2 < h);
 				if (is_active)
@@ -565,23 +572,23 @@ namespace lap
 						d[j] = h = v2;
 					}
 					int c_colsol = colsol[j];
-					if ((h < v_min) || ((h == v_min) && (c_colsol < 0) && (v_colsol >= 0)))
+					if ((h < t_min) || ((h == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
 					{
-						v_min = h;
-						v_jmin = j;
-						v_colsol = c_colsol;
+						t_min = h;
+						t_jmin = j;
+						t_colsol = c_colsol;
 					}
 				}
 				j += blockDim.x * gridDim.x;
 			}
 
-			minWarpIndex(v_min, v_jmin, v_colsol);
+			minWarpIndex(t_min, t_jmin, t_colsol);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
 				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = v_min;
-				o_jmin[i] = v_jmin;
-				o_colsol[i] = v_colsol;
+				o_min[i] = t_min;
+				o_jmin[i] = t_jmin;
+				o_colsol[i] = t_colsol;
 			}
 		}
 
@@ -1036,7 +1043,7 @@ namespace lap
 				displayProgress(start_time, elapsed, 0, dim2, " rows");
 #endif
 				long long count = 0ll;
-				SC h2(0);
+				//SC h2(0);
 
 				if (devices == 1)
 				{
@@ -1366,12 +1373,13 @@ namespace lap
 										cudaMemcpyAsync(tt_jmin, &(tt[jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
 										cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 										cudaStreamSynchronize(stream);
-										h2 = tt_jmin[0] - v_jmin[0] - min;
+										//h2 = tt_jmin[0] - v_jmin[0] - min;
 									}
 									// propagate h2
 #pragma omp barrier
 									// continue search
-									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size, dim2);
+									//continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size, dim2);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], i, (SC)tt_jmin[0], v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
 								}
 								else
 								{
@@ -1379,12 +1387,13 @@ namespace lap
 									{
 										cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 										cudaStreamSynchronize(stream);
-										h2 = -v_jmin[0] - min;
+										//h2 = -v_jmin[0] - min;
 									}
 									// propagate h2
 #pragma omp barrier
 									// continue search
-									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size, dim2);
+									//continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size, dim2);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
 								}
 								// min is now set so we need to find the correspoding minima for free and taken columns
 								int min_count = grid_size_min.x * (block_size.x >> 5);
@@ -1667,7 +1676,7 @@ namespace lap
 								}
 								// single device
 								cudaStreamSynchronize(iterator.ws.stream[iterator.ws.find(jmin)]);
-								h2 = tt_jmin[0] - v_jmin[0] - min;
+								//h2 = tt_jmin[0] - v_jmin[0] - min;
 								for (int t = 0; t < devices; t++)
 								{
 									cudaSetDevice(iterator.ws.device[t]);
@@ -1681,7 +1690,8 @@ namespace lap
 									grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] *
 										std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
 									// continue search
-									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size, dim2);
+									//continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size, dim2);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin[0], v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
 								}
 							}
 							else
@@ -1694,7 +1704,7 @@ namespace lap
 									cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 									cudaStreamSynchronize(stream);
 								}
-								h2 = -v_jmin[0] - min;
+								//h2 = -v_jmin[0] - min;
 								for (int t = 0; t < devices; t++)
 								{
 									cudaSetDevice(iterator.ws.device[t]);
@@ -1708,7 +1718,8 @@ namespace lap
 									grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[0] *
 										std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
 									// continue search
-									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size, dim2);
+									//continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, h2, std::numeric_limits<SC>::max(), size, dim2);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
 								}
 							}
 							for (int t = 0; t < devices; t++)

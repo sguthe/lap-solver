@@ -527,8 +527,8 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				for (int i = 0; i < num_enabled; i++)
 				{
 					cudaSetDevice(ws.device[i]);
-					cudaMalloc(&(d_vec[i]), 2 * N * sizeof(C));
-					cudaMemcpy(d_vec[i], vec, 2 * N * sizeof(C), cudaMemcpyHostToDevice);
+					cudaMalloc(&(d_vec[i]), N * rank * sizeof(C));
+					cudaMemcpy(d_vec[i], vec, N * rank * sizeof(C), cudaMemcpyHostToDevice);
 				}
 
 				int *rowsol = new int[N];

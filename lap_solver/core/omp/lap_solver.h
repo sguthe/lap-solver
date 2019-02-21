@@ -54,7 +54,7 @@ namespace lap
 			}
 			lapFree(min_cost);
 			lapFree(max_cost);
-			return epsilon / (SC(10) * SC(x_size));
+			return epsilon / (SC(8) * SC(x_size));
 		}
 
 		template <class SC, class CF, class I>
@@ -170,7 +170,8 @@ namespace lap
 #endif
 				jmin = dim2;
 				min = std::numeric_limits<SC>::max();
-				SC h2_global;
+				//SC h2_global;
+				SC tt_jmin_global;
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
@@ -268,17 +269,28 @@ namespace lap
 							min_local = std::numeric_limits<SC>::max();
 							if (i < dim)
 							{
-								SC h2;
+								//SC h2;
+								SC tt_jmin;
+								SC v_jmin = v[jmin];
 								auto tt = iterator.getRow(t, i);
-								if ((jmin >= start) && (jmin < end)) h2_global = h2 = tt[jmin - start] - v[jmin] - min;
+								if ((jmin >= start) && (jmin < end))
+								{
+									//h2_global = h2 = tt[jmin - start] - v[jmin] - min;
+									tt_jmin_global = tt_jmin = (SC)tt[jmin - start];
+								}
 #pragma omp barrier
-								if ((jmin < start) || (jmin >= end)) h2 = h2_global;
+								if ((jmin < start) || (jmin >= end))
+								{
+									//h2 = h2_global;
+									tt_jmin = tt_jmin_global;
+								}
 								for (int j = start; j < end; j++)
 								{
 									int j_local = j - start;
 									if (colactive[j] != 0)
 									{
-										SC v2 = tt[j_local] - v[j] - h2;
+										//SC v2 = tt[j_local] - v[j] - h2;
+										SC v2 = (tt[j_local] - tt_jmin) - (v[j] - v_jmin) + min;
 										SC h = d[j];
 										if (v2 < h)
 										{
@@ -302,12 +314,13 @@ namespace lap
 							}
 							else
 							{
-								SC h2 = -v[jmin] - min;
+								SC v_jmin = v[jmin];
+								//SC h2 = -v[jmin] - min;
 								for (int j = start; j < end; j++)
 								{
 									if (colactive[j] != 0)
 									{
-										SC v2 = -v[j] - h2;
+										SC v2 = -(v[j] - v_jmin) + min;
 										SC h = d[j];
 										if (v2 < h)
 										{

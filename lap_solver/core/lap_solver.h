@@ -232,7 +232,7 @@ namespace lap
 		}
 		lapFree(min_cost);
 		lapFree(max_cost);
-		return epsilon / (SC(10) * SC(x_size));
+		return epsilon / (SC(8) * SC(x_size));
 	}
 
 #if defined(__GNUC__)
@@ -286,6 +286,33 @@ namespace lap
 		} while (i != f);
 	}
 
+	template <class SC> void roundEpsilon(SC &epsilon) {}
+	template <> void roundEpsilon(float &epsilon)
+	{
+		unsigned int &f = *((unsigned int *)(&epsilon));
+		unsigned int exponent = (f >> 23u) & 0xff;
+		if (exponent == 0x00) epsilon = 0.0f;
+		else if (exponent == 0xff) epsilon = 0.0f;
+		else f &= 0xff800000;
+	}
+	template <> void roundEpsilon(double &epsilon)
+	{
+		unsigned long long &f = *((unsigned long long *)(&epsilon));
+		unsigned long long exponent = (f >> 52u) & 0x7ff;
+		if (exponent == 0x00) epsilon = 0.0;
+		else if (exponent == 0x7ff) epsilon = 0.0;
+		else f &= 0xfff0000000000000ll;
+	}
+
+	template <class SC>
+	void adaptV(SC &epsilon, SC *v, int dim2)
+	{
+		SC v_max = v[0];
+		for (int i = 1; i < dim2; i++) v_max = std::max(v_max, v[i]);
+		v_max = -epsilon * floor(-v_max / epsilon);
+		for (int i = 0; i < dim2; i++) v[i] += v_max;
+	}
+
 	template <class SC>
 	void getNextEpsilon(SC &epsilon, SC epsilon_lower, SC last_avg, bool first, bool &allow_reset, SC *v, int dim2)
 	{
@@ -302,6 +329,10 @@ namespace lap
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
 					memset(v, 0, dim2 * sizeof(SC));
+				}
+				else
+				{
+					adaptV(epsilon, v, dim2);
 				}
 				epsilon = SC(0);
 			}
@@ -323,12 +354,14 @@ namespace lap
 					}
 					else
 					{
+						adaptV(epsilon, v, dim2);
 						epsilon = std::max(SC(epsilon / 64.0), next);
 						allow_reset = false;
 					}
 				}
 			}
 		}
+		roundEpsilon(epsilon);
 	}
 
 	void getNextEpsilon(long long &epsilon, long long epsilon_lower, long long last_avg, bool first, bool &allow_reset, long long *v, int dim2)
@@ -608,12 +641,15 @@ namespace lap
 					if (i < dim)
 					{
 						auto tt = iterator.getRow(i);
-						SC h2 = tt[jmin] - v[jmin] - min;
+						//SC h2 = tt[jmin] - v[jmin] - min;
+						SC tt_jmin = (SC)tt[jmin];
+						SC v_jmin = v[jmin];
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
 							{
-								SC v2 = tt[j] - v[j] - h2;
+								//SC v2 = tt[j] - v[j] - h2;
+								SC v2 = (tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
 								SC h = d[j];
 								if (v2 < h)
 								{
@@ -637,12 +673,14 @@ namespace lap
 					}
 					else
 					{
-						SC h2 = -v[jmin] - min;
+						//SC h2 = -v[jmin] - min;
+						SC v_jmin = v[jmin];
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
 							{
-								SC v2 = -v[j] - h2;
+								//SC v2 = -v[j] - h2;
+								SC v2 = -(v[j] - v_jmin) + min;
 								SC h = d[j];
 								if (v2 < h)
 								{
