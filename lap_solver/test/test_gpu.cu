@@ -10,6 +10,8 @@
 #define LAP_CUDA_OPENMP
 //#define LAP_CUDA_COMPARE_CPU
 
+//#define RANDOM_SEED 1234
+
 #include "../lap.h"
 
 #include <random>
@@ -208,7 +210,12 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			auto start_time = std::chrono::high_resolution_clock::now();
 
 			std::uniform_real_distribution<C> distribution(0.0, 1.0);
-			std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+			std::mt19937_64 generator(RANDOM_SEED);
+#else
+			std::random_device rd;
+			std::mt19937_64 generator(rd());
+#endif
 
 			C *tab_s = new C[2 * N];
 			C *tab_t = new C[2 * N];
@@ -357,7 +364,12 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			auto start_time = std::chrono::high_resolution_clock::now();
 
 			std::uniform_real_distribution<C> distribution(0.0, 1.0);
-			std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+			std::mt19937_64 generator(RANDOM_SEED);
+#else
+			std::random_device rd;
+			std::mt19937_64 generator(rd());
+#endif
 
 			C *vec = new C[N << 1];
 
@@ -502,7 +514,12 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				auto start_time = std::chrono::high_resolution_clock::now();
 
 				std::uniform_real_distribution<C> distribution(0.0, 1.0);
-				std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+				std::mt19937_64 generator(RANDOM_SEED);
+#else
+				std::random_device rd;
+				std::mt19937_64 generator(rd());
+#endif
 
 				// The following matrix will have at most the seletcted rank.
 				C *vec = new C[N * rank];
@@ -593,7 +610,12 @@ void testInteger(long long min_tab, long long max_tab, long long max_memory, int
 				else if (range == 1) n = N;
 				else n = 10 * N;
 				std::uniform_int_distribution<int> distribution(0, n);
-				std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+				std::mt19937_64 generator(RANDOM_SEED);
+#else
+				std::random_device rd;
+				std::mt19937_64 generator(rd());
+#endif
 
 				auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -629,7 +651,12 @@ template <class C> void testRandom(long long min_tab, long long max_tab, long lo
 			std::cout << std::endl;
 
 			std::uniform_real_distribution<C> distribution(0.0, 1.0);
-			std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+			std::mt19937_64 generator(RANDOM_SEED);
+#else
+			std::random_device rd;
+			std::mt19937_64 generator(rd());
+#endif
 
 			auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -664,7 +691,12 @@ template <class C> void testSanity(long long min_tab, long long max_tab, long lo
 			std::cout << std::endl;
 
 			std::uniform_real_distribution<C> distribution(0.0, 1.0);
-			std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+			std::mt19937_64 generator(RANDOM_SEED);
+#else
+			std::random_device rd;
+			std::mt19937_64 generator(rd());
+#endif
 
 			auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -724,7 +756,12 @@ template <class C> void testGeometric(long long min_tab, long long max_tab, long
 			auto start_time = std::chrono::high_resolution_clock::now();
 
 			std::uniform_real_distribution<C> distribution(0.0, 1.0);
-			std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+			std::mt19937_64 generator(RANDOM_SEED);
+#else
+			std::random_device rd;
+			std::mt19937_64 generator(rd());
+#endif
 
 			C *tab_s = new C[2 * N];
 			C *tab_t = new C[2 * N];
@@ -793,7 +830,12 @@ template <class C> void testRandomLowRank(long long min_tab, long long max_tab, 
 				auto start_time = std::chrono::high_resolution_clock::now();
 
 				std::uniform_real_distribution<C> distribution(0.0, 1.0);
-				std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+				std::mt19937_64 generator(RANDOM_SEED);
+#else
+				std::random_device rd;
+				std::mt19937_64 generator(rd());
+#endif
 
 				// The following matrix will have at most the seletcted rank.
 				C *vec = new C[N * rank];
