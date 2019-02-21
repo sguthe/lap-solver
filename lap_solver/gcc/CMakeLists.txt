@@ -13,9 +13,9 @@ SET(CMAKE_C_COMPILER gcc)
 if (${CUDA_FOUND})
   SET(CUDA_PROPAGATE_HOST_FLAGS "OFF")
 endif (${CUDA_FOUND})
-SET(CMAKE_CXX_FLAGS "-Wall -O3 -Wfatal-errors -fstrict-aliasing -m64 -std=c++11 -fopenmp -flto -march=native")
+SET(CMAKE_CXX_FLAGS "-Wall -O3 -Wfatal-errors -fstrict-aliasing -m64 -std=c++11 -fopenmp -flto -march=native -mfpmath=sse")
 if (${CUDA_FOUND})
-  SET(CUDA_NVCC_FLAGS "-arch=sm_52 --ptxas-options=-v -Xcompiler -Wall -O3 -std=c++11 -Xcompiler -fopenmp -Xcompiler -march=native")
+  SET(CUDA_NVCC_FLAGS "-arch=sm_52 --ptxas-options=-v -Xcompiler -Wall -O3 -std=c++11 -Xcompiler -fopenmp -Xcompiler -march=native -Xcompiler -mfpmath=sse")
 endif (${CUDA_FOUND})
 
 # Define where your executables should be put
