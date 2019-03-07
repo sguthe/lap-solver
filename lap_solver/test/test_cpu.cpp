@@ -6,6 +6,7 @@
 //#define LAP_DEBUG
 //#define LAP_NO_MEM_DEBUG
 //#define LAP_ROWS_SCANNED
+//#define LAP_VERIFY_RESULT
 
 //#define RANDOM_SEED 1234
 
