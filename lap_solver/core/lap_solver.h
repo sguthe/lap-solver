@@ -257,8 +257,8 @@ namespace lap
 		for (int i = 0; i < completecount; i++)
 		{
 			int j1 = colcomplete[i];
-			SC dlt = d[j1] - min;
-			v[j1] += dlt;
+			SC dlt = min - d[j1];
+			v[j1] -= dlt;
 		}
 	}
 
@@ -268,9 +268,14 @@ namespace lap
 		for (int i = 0; i < completecount; i++)
 		{
 			int j1 = colcomplete[i];
-			SC dlt = d[j1] - min;
-			v[j1] += dlt - eps;
-			total += dlt;
+			SC dlt = min - d[j1];
+			total -= dlt;
+#if 0
+			v[j1] -= dlt + eps;
+#else
+			dlt = std::max(dlt, eps);
+			v[j1] -= dlt;
+#endif
 		}
 		count += completecount;
 	}
@@ -289,8 +294,9 @@ namespace lap
 	}
 
 	template <class SC>
-	void getNextEpsilon(SC &epsilon, SC epsilon_lower, SC last_avg, bool first, bool &allow_reset, SC *v, int dim2)
+	bool getNextEpsilon(SC &epsilon, SC epsilon_lower, SC last_avg, bool first, bool &allow_reset, int dim2)
 	{
+		bool reset = false;
 		if (epsilon > SC(0))
 		{
 			if (epsilon <= epsilon_lower)
@@ -298,12 +304,12 @@ namespace lap
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
 #endif
-				if ((allow_reset) && (-last_avg <= SC(0.0625 * epsilon)))
+				if ((allow_reset) && (-last_avg <= SC(0.015625 * epsilon)))
 				{
 #ifdef LAP_DEBUG
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
-					memset(v, 0, dim2 * sizeof(SC));
+					reset = true;
 				}
 				epsilon = SC(0);
 			}
@@ -311,16 +317,16 @@ namespace lap
 			{
 				if (!first)
 				{
-					SC next = std::max(epsilon_lower, std::min(SC(0.125 * epsilon), -last_avg));
+					SC next = std::max(epsilon_lower, std::min(SC(0.0625 * epsilon), -last_avg));
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
 #endif
-					if ((allow_reset) && (-last_avg <= SC(0.0625 * epsilon)))
+					if ((allow_reset) && (-last_avg <= SC(0.015625 * epsilon)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
-						memset(v, 0, dim2 * sizeof(SC));
+						reset = true;
 						epsilon = std::max(SC(epsilon / 1024.0), next);
 					}
 					else
@@ -331,10 +337,12 @@ namespace lap
 				}
 			}
 		}
+		return reset;
 	}
 
-	void getNextEpsilon(long long &epsilon, long long epsilon_lower, long long last_avg, bool first, bool &allow_reset, long long *v, int dim2)
+	bool getNextEpsilon(long long &epsilon, long long epsilon_lower, long long last_avg, bool first, bool &allow_reset, int dim2)
 	{
+		bool reset = false;
 		if (epsilon > 0)
 		{
 			if (epsilon == 1)
@@ -347,7 +355,7 @@ namespace lap
 #ifdef LAP_DEBUG
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
-					memset(v, 0, dim2 * sizeof(long long));
+					reset = true;
 				}
 				epsilon = 0;
 			}
@@ -359,12 +367,12 @@ namespace lap
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
 #endif
-					if ((allow_reset) && (next < (epsilon >> 3)))
+					if ((allow_reset) && (next < (epsilon >> 6)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
-						memset(v, 0, dim2 * sizeof(long long));
+						reset = true;
 						epsilon = std::max(1ll, std::max(epsilon >> 10, next));
 					}
 					else
@@ -375,10 +383,12 @@ namespace lap
 				}
 			}
 		}
+		return reset;
 	}
 
-	void getNextEpsilon(int &epsilon, int epsilon_lower, int last_avg, bool first, bool &allow_reset, int *v, int dim2)
+	bool getNextEpsilon(int &epsilon, int epsilon_lower, int last_avg, bool first, bool &allow_reset, int dim2)
 	{
+		bool reset = false;
 		if (epsilon > 0)
 		{
 			if (epsilon == 1)
@@ -391,7 +401,7 @@ namespace lap
 #ifdef LAP_DEBUG
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
-					memset(v, 0, dim2 * sizeof(int));
+					reset = true;
 				}
 				epsilon = 0;
 			}
@@ -403,12 +413,12 @@ namespace lap
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
 #endif
-					if ((allow_reset) && (next < (epsilon >> 3)))
+					if ((allow_reset) && (next < (epsilon >> 6)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
-						memset(v, 0, dim2 * sizeof(int));
+						reset = true;
 						epsilon = std::max(1, std::max(epsilon >> 10, next));
 					}
 					else
@@ -418,6 +428,16 @@ namespace lap
 					}
 				}
 			}
+		}
+		return reset;
+	}
+
+	template <class SC>
+	void getNextEpsilon(SC &epsilon, SC epsilon_lower, SC last_avg, bool first, bool &allow_reset, SC *v, int dim2)
+	{
+		if (getNextEpsilon(epsilon, epsilon_lower, last_avg, first, allow_reset, dim2))
+		{
+			memset(v, 0, dim2 * sizeof(SC));
 		}
 	}
 

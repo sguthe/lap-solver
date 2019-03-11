@@ -761,19 +761,27 @@ namespace lap
 
 			if (colactive[j] == 0)
 			{
-				v[j] = v[j] + d[j] - min;
+				SC dlt = min - d[j];
+				v[j] -= dlt;
 			}
 		}
 
 		template <class SC>
-		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC eps, int size)
+		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total, SC eps, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
 
 			if (colactive[j] == 0)
 			{
+#if 0
 				v[j] = v[j] + d[j] - min - eps;
+#else
+				SC dlt = min - d[j];
+				total[j] -= dlt;
+				if (eps > dlt) dlt = eps;
+				v[j] -= dlt;
+#endif
 			}
 		}
 
@@ -875,8 +883,10 @@ namespace lap
 #endif
 
 			int  endofpath;
+#ifdef LAP_DEBUG
 			SC *v;
-			SC *v2;
+#endif
+			SC *total;
 			// for calculating h2
 			TC *tt_jmin;
 			SC *v_jmin;
@@ -908,8 +918,10 @@ namespace lap
 			min_struct<SC> *host_min_private;
 			reset_struct *host_reset;
 			cudaMallocHost(&host_reset, 2 * sizeof(reset_struct));
+#ifdef LAP_DEBUG
 			cudaMallocHost(&v, dim2 * sizeof(SC));
-			cudaMallocHost(&v2, dim2 * sizeof(SC));
+#endif
+			cudaMallocHost(&total, dim2 * sizeof(SC));
 			cudaMallocHost(&host_min_private, devices * sizeof(min_struct<SC>));
 			cudaMallocHost(&tt_jmin, sizeof(TC));
 			cudaMallocHost(&v_jmin, sizeof(SC));
@@ -923,6 +935,7 @@ namespace lap
 			int **colsol_private;
 			int **rowsol_private;
 			SC **v_private;
+			SC **total_private;
 			// on device
 			lapAlloc(min_private, devices, __FILE__, __LINE__);
 			lapAlloc(jmin_private, devices, __FILE__, __LINE__);
@@ -933,6 +946,7 @@ namespace lap
 			lapAlloc(colsol_private, devices, __FILE__, __LINE__);
 			lapAlloc(rowsol_private, devices, __FILE__, __LINE__);
 			lapAlloc(v_private, devices, __FILE__, __LINE__);
+			lapAlloc(total_private, devices, __FILE__, __LINE__);
 
 			for (int t = 0; t < devices; t++)
 			{
@@ -941,6 +955,7 @@ namespace lap
 				int start = iterator.ws.part[t].first;
 				int end = iterator.ws.part[t].second;
 				int size = end - start;
+				cudaStream_t stream = iterator.ws.stream[t];
 				dim3 block_size, grid_size, grid_size_min;
 				block_size.x = 256;
 				grid_size.x = (size + block_size.x - 1) / block_size.x;
@@ -953,9 +968,11 @@ namespace lap
 				cudaMalloc(&(colactive_private[t]), sizeof(char) * size);
 				cudaMalloc(&(d_private[t]), sizeof(SC) * size);
 				cudaMalloc(&(v_private[t]), sizeof(SC) * size);
+				cudaMalloc(&(total_private[t]), sizeof(SC) * size);
 				cudaMalloc(&(colsol_private[t]), sizeof(int) * size);
 				cudaMalloc(&(pred_private[t]), sizeof(int) * size);
 				cudaMalloc(&(rowsol_private[t]), sizeof(int) * dim2);
+				cudaMemsetAsync(v_private[t], 0, sizeof(SC) * size, stream);
 			}
 
 #ifdef LAP_ROWS_SCANNED
@@ -972,11 +989,9 @@ namespace lap
 			bool first = true;
 			bool allow_reset = true;
 
-			memset(v, 0, dim2 * sizeof(SC));
-
 			while (epsilon >= SC(0))
 			{
-				lap::getNextEpsilon(epsilon, epsilon_lower, last_avg, first, allow_reset, v, dim2);
+				bool reset = lap::getNextEpsilon(epsilon, epsilon_lower, last_avg, first, allow_reset, dim2);
 #ifndef LAP_QUIET
 				{
 					std::stringstream ss;
@@ -995,9 +1010,9 @@ namespace lap
 					int t = 0;
 					cudaSetDevice(iterator.ws.device[t]);
 					int size = iterator.ws.part[t].second - iterator.ws.part[t].first;
-					int start = iterator.ws.part[t].first;
 					cudaStream_t stream = iterator.ws.stream[t];
-					cudaMemcpyAsync(v_private[t], &(v[start]), sizeof(SC) * size, cudaMemcpyHostToDevice, stream);
+					if (reset) cudaMemsetAsync(v_private[t], 0, sizeof(SC) * size, stream);
+					cudaMemsetAsync(total_private[t], 0, sizeof(SC) * size, stream);
 					cudaMemsetAsync(rowsol_private[t], -1, dim2 * sizeof(int), stream);
 					cudaMemsetAsync(colsol_private[t], -1, size * sizeof(int), stream);
 				}
@@ -1009,9 +1024,9 @@ namespace lap
 					{
 						cudaSetDevice(iterator.ws.device[t]);
 						int size = iterator.ws.part[t].second - iterator.ws.part[t].first;
-						int start = iterator.ws.part[t].first;
 						cudaStream_t stream = iterator.ws.stream[t];
-						cudaMemcpyAsync(v_private[t], &(v[start]), sizeof(SC) * size, cudaMemcpyHostToDevice, stream);
+						if (reset) cudaMemsetAsync(v_private[t], 0, sizeof(SC) * size, stream);
+						cudaMemsetAsync(total_private[t], 0, sizeof(SC) * size, stream);
 						cudaMemsetAsync(rowsol_private[t], -1, dim2 * sizeof(int), stream);
 						cudaMemsetAsync(colsol_private[t], -1, size * sizeof(int), stream);
 					}
@@ -1022,9 +1037,9 @@ namespace lap
 					// upload v to devices
 					cudaSetDevice(iterator.ws.device[t]);
 					int size = iterator.ws.part[t].second - iterator.ws.part[t].first;
-					int start = iterator.ws.part[t].first;
 					cudaStream_t stream = iterator.ws.stream[t];
-					cudaMemcpyAsync(v_private[t], &(v[start]), sizeof(SC) * size, cudaMemcpyHostToDevice, stream);
+					if (reset) cudaMemsetAsync(v_private[t], 0, sizeof(SC) * size, stream);
+					cudaMemsetAsync(total_private[t], 0, sizeof(SC) * size, stream);
 					cudaMemsetAsync(rowsol_private[t], -1, dim2 * sizeof(int), stream);
 					cudaMemsetAsync(colsol_private[t], -1, size * sizeof(int), stream);
 				}
@@ -1216,7 +1231,7 @@ namespace lap
 						// update column prices. can increase or decrease
 						if ((epsilon > SC(0)) && (f + 1 < dim2))
 						{
-							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], epsilon, size);
+							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_private[t], epsilon, size);
 						}
 						else
 						{
@@ -1245,7 +1260,7 @@ namespace lap
 					}
 
 					// download updated v
-					cudaMemcpyAsync(&(v2[start]), v_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
+					cudaMemcpyAsync(&(total[start]), total_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
 					cudaStreamSynchronize(stream);
 				}
 				else
@@ -1485,7 +1500,7 @@ namespace lap
 							// update column prices. can increase or decrease
 							if ((epsilon > SC(0)) && (f + 1 < dim2))
 							{
-								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], epsilon, size);
+								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_private[t], epsilon, size);
 							}
 							else
 							{
@@ -1536,7 +1551,7 @@ namespace lap
 						}
 
 						// download updated v
-						cudaMemcpyAsync(&(v2[start]), v_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
+						cudaMemcpyAsync(&(total[start]), total_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
 						cudaStreamSynchronize(stream);
 					} // end of #pragma omp parallel
 #else
@@ -1839,7 +1854,7 @@ namespace lap
 							grid_size.x = (size + block_size.x - 1) / block_size.x;
 							if ((epsilon > SC(0)) && (f + 1 < dim2))
 							{
-								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], epsilon, size);
+								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], d_total[t], epsilon, size);
 							}
 							else
 							{
@@ -1899,21 +1914,22 @@ namespace lap
 						int end = iterator.ws.part[t].second;
 						int size = end - start;
 						cudaStream_t stream = iterator.ws.stream[t];
-						cudaMemcpyAsync(&(v2[start]), v_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
+						cudaMemcpyAsync(&(total[start]), total_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
+#ifdef LAP_DEBUG
+						cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
+#endif
 					}
 					for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
 #endif
 				}
 
 				// now we need to compare the previous v with the new one to get back all the changes
-				SC total(0);
-				SC scaled_epsilon = epsilon * SC(count) / SC(dim2);
+				SC tot(0);
 
-				for (int i = 0; i < dim2; i++) total += v2[i] - v[i] + scaled_epsilon;
+				for (int i = 0; i < dim2; i++) tot += total[i];
 
-				if (count > 0) last_avg = total / SC(count);
+				if (count > 0) last_avg = tot / SC(count);
 				else last_avg = SC(0);
-				std::swap(v, v2);
 
 #ifdef LAP_DEBUG
 				if (epsilon > SC(0))
@@ -2002,6 +2018,7 @@ namespace lap
 				cudaFree(colactive_private[t]);
 				cudaFree(d_private[t]);
 				cudaFree(v_private[t]);
+				cudaFree(total_private[t]);
 				cudaFree(pred_private[t]);
 				cudaFree(colsol_private[t]);
 				cudaFree(rowsol_private[t]);
@@ -2009,8 +2026,10 @@ namespace lap
 
 			// free reserved memory.
 			cudaFreeHost(host_reset);
+#ifdef LAP_DEBUG
 			cudaFreeHost(v);
-			cudaFreeHost(v2);
+#endif
+			cudaFreeHost(total);
 			cudaFreeHost(tt_jmin);
 			cudaFreeHost(v_jmin);
 			lapFree(min_private);
@@ -2023,6 +2042,7 @@ namespace lap
 			lapFree(colsol_private);
 			lapFree(rowsol_private);
 			lapFree(v_private);
+			lapFree(total_private);
 #ifdef LAP_CUDA_OPENMP
 			omp_set_num_threads(old_threads);
 #else
