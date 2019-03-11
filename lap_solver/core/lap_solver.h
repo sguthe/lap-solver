@@ -304,7 +304,7 @@ namespace lap
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
 #endif
-				if ((allow_reset) && (-last_avg <= SC(0.015625 * epsilon)))
+				if ((allow_reset) && (-last_avg <= SC(0.0625 * epsilon)))
 				{
 #ifdef LAP_DEBUG
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -321,7 +321,7 @@ namespace lap
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
 #endif
-					if ((allow_reset) && (-last_avg <= SC(0.015625 * epsilon)))
+					if ((allow_reset) && (-last_avg <= SC(0.0625 * epsilon)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -367,7 +367,7 @@ namespace lap
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
 #endif
-					if ((allow_reset) && (next < (epsilon >> 6)))
+					if ((allow_reset) && (next < (epsilon >> 4)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -413,7 +413,7 @@ namespace lap
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
 #endif
-					if ((allow_reset) && (next < (epsilon >> 6)))
+					if ((allow_reset) && (next < (epsilon >> 4)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
