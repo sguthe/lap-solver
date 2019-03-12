@@ -138,11 +138,13 @@ namespace lap
 
 			memset(v, 0, dim2 * sizeof(SC));
 
+			SC total_d = SC(0);
+			SC total_eps = SC(0);
 			while (epsilon >= SC(0))
 			{
-				SC total = SC(0);
-				unsigned long long count = 0ULL;
-				lap::getNextEpsilon(epsilon, epsilon_lower, last_avg, first, allow_reset, v, dim2); 
+				lap::getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, v, dim2);
+				total_d = SC(0);
+				total_eps = SC(0);
 #ifndef LAP_QUIET
 				{
 					std::stringstream ss;
@@ -382,7 +384,7 @@ namespace lap
 							// update column prices. can increase or decrease
 							if (epsilon > SC(0))
 							{
-								updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total, count);
+								updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
 							}
 							else
 							{
@@ -429,9 +431,6 @@ namespace lap
 #pragma omp barrier
 					}
 				}
-
-				if (count > 0) last_avg = total / SC(count);
-				else last_avg = SC(0);
 
 #ifdef LAP_DEBUG
 				if (epsilon > SC(0))

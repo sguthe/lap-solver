@@ -263,7 +263,7 @@ namespace lap
 	}
 
 	template <class SC>
-	__forceinline void updateColumnPrices(int *colcomplete, int completecount, SC min, SC *v, SC *d, SC eps, SC &total, unsigned long long &count)
+	__forceinline void updateColumnPrices(int *colcomplete, int completecount, SC min, SC *v, SC *d, SC eps, SC &total, SC &total_eps)
 	{
 		for (int i = 0; i < completecount; i++)
 		{
@@ -271,13 +271,13 @@ namespace lap
 			SC dlt = min - d[j1];
 			total -= dlt;
 #if 0
-			v[j1] -= dlt + eps;
+			dlt += eps;;
 #else
 			dlt = std::max(dlt, eps);
-			v[j1] -= dlt;
 #endif
+			total_eps -= dlt;
+			v[j1] -= dlt;
 		}
-		count += completecount;
 	}
 
 	__forceinline void resetRowColumnAssignment(int &endofpath, int f, int *pred, int *rowsol, int *colsol)
@@ -294,17 +294,19 @@ namespace lap
 	}
 
 	template <class SC>
-	bool getNextEpsilon(SC &epsilon, SC epsilon_lower, SC last_avg, bool first, bool &allow_reset, int dim2)
+	bool getNextEpsilon(SC &epsilon, SC epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_reset, int dim2)
 	{
+		total_eps = total_d - total_eps;
+		total_d = -total_d;
 		bool reset = false;
 		if (epsilon > SC(0))
 		{
 			if (epsilon <= epsilon_lower)
 			{
 #ifdef LAP_DEBUG
-				lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
+				lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-				if ((allow_reset) && (-last_avg <= SC(0.0625 * epsilon)))
+				if ((allow_reset) && (SC(dim2) * epsilon > SC(4) * total_d))
 				{
 #ifdef LAP_DEBUG
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -317,21 +319,22 @@ namespace lap
 			{
 				if (!first)
 				{
-					SC next = std::max(epsilon_lower, std::min(SC(0.0625 * epsilon), -last_avg));
 #ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
+					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-					if ((allow_reset) && (-last_avg <= SC(0.0625 * epsilon)))
+					if ((allow_reset) && (SC(dim2) * epsilon > SC(4) * total_d))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
 						reset = true;
-						epsilon = std::max(SC(epsilon / 1024.0), next);
+						epsilon = std::max(epsilon / SC(1024), std::min(epsilon / SC(2), total_d / (SC(8) * SC(dim2))));
 					}
 					else
 					{
-						epsilon = std::max(SC(epsilon / 64.0), next);
+						if ((total_d <= SC(0)) || (total_eps <= SC(0)))  epsilon = SC(0);
+						else if (total_eps < SC(16) * total_d) epsilon = epsilon / SC(16);
+						else epsilon = std::max(epsilon / SC(64), std::min(epsilon / SC(16), epsilon * total_d / total_eps));
 						allow_reset = false;
 					}
 				}
@@ -340,17 +343,19 @@ namespace lap
 		return reset;
 	}
 
-	bool getNextEpsilon(long long &epsilon, long long epsilon_lower, long long last_avg, bool first, bool &allow_reset, int dim2)
+	bool getNextEpsilon(long long &epsilon, long long epsilon_lower, long long total_d, long long total_eps, bool first, bool &allow_reset, int dim2)
 	{
+		total_eps = total_d - total_eps;
+		total_d = -total_d;
 		bool reset = false;
 		if (epsilon > 0)
 		{
 			if (epsilon == 1)
 			{
 #ifdef LAP_DEBUG
-				lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
+				lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-				if ((allow_reset) && (last_avg == 0))
+				if ((allow_reset) && (total_eps > (total_d << 4)))
 				{
 #ifdef LAP_DEBUG
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -363,21 +368,22 @@ namespace lap
 			{
 				if (!first)
 				{
-					long long next = std::max(1ll, std::min(epsilon >> 4, -last_avg));
 #ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
+					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-					if ((allow_reset) && (next < (epsilon >> 4)))
+					if ((allow_reset) && (total_eps > (total_d << 4)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
 						reset = true;
-						epsilon = std::max(1ll, std::max(epsilon >> 10, next));
+						epsilon = std::max(1ll, std::max(epsilon >> 10, std::min(epsilon >> 4, (long long)(((long double)epsilon) * ((long double)total_d) / ((long double)total_eps)))));
 					}
 					else
 					{
-						epsilon = std::max(1ll, std::max(epsilon >> 6, next));
+						if ((total_d == 0) || (total_eps == 0)) epsilon = 0;
+						else if (total_eps < (total_d << 4)) epsilon = epsilon >> 4;
+						else epsilon = std::max(1ll, std::max(epsilon >> 6, std::min(epsilon >> 4, (long long)(((long double)epsilon) * ((long double)total_d) / ((long double)total_eps)))));
 						allow_reset = false;
 					}
 				}
@@ -386,17 +392,19 @@ namespace lap
 		return reset;
 	}
 
-	bool getNextEpsilon(int &epsilon, int epsilon_lower, int last_avg, bool first, bool &allow_reset, int dim2)
+	bool getNextEpsilon(int &epsilon, int epsilon_lower, int total_d, int total_eps, bool first, bool &allow_reset, int dim2)
 	{
+		total_eps = total_d - total_eps;
+		total_d = -total_d;
 		bool reset = false;
 		if (epsilon > 0)
 		{
 			if (epsilon == 1)
 			{
 #ifdef LAP_DEBUG
-				lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << std::endl;
+				lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-				if ((allow_reset) && (last_avg == 0))
+				if ((allow_reset) && (total_eps > (total_d << 4)))
 				{
 #ifdef LAP_DEBUG
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -409,21 +417,22 @@ namespace lap
 			{
 				if (!first)
 				{
-					int next = std::max(1, std::min(epsilon >> 4, -last_avg));
 #ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << -last_avg << " v_eps = " << epsilon << " next = " << next << std::endl;
+					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-					if ((allow_reset) && (next < (epsilon >> 4)))
+					if ((allow_reset) && (total_eps > (total_d << 4)))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
 						reset = true;
-						epsilon = std::max(1, std::max(epsilon >> 10, next));
+						epsilon = std::max(1, std::max(epsilon >> 10, std::min(epsilon >> 4, (int)(((double)epsilon) * ((double)total_d) / ((double)total_eps)))));
 					}
 					else
 					{
-						epsilon = std::max(1, std::max(epsilon >> 6, next));
+						if ((total_d == 0) || (total_eps == 0)) epsilon = 0;
+						else if (total_eps < (total_d << 4)) epsilon = epsilon >> 4;
+						else epsilon = std::max(1, std::max(epsilon >> 6, std::min(epsilon >> 4, (int)(((double)epsilon) * ((double)total_d) / ((double)total_eps)))));
 						allow_reset = false;
 					}
 				}
@@ -433,9 +442,9 @@ namespace lap
 	}
 
 	template <class SC>
-	void getNextEpsilon(SC &epsilon, SC epsilon_lower, SC last_avg, bool first, bool &allow_reset, SC *v, int dim2)
+	void getNextEpsilon(SC &epsilon, SC epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_reset, SC *v, int dim2)
 	{
-		if (getNextEpsilon(epsilon, epsilon_lower, last_avg, first, allow_reset, dim2))
+		if (getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, dim2))
 		{
 			memset(v, 0, dim2 * sizeof(SC));
 		}
@@ -511,18 +520,19 @@ namespace lap
 		SC epsilon = (SC)costfunc.getInitialEpsilon();
 		SC epsilon_lower = epsilon / SC(dim2);
 
-		SC last_avg = SC(0);
+		SC last_ration = SC(0);
 		bool first = true;
 		bool allow_reset = true;
 
 		memset(v, 0, dim2 * sizeof(SC));
 
-		unsigned long long count = 0ULL;
+		SC total_d = SC(0);
+		SC total_eps = SC(0);
 		while (epsilon >= SC(0))
 		{
-			getNextEpsilon(epsilon, epsilon_lower, last_avg, first, allow_reset, v, dim2);
-			SC total = SC(0);
-			count = 0;
+			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, v, dim2);
+			total_d = SC(0);
+			total_eps = SC(0);
 #ifndef LAP_QUIET
 			{
 				std::stringstream ss;
@@ -700,7 +710,7 @@ namespace lap
 				// update column prices. can increase or decrease
 				if (epsilon > SC(0))
 				{
-					updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total, count);
+					updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
 				}
 				else
 				{
@@ -738,9 +748,6 @@ namespace lap
 				}
 #endif
 			}
-
-			if (count > 0) last_avg = total / SC(count);
-			else last_avg = SC(0);
 
 #ifdef LAP_DEBUG
 			if (epsilon > SC(0))
