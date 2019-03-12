@@ -132,7 +132,6 @@ namespace lap
 			SC epsilon = (SC)costfunc.getInitialEpsilon();
 			SC epsilon_lower = epsilon / SC(dim2);
 
-			SC last_avg = SC(0);
 			bool first = true;
 			bool allow_reset = true;
 
