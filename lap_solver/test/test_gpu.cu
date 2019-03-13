@@ -114,6 +114,10 @@ int main(int argc, char* argv[])
 		if (opt.use_epsilon) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, true, std::string("long long"), opt.devices, opt.silent);
 	}
 
+#ifndef LAP_QUIET
+	lap::allocationLogger.destroy();
+#endif
+
 	return 0;
 }
 
@@ -130,7 +134,7 @@ void solveCachingCUDA(TP &start_time, int N1, int N2, RCF &get_cost_row, CF &get
 	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol);
 
 	std::stringstream ss;
-	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cuda::cost<SC>(N1, N2, costFunction, rowsol, ws.stream[0]);
+	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cuda::cost<SC, TC>(N1, N2, costFunction, rowsol, ws.stream[0]);
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
@@ -245,11 +249,8 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 				}
 			}
 
-			// enabled function
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 			int num_enabled = (int)ws.device.size();
-
-			int step = (int)N / (int)std::min((long long)N, (long long)((num_enabled * max_memory) / (sizeof(C) * N)));
 
 			C **d_tab_s = new C*[num_enabled];
 			C **d_tab_t = new C*[num_enabled];
@@ -375,11 +376,8 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 
 			for (long long i = 0; i < N << 1; i++) vec[i] = distribution(generator);
 
-			// enabled function
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 			int num_enabled = (int)ws.device.size();
-
-			int step = (int)N / (int)std::min((long long)N, (long long)((num_enabled * max_memory) / (sizeof(C) * N)));
 
 			C **d_vec = new C*[num_enabled];
 
@@ -528,11 +526,8 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 					for (long long j = 0; j < N; j++) vec[i * N + j] = distribution(generator);
 				}
 
-				// enabled function
 				lap::cuda::Worksharing ws(N, 256, devs, silent);
 				int num_enabled = (int)ws.device.size();
-
-				int step = (int)N / (int)std::min((long long)N, (long long)((num_enabled * max_memory) / (sizeof(C) * N)));
 
 				C **d_vec = new C*[num_enabled];
 
@@ -1006,16 +1001,16 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 				};
 
 				// cost function
-				auto get_cost = [&img](C *d_row, cudaStream_t stream, int *d_rowsol, int N2)
+				auto get_cost = [&img](C *d_row, cudaStream_t stream, int *d_rowsol, int N1)
 				{
 					dim3 block_size, grid_size;
 					block_size.x = 256;
-					grid_size.x = (N2 + block_size.x - 1) / block_size.x;
+					grid_size.x = (N1 + block_size.x - 1) / block_size.x;
 					int size_0 = img[0][0].width * img[0][0].height;
 					int size_1 = img[1][0].width * img[1][0].height;
 					getCost_image_kernel<<<grid_size, block_size, 0, stream>>>(d_row,
 						img[0][0].raw, img[0][0].raw + size_0, img[0][0].raw + 2 * size_0, img[0][0].width, img[0][0].height, img[0][0].max_val,
-						img[1][0].raw, img[1][0].raw + size_1, img[1][0].raw + 2 * size_1, img[1][0].width, img[1][0].height, img[1][0].max_val, d_rowsol, N2);
+						img[1][0].raw, img[1][0].raw + size_1, img[1][0].raw + 2 * size_1, img[1][0].width, img[1][0].height, img[1][0].max_val, d_rowsol, N1);
 				};
 
 				int *rowsol = new int[N2];

@@ -2087,22 +2087,22 @@ namespace lap
 			cudaSetDevice(iterator.ws.device[0]);
 		}
 
-		template <class SC, class CF>
+		template <class SC, class TC, class CF>
 		SC cost(int dim, int dim2, CF &costfunc, int *rowsol, cudaStream_t stream)
 		{
 			SC my_cost(0);
-			SC *row = new SC[dim2];
+			TC *row = new TC[dim];
 			int *d_rowsol;
-			SC *d_row;
-			cudaMalloc(&d_rowsol, dim2 * sizeof(int));
-			cudaMalloc(&d_row, dim2 * sizeof(SC));
-			cudaMemcpyAsync(d_rowsol, rowsol, dim2 * sizeof(int), cudaMemcpyHostToDevice, stream);
-			costfunc.getCost(d_row, 0, d_rowsol, dim2);
-			cudaMemcpyAsync(row, d_row, dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+			TC *d_row;
+			cudaMalloc(&d_rowsol, dim * sizeof(int));
+			cudaMalloc(&d_row, dim * sizeof(TC));
+			cudaMemcpyAsync(d_rowsol, rowsol, dim * sizeof(int), cudaMemcpyHostToDevice, stream);
+			costfunc.getCost(d_row, stream, d_rowsol, dim);
+			cudaMemcpyAsync(row, d_row, dim * sizeof(SC), cudaMemcpyDeviceToHost, stream);
 			cudaFree(d_row);
 			cudaFree(d_rowsol);
 			cudaStreamSynchronize(stream);
-			for (int i = 0; i < dim2; i++) my_cost += row[i];
+			for (int i = 0; i < dim; i++) my_cost += row[i];
 			delete[] row;
 			return my_cost;
 		}
@@ -2115,10 +2115,10 @@ namespace lap
 		}
 
 		// shortcut for square problems
-		template <class SC, class CF>
+		template <class SC, class TC, class CF>
 		SC cost(int dim, CF &costfunc, int *rowsol, cudaStream_t stream)
 		{
-			return lap::cuda::cost<SC, CF>(dim, dim, costfunc, rowsol, stream);
+			return lap::cuda::cost<SC, TC, CF>(dim, dim, costfunc, rowsol, stream);
 		}
 	}
 }

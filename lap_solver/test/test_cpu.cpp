@@ -1,7 +1,7 @@
 #ifdef _OPENMP
 #  define LAP_OPENMP
 #endif
-#define LAP_QUIET
+//#define LAP_QUIET
 //#define LAP_DISPLAY_EVALUATED
 //#define LAP_DEBUG
 //#define LAP_NO_MEM_DEBUG
@@ -119,6 +119,11 @@ int main(int argc, char* argv[])
 		if (opt.use_single) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("long long"));
 		if (opt.use_epsilon) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("long long"));
 	}
+
+#ifndef LAP_QUIET
+	lap::allocationLogger.destroy();
+#endif
+
 	return 0;
 }
 

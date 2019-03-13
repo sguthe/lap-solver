@@ -63,7 +63,7 @@ namespace lap
 			std::lock_guard<std::mutex> guard(lock);
 #ifdef LAP_DEBUG
 #ifndef LAP_NO_MEM_DEBUG
-			lapDebug << "Freeing memory at " << std::hex << a << std::dec << std::endl;
+			lapDebug << "Freeing memory at " << std::hex << (size_t)a << std::dec << std::endl;
 #endif
 #endif
 			for (unsigned long long i = 0; i < allocated.size(); i++)
@@ -90,7 +90,7 @@ namespace lap
 			std::lock_guard<std::mutex> guard(lock);
 #ifdef LAP_DEBUG
 #ifndef LAP_NO_MEM_DEBUG
-			lapDebug << "Allocating " << s * sizeof(T) << " bytes at " << std::hex << a << std::dec << " \"" << file << ":" << line << std::endl;
+			lapDebug << "Allocating " << s * sizeof(T) << " bytes at " << std::hex << (size_t)a << std::dec << " \"" << file << ":" << line << std::endl;
 #endif
 #endif
 			current += s;
@@ -774,7 +774,7 @@ namespace lap
 						dlt /= SC(dim2);
 						dlt2 /= SC(dim2);
 						lapDebug << "iteration = " << l << " eps/mse = " << eps_list[l] << " " << dlt2 - dlt * dlt << " eps/rmse = " << eps_list[l] << " " << sqrt(dlt2 - dlt * dlt) << std::endl;
-						delete v_list[l];
+						lapFree(v_list[l]);
 					}
 				}
 			}
