@@ -2099,9 +2099,9 @@ namespace lap
 			cudaMemcpyAsync(d_rowsol, rowsol, dim * sizeof(int), cudaMemcpyHostToDevice, stream);
 			costfunc.getCost(d_row, stream, d_rowsol, dim);
 			cudaMemcpyAsync(row, d_row, dim * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+			cudaStreamSynchronize(stream);
 			cudaFree(d_row);
 			cudaFree(d_rowsol);
-			cudaStreamSynchronize(stream);
 			for (int i = 0; i < dim; i++) my_cost += row[i];
 			delete[] row;
 			return my_cost;
