@@ -93,7 +93,7 @@ namespace lap
 			lapDebug << "Allocating " << s * sizeof(T) << " bytes at " << std::hex << (size_t)a << std::dec << " \"" << file << ":" << line << std::endl;
 #endif
 #endif
-			current += s;
+			current += s * sizeof(T);
 			peak = std::max(peak, current);
 			allocated.push_back((void *)a);
 			size.push_back(s);
@@ -271,7 +271,7 @@ namespace lap
 			SC dlt = min - d[j1];
 			total -= dlt;
 #if 0
-			dlt += eps;;
+			dlt += eps;
 #else
 			dlt = std::max(dlt, eps);
 #endif
@@ -556,7 +556,8 @@ namespace lap
 #ifndef LAP_QUIET
 			displayProgress(start_time, elapsed, 0, dim2, " rows");
 #endif
-			for (int f = 0; f < dim2; f++)
+			int dim_limit = ((epsilon > SC(0)) && (allow_reset)) ? dim : dim2;
+			for (int f = 0; f < dim_limit; f++)
 			{
 #ifndef LAP_QUIET
 				if (f < dim) total_rows++; else total_virtual++;
@@ -603,21 +604,37 @@ namespace lap
 						colactive[j] = 1;
 						pred[j] = f;
 						SC h = d[j] = -v[j];
-						if (h < min)
+						if (colsol[j] < dim)
 						{
-							// better
-							jmin = j;
-							min = h;
-						}
-						else if (h == min)
-						{
-							// same, do only update if old was used and new is free
-							if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
+							if (h < min)
+							{
+								// better
+								jmin = j;
+								min = h;
+							}
+							else if (h == min)
+							{
+								// same, do only update if old was used and new is free
+								if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
+							}
 						}
 					}
 				}
 
 				dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
+				// marked skipped columns that were cheaper
+				if (f >= dim)
+				{
+					for (int j = 0; j < dim2; j++)
+					{
+						// ignore any columns assigned to virtual rows
+						if ((colsol[j] >= dim) && (d[j] <= min))
+						{
+							colcomplete[completecount++] = j;
+							colactive[j] = 0;
+						}
+					}
+				}
 
 				while (!unassignedfound)
 				{
@@ -686,16 +703,19 @@ namespace lap
 									d[j] = v2;
 									h = v2;
 								}
-								if (h < min_n)
+								if (colsol[j] < dim)
 								{
-									// better
-									jmin_n = j;
-									min_n = h;
-								}
-								else if (h == min_n)
-								{
-									// same, do only update if old was used and new is free
-									if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
+									if (h < min_n)
+									{
+										// better
+										jmin_n = j;
+										min_n = h;
+									}
+									else if (h == min_n)
+									{
+										// same, do only update if old was used and new is free
+										if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
+									}
 								}
 							}
 						}
@@ -704,6 +724,19 @@ namespace lap
 					min = std::max(min, min_n);
 					jmin = jmin_n;
 					dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
+					// marked skipped columns that were cheaper
+					if (i >= dim)
+					{
+						for (int j = 0; j < dim2; j++)
+						{
+							// ignore any columns assigned to virtual rows
+							if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min_n))
+							{
+								colcomplete[completecount++] = j;
+								colactive[j] = 0;
+							}
+						}
+					}
 				}
 
 				// update column prices. can increase or decrease
@@ -746,6 +779,22 @@ namespace lap
 					old_complete = f + 1;
 				}
 #endif
+			}
+
+			if (dim_limit < dim2)
+			{
+				int j = 0;
+				for (int f = dim_limit; f < dim2; f++)
+				{
+					while (colsol[j] >= 0) j++;
+					colsol[j] = f;
+					rowsol[f] = j;
+					if (epsilon > SC(0))
+					{
+						total_eps -= epsilon;
+						v[j] -= epsilon;
+					}
+				}
 			}
 
 #ifdef LAP_DEBUG

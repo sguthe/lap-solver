@@ -173,13 +173,15 @@ namespace lap
 				min = std::numeric_limits<SC>::max();
 				//SC h2_global;
 				SC tt_jmin_global;
+				int dim_limit = ((epsilon > SC(0)) && (allow_reset)) ? dim : dim2;
+
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
 					int start = iterator.ws.part[t].first;
 					int end = iterator.ws.part[t].second;
 
-					for (int f = 0; f < dim2; f++)
+					for (int f = 0; f < dim_limit; f++)
 					{
 						int jmin_local = dim2;
 						SC min_local = std::numeric_limits<SC>::max();
@@ -213,16 +215,20 @@ namespace lap
 								colactive[j] = 1;
 								pred[j] = f;
 								SC h = d[j] = -v[j];
-								if (h < min_local)
+								// ignore any columns assigned to virtual rows
+								if (colsol[j] < dim)
 								{
-									// better
-									jmin_local = j;
-									min_local = h;
-								}
-								else if (h == min_local)
-								{
-									// same, do only update if old was used and new is free
-									if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+									if (h < min_local)
+									{
+										// better
+										jmin_local = j;
+										min_local = h;
+									}
+									else if (h == min_local)
+									{
+										// same, do only update if old was used and new is free
+										if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+									}
 								}
 							}
 						}
@@ -259,6 +265,19 @@ namespace lap
 							unassignedfound = false;
 							completecount = 0;
 							dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
+							// marked skipped columns that were cheaper
+							if (f >= dim)
+							{
+								for (int j = 0; j < dim2; j++)
+								{
+									// ignore any columns assigned to virtual rows
+									if ((colsol[j] >= dim) && (d[j] <= min))
+									{
+										colcomplete[completecount++] = j;
+										colactive[j] = 0;
+									}
+								}
+							}
 						}
 #pragma omp barrier
 						while (!unassignedfound)
@@ -329,16 +348,20 @@ namespace lap
 											d[j] = v2;
 											h = v2;
 										}
-										if (h < min_local)
+										// ignore any columns assigned to virtual rows
+										if (colsol[j] < dim)
 										{
-											// better
-											jmin_local = j;
-											min_local = h;
-										}
-										else if (h == min_local)
-										{
-											// same, do only update if old was used and new is free
-											if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+											if (h < min_local)
+											{
+												// better
+												jmin_local = j;
+												min_local = h;
+											}
+											else if (h == min_local)
+											{
+												// same, do only update if old was used and new is free
+												if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+											}
 										}
 									}
 								}
@@ -375,6 +398,19 @@ namespace lap
 								}
 								min = std::max(min, min_n);
 								dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
+								// marked skipped columns that were cheaper
+								if (i >= dim)
+								{
+									for (int j = 0; j < dim2; j++)
+									{
+										// ignore any columns assigned to virtual rows
+										if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min_n))
+										{
+											colcomplete[completecount++] = j;
+											colactive[j] = 0;
+										}
+									}
+								}
 							}
 #pragma omp barrier
 						}
@@ -410,7 +446,7 @@ namespace lap
 							min = std::numeric_limits<SC>::max();
 #ifndef LAP_QUIET
 							int level;
-							if ((level = displayProgress(start_time, elapsed, f + 1, dim2, " rows")) != 0)
+							if ((level = displayProgress(start_time, elapsed, f + 1, dim_limit, " rows")) != 0)
 							{
 								long long hit, miss;
 								iterator.getHitMiss(hit, miss);
@@ -428,6 +464,22 @@ namespace lap
 #endif
 						}
 #pragma omp barrier
+					}
+				}
+
+				if (dim_limit < dim2)
+				{
+					int j = 0;
+					for (int f = dim_limit; f < dim2; f++)
+					{
+						while (colsol[j] >= 0) j++;
+						colsol[j] = f;
+						rowsol[f] = j;
+						if (epsilon > SC(0))
+						{
+							total_eps -= epsilon;
+							v[j] -= epsilon;
+						}
 					}
 				}
 
