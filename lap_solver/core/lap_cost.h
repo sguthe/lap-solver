@@ -22,7 +22,6 @@ namespace lap
 	};
 
 	// Wrapper around per-row cost funtion, e.g. CUDA, OpenCL or OpenMPI
-	// getCost is not supported here
 	template <class TC, typename GETCOSTROW>
 	class RowCostFunction
 	{

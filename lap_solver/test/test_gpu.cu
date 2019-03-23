@@ -121,10 +121,13 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-template <class SC, class TC, class RCF, class CF, class TP>
-void solveCachingCUDA(TP &start_time, int N1, int N2, RCF &get_cost_row, CF &get_cost, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon)
+//template <class SC, class TC, class RCF, class CF, class TP>
+//void solveCachingCUDA(TP &start_time, int N1, int N2, RCF &get_cost_row, CF &get_cost, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon)
+template <class SC, class TC, class CF, class STATE, class TP>
+void solveCachingCUDA(TP &start_time, int N1, int N2, CF &get_cost, STATE *state, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon)
 {
-	lap::cuda::RowCostFunction<TC, decltype(get_cost_row), decltype(get_cost)> costFunction(get_cost_row, get_cost);
+	//lap::cuda::RowCostFunction<TC, decltype(get_cost_row), decltype(get_cost)> costFunction(get_cost_row, get_cost);
+	lap::cuda::SimpleCostFunction<TC, CF, STATE> costFunction(get_cost, state);
 
 	// different cache size, so always use SLRU
 	lap::cuda::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costFunction, ws);
@@ -170,31 +173,13 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
-
+// needs to be declared outside of a function
 template <class C>
-__global__
-void getCostRow_geometric_kernel(C *cost, C *tab_s, C *tab_t, int x, int start, int end, int N)
+struct GeometricState
 {
-	int y = start + threadIdx.x + blockIdx.x * blockDim.x;
-	if (y >= end) return;
-
-	C d0 = tab_s[x] - tab_t[y];
-	C d1 = tab_s[x + N] - tab_t[y + N];
-	cost[threadIdx.x + blockIdx.x * blockDim.x] = d0 * d0 + d1 * d1;
-}
-
-template <class C>
-__global__
-void getCost_geometric_kernel(C *cost, C *tab_s, C *tab_t, int *rowsol, int N)
-{
-	int x = threadIdx.x + blockIdx.x * blockDim.x;
-	if (x >= N) return;
-	int y = rowsol[x];
-
-	float d0 = tab_s[x] - tab_t[y];
-	float d1 = tab_s[x + N] - tab_t[y + N];
-	cost[x] = d0 * d0 + d1 * d1;
-}
+	C *tab_s;
+	C *tab_t;
+};
 
 template <class C>
 void testGeometricCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool epsilon, bool disjoint, std::string name_C, std::vector<int> &devs, bool silent)
@@ -252,102 +237,68 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 			int num_enabled = (int)ws.device.size();
 
-			C **d_tab_s = new C*[num_enabled];
-			C **d_tab_t = new C*[num_enabled];
+			typedef GeometricState<C> State;
+
+			State *d_state = new State[num_enabled];
 
 			for (int i = 0; i < num_enabled; i++)
 			{
-				d_tab_s[i] = 0;
-				d_tab_t[i] = 0;
+				d_state[i].tab_s = 0;
+				d_state[i].tab_t = 0;
 			}
 
 			for (int i = 0; i < num_enabled; i++)
 			{
 				cudaSetDevice(ws.device[i]);
-				cudaMalloc(&(d_tab_s[i]), 2 * N * sizeof(C));
-				cudaMalloc(&(d_tab_t[i]), 2 * N * sizeof(C));
-				cudaMemcpy(d_tab_s[i], tab_s, 2 * N * sizeof(C), cudaMemcpyHostToDevice);
-				cudaMemcpy(d_tab_t[i], tab_t, 2 * N * sizeof(C), cudaMemcpyHostToDevice);
+				cudaMalloc(&(d_state[i].tab_s), 2 * N * sizeof(C));
+				cudaMalloc(&(d_state[i].tab_t), 2 * N * sizeof(C));
+				cudaMemcpy(d_state[i].tab_s, tab_s, 2 * N * sizeof(C), cudaMemcpyHostToDevice);
+				cudaMemcpy(d_state[i].tab_t, tab_t, 2 * N * sizeof(C), cudaMemcpyHostToDevice);
 			}
 
 			int *rowsol = new int[N];
 
 			// cost function
-			auto get_cost_row = [&d_tab_s, &d_tab_t, &N](C *d_row, int t, cudaStream_t stream, int x, int start, int end)
+			auto get_cost = [N] __device__(int x, int y, State &state)
 			{
-				dim3 block_size, grid_size;
-				block_size.x = 256;
-				grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
-				getCostRow_geometric_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_tab_s[t], d_tab_t[t], x, start, end, N);
+				float d0 = state.tab_s[x] - state.tab_t[y];
+				float d1 = state.tab_s[x + N] - state.tab_t[y + N];
+				return d0 * d0 + d1 * d1;
 			};
 
-			// cost function
-			auto get_cost = [&d_tab_s, &d_tab_t](C *d_row, cudaStream_t stream, int *d_rowsol, int N)
-			{
-				dim3 block_size, grid_size;
-				block_size.x = 256;
-				grid_size.x = (N + block_size.x - 1) / block_size.x;
-				getCost_geometric_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_tab_s[0], d_tab_t[0], d_rowsol, N);
-			};
-
-			solveCachingCUDA<C, C>(start_time, N, N, get_cost_row, get_cost, ws, max_memory, rowsol, epsilon);
+			solveCachingCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
 
 			for (int i = 0; i < num_enabled; i++)
 			{
 				cudaSetDevice(ws.device[i]);
-				cudaFree(d_tab_s[i]);
-				cudaFree(d_tab_t[i]);
+				cudaFree(d_state[i].tab_s);
+				cudaFree(d_state[i].tab_t);
 			}
 
 			delete[] rowsol;
 			delete[] tab_s;
 			delete[] tab_t;
-			delete[] d_tab_s;
-			delete[] d_tab_t;
+			delete[] d_state;
 		}
 	}
 }
 
-template <class C>
+template <class C, class GETCOST, class STATE>
 __global__
-void getCostRow_sanity_kernel(C *cost, C *vec, int x, int start, int end, int N)
-{
-	int y = start + threadIdx.x + blockIdx.x * blockDim.x;
-	if (y >= end) return;
-
-	C r = vec[x] + vec[y + N];
-	if (x != y) r += C(0.1);
-
-	cost[threadIdx.x + blockIdx.x * blockDim.x] = r;
-}
-
-template <class C>
-__global__
-void getCost_sanity_kernel(C *cost, C *vec, int *rowsol, int N)
+void getGTCost_sanity_kernel(C *cost, GETCOST getcost, STATE state, int N)
 {
 	int x = threadIdx.x + blockIdx.x * blockDim.x;
 	if (x >= N) return;
-	int y = rowsol[x];
 
-	C r = vec[x] + vec[y + N];
-	if (x != y) r += C(0.1);
-
-	cost[x] = r;
+	cost[x] = getcost(x, x, state);
 }
 
+// needs to be declared outside of a function
 template <class C>
-__global__
-void getGTCost_sanity_kernel(C *cost, C *vec, int N)
+struct SanityState
 {
-	int x = threadIdx.x + blockIdx.x * blockDim.x;
-	if (x >= N) return;
-	int y = x;
-
-	C r = vec[x] + vec[y + N];
-	if (x != y) r += C(0.1);
-
-	cost[x] = r;
-}
+	C *vec;
+};
 
 template <class C>
 void testSanityCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent)
@@ -379,41 +330,33 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 			int num_enabled = (int)ws.device.size();
 
-			C **d_vec = new C*[num_enabled];
+			typedef SanityState<C> State;
+			State *d_state = new State[num_enabled];
 
 			for (int i = 0; i < num_enabled; i++)
 			{
-				d_vec[i] = 0;
+				d_state[i].vec = 0;
 			}
 
 			for (int i = 0; i < num_enabled; i++)
 			{
 				cudaSetDevice(ws.device[i]);
-				cudaMalloc(&(d_vec[i]), 2 * N * sizeof(C));
-				cudaMemcpy(d_vec[i], vec, 2 * N * sizeof(C), cudaMemcpyHostToDevice);
+				cudaMalloc(&(d_state[i].vec), 2 * N * sizeof(C));
+				cudaMemcpy(d_state[i].vec, vec, 2 * N * sizeof(C), cudaMemcpyHostToDevice);
 			}
 
 			int *rowsol = new int[N];
 
 			// cost function
-			auto get_cost_row = [&d_vec, &N](C *d_row, int t, cudaStream_t stream, int x, int start, int end)
+			auto get_cost = [N] __device__(int x, int y, State &state)
 			{
-				dim3 block_size, grid_size;
-				block_size.x = 256;
-				grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
-				getCostRow_sanity_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_vec[t], x, start, end, N);
+				C r = state.vec[x] + state.vec[y + N];
+				if (x != y) r += C(0.1);
+
+				return r;
 			};
 
-			// cost function
-			auto get_cost = [&d_vec](C *d_row, cudaStream_t stream, int *d_rowsol, int N)
-			{
-				dim3 block_size, grid_size;
-				block_size.x = 256;
-				grid_size.x = (N + block_size.x - 1) / block_size.x;
-				getCost_sanity_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_vec[0], d_rowsol, N);
-			};
-
-			solveCachingCUDA<C, C>(start_time, N, N, get_cost_row, get_cost, ws, max_memory, rowsol, epsilon);
+			solveCachingCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
 
 			bool passed = true;
 			for (long long i = 0; (passed) && (i < N); i++)
@@ -435,7 +378,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 					dim3 block_size, grid_size;
 					block_size.x = 256;
 					grid_size.x = (N + block_size.x - 1) / block_size.x;
-					getGTCost_sanity_kernel<<<grid_size, block_size>>>(d_row, d_vec[0], N);
+					getGTCost_sanity_kernel<<<grid_size, block_size>>>(d_row, get_cost, d_state[0], N);
 					cudaMemcpy(row, d_row, N * sizeof(C), cudaMemcpyDeviceToHost);
 					cudaFree(d_row);
 				}
@@ -448,49 +391,14 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			for (int i = 0; i < num_enabled; i++)
 			{
 				cudaSetDevice(ws.device[i]);
-				cudaFree(d_vec[i]);
+				cudaFree(d_state[i].vec);
 			}
 
 			delete[] rowsol;
 			delete[] vec;
-			delete[] d_vec;
+			delete[] d_state;
 		}
 	}
-}
-
-template <class C>
-__global__
-void getCostRow_lowRank_kernel(C *cost, C *vec, int rank, int x, int start, int end, int N)
-{
-	int y = start + threadIdx.x + blockIdx.x * blockDim.x;
-	if (y >= end) return;
-
-	C sum(0);
-	for (long long k = 0; k < rank; k++)
-	{
-		sum += vec[k * N + x] * vec[k * N + y];
-	}
-	sum /= C(rank);
-
-	cost[threadIdx.x + blockIdx.x * blockDim.x] = sum;
-}
-
-template <class C>
-__global__
-void getCost_lowRank_kernel(C *cost, C *vec, int rank, int *rowsol, int N)
-{
-	int x = threadIdx.x + blockIdx.x * blockDim.x;
-	if (x >= N) return;
-	int y = rowsol[x];
-
-	C sum(0);
-	for (long long k = 0; k < rank; k++)
-	{
-		sum += vec[k * N + x] * vec[k * N + y];
-	}
-	sum /= C(rank);
-
-	cost[x] = sum;
 }
 
 template <class C>
@@ -529,51 +437,47 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				lap::cuda::Worksharing ws(N, 256, devs, silent);
 				int num_enabled = (int)ws.device.size();
 
-				C **d_vec = new C*[num_enabled];
+				typedef SanityState<C> State;
+				State *d_state = new State[num_enabled];
 
 				for (int i = 0; i < num_enabled; i++)
 				{
-					d_vec[i] = 0;
+					d_state[i].vec = 0;
 				}
 
 				for (int i = 0; i < num_enabled; i++)
 				{
 					cudaSetDevice(ws.device[i]);
-					cudaMalloc(&(d_vec[i]), N * rank * sizeof(C));
-					cudaMemcpy(d_vec[i], vec, N * rank * sizeof(C), cudaMemcpyHostToDevice);
+					cudaMalloc(&(d_state[i].vec), N * rank * sizeof(C));
+					cudaMemcpy(d_state[i].vec, vec, N * rank * sizeof(C), cudaMemcpyHostToDevice);
 				}
 
 				int *rowsol = new int[N];
 
 				// cost function
-				auto get_cost_row = [&d_vec, &N, &rank](C *d_row, int t, cudaStream_t stream, int x, int start, int end)
+				auto get_cost = [rank, N] __device__(int x, int y, State &state)
 				{
-					dim3 block_size, grid_size;
-					block_size.x = 256;
-					grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
-					getCostRow_lowRank_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_vec[t], (int)rank, x, start, end, N);
+					C sum(0);
+					for (long long k = 0; k < rank; k++)
+					{
+						sum += state.vec[k * N + x] * state.vec[k * N + y];
+					}
+					sum /= C(rank);
+
+					return sum;
 				};
 
-				// cost function
-				auto get_cost = [&d_vec, &rank](C *d_row, cudaStream_t stream, int *d_rowsol, int N)
-				{
-					dim3 block_size, grid_size;
-					block_size.x = 256;
-					grid_size.x = (N + block_size.x - 1) / block_size.x;
-					getCost_lowRank_kernel<<<grid_size, block_size, 0, stream>>>(d_row, d_vec[0], (int)rank, d_rowsol, N);
-				};
-
-				solveCachingCUDA<C, C>(start_time, N, N, get_cost_row, get_cost, ws, max_memory, rowsol, epsilon);
+				solveCachingCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
 
 				for (int i = 0; i < num_enabled; i++)
 				{
 					cudaSetDevice(ws.device[i]);
-					cudaFree(d_vec[i]);
+					cudaFree(d_state[i].vec);
 				}
 
 				delete[] rowsol;
 				delete[] vec;
-				delete[] d_vec;
+				delete[] d_state;
 			}
 		}
 	}
@@ -869,40 +773,16 @@ template <class C> void testRandomLowRank(long long min_tab, long long max_tab, 
 	}
 }
 
-template <class C>
-__device__ __forceinline__ C getCost_image(unsigned char *c00, unsigned char *c01, unsigned char *c02, int w0, int h0, int mval0,
-	unsigned char *c10, unsigned char *c11, unsigned char *c12, int w1, int h1, int mval1, int x, int y)
+// needs to be declared outside of a function
+struct ImagesState
 {
-	C r = C(c00[x]) / C(mval0) - C(c10[y]) / C(mval1);
-	C g = C(c01[x]) / C(mval0) - C(c11[y]) / C(mval1);
-	C b = C(c02[x]) / C(mval0) - C(c12[y]) / C(mval1);
-	C u = C(x % w0) / C(w0 - 1) - C(y % w1) / C(w1 - 1);
-	C v = C(x / w0) / C(h0 - 1) - C(y / w1) / C(h1 - 1);
-	return r * r + g * g + b * b + u * u + v * v;
-}
-
-template <class C>
-__global__
-void getCostRow_image_kernel(C *row, unsigned char *c00, unsigned char *c01, unsigned char *c02, int w0, int h0, int mval0, 
-	unsigned char *c10, unsigned char *c11, unsigned char *c12, int w1, int h1, int mval1, int x, int start, int end)
-{
-	int y = start + threadIdx.x + blockIdx.x * blockDim.x;
-	if (y >= end) return;
-
-	row[threadIdx.x + blockIdx.x * blockDim.x] = getCost_image<C>(c00, c01, c02, w0, h0, mval0, c10, c11, c12, w1, h1, mval1, x, y);
-}
-
-template <class C>
-__global__
-void getCost_image_kernel(C *cost, unsigned char *c00, unsigned char *c01, unsigned char *c02, int w0, int h0, int mval0,
-	unsigned char *c10, unsigned char *c11, unsigned char *c12, int w1, int h1, int mval1, int *rowsol, int N)
-{
-	int x = threadIdx.x + blockIdx.x * blockDim.x;
-	if (x >= N) return;
-	int y = rowsol[x];
-
-	cost[x] = getCost_image<C>(c00, c01, c02, w0, h0, mval0, c10, c11, c12, w1, h1, mval1, x, y);
-}
+	unsigned char *c00;
+	unsigned char *c01;
+	unsigned char *c02;
+	unsigned char *c10;
+	unsigned char *c11;
+	unsigned char *c12;
+};
 
 template <class C> void testImages(std::vector<std::string> &images, long long max_memory, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent)
 {
@@ -925,6 +805,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				lap::cuda::Worksharing ws(N2, 256, devs, silent);
 				int num_devices = (int)ws.device.size();
+				typedef ImagesState State;
 				// make sure img[0] is at most as large as img[1]
 				PPMImage *img[2];
 				img[0] = new PPMImage[num_devices];
@@ -987,35 +868,40 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 				delete[] buf_a;
 				delete[] buf_b;
 
-				// cost function
-				auto get_cost_row = [&img](C *d_row, int t, cudaStream_t stream, int x, int start, int end)
+				// setup state and other arguments
+				typedef ImagesState State;
+				State *d_state = new State[num_devices];
+				int w0 = img[0][0].width;
+				int h0 = img[0][0].height;
+				int mval0 = img[0][0].max_val;
+				int w1 = img[1][0].width;
+				int h1 = img[1][0].height;
+				int mval1 = img[1][0].max_val;
+				int size_0 = img[0][0].width * img[0][0].height;
+				int size_1 = img[1][0].width * img[1][0].height;
+				for (int t = 0; t < num_devices; t++)
 				{
-					dim3 block_size, grid_size;
-					block_size.x = 256;
-					grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
-					int size_0 = img[0][t].width * img[0][t].height;
-					int size_1 = img[1][t].width * img[1][t].height;
-					getCostRow_image_kernel<<<grid_size, block_size, 0, stream>>>(d_row,
-						img[0][t].raw, img[0][t].raw + size_0, img[0][t].raw + 2 * size_0, img[0][t].width, img[0][t].height, img[0][t].max_val,
-						img[1][t].raw, img[1][t].raw + size_1, img[1][t].raw + 2 * size_1, img[1][t].width, img[1][t].height, img[1][t].max_val, x, start, end);
-				};
+					d_state[t].c00 = img[0][0].raw;
+					d_state[t].c01 = img[0][0].raw + size_0;
+					d_state[t].c02 = img[0][0].raw + 2 * size_0;
+					d_state[t].c10 = img[1][0].raw;
+					d_state[t].c11 = img[1][0].raw + size_1;
+					d_state[t].c12 = img[1][0].raw + 2 * size_1;
+				}
 
-				// cost function
-				auto get_cost = [&img](C *d_row, cudaStream_t stream, int *d_rowsol, int N1)
+				auto get_cost = [w0, h0, mval0, w1, h1, mval1] __device__(int x, int y, State &state)
 				{
-					dim3 block_size, grid_size;
-					block_size.x = 256;
-					grid_size.x = (N1 + block_size.x - 1) / block_size.x;
-					int size_0 = img[0][0].width * img[0][0].height;
-					int size_1 = img[1][0].width * img[1][0].height;
-					getCost_image_kernel<<<grid_size, block_size, 0, stream>>>(d_row,
-						img[0][0].raw, img[0][0].raw + size_0, img[0][0].raw + 2 * size_0, img[0][0].width, img[0][0].height, img[0][0].max_val,
-						img[1][0].raw, img[1][0].raw + size_1, img[1][0].raw + 2 * size_1, img[1][0].width, img[1][0].height, img[1][0].max_val, d_rowsol, N1);
+					C r = C(state.c00[x]) / C(mval0) - C(state.c10[y]) / C(mval1);
+					C g = C(state.c01[x]) / C(mval0) - C(state.c11[y]) / C(mval1);
+					C b = C(state.c02[x]) / C(mval0) - C(state.c12[y]) / C(mval1);
+					C u = C(x % w0) / C(w0 - 1) - C(y % w1) / C(w1 - 1);
+					C v = C(x / w0) / C(h0 - 1) - C(y / w1) / C(h1 - 1);
+					return r * r + g * g + b * b + u * u + v * v;
 				};
 
 				int *rowsol = new int[N2];
 
-				solveCachingCUDA<C, C>(start_time, N1, N2, get_cost_row, get_cost, ws, max_memory, rowsol, epsilon);
+				solveCachingCUDA<C, C>(start_time, N1, N2, get_cost, d_state, ws, max_memory, rowsol, epsilon);
 
 				for (int t = 0; t < num_devices; t++)
 				{
@@ -1025,6 +911,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 				delete[] rowsol;
 				delete[] img[0];
 				delete[] img[1];
+				delete[] d_state;
 			}
 		}
 	}
