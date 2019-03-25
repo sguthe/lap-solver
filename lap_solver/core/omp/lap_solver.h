@@ -419,7 +419,8 @@ namespace lap
 							// update column prices. can increase or decrease
 							if (epsilon > SC(0))
 							{
-								updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
+								if (first) updateColumnPricesClamp(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
+								else updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
 							}
 							else
 							{
@@ -469,17 +470,11 @@ namespace lap
 
 				if (dim_limit < dim2)
 				{
-					int j = 0;
-					for (int f = dim_limit; f < dim2; f++)
+					total_eps -= SC(dim2 - dim_limit) * epsilon;
+					// fix v in unassigned columns
+					for (int j = 0; j < dim2; j++)
 					{
-						while (colsol[j] >= 0) j++;
-						colsol[j] = f;
-						rowsol[f] = j;
-						if (epsilon > SC(0))
-						{
-							total_eps -= epsilon;
-							v[j] -= epsilon;
-						}
+						if (colsol[j] < 0) v[j] -= epsilon;
 					}
 				}
 

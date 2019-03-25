@@ -1,4 +1,5 @@
 #pragma once
+#pragma once
 
 #include <chrono>
 #include <sstream>
@@ -270,11 +271,21 @@ namespace lap
 			int j1 = colcomplete[i];
 			SC dlt = min - d[j1];
 			total -= dlt;
-#if 0
 			dlt += eps;
-#else
+			total_eps -= dlt;
+			v[j1] -= dlt;
+		}
+	}
+
+	template <class SC>
+	__forceinline void updateColumnPricesClamp(int *colcomplete, int completecount, SC min, SC *v, SC *d, SC eps, SC &total, SC &total_eps)
+	{
+		for (int i = 0; i < completecount; i++)
+		{
+			int j1 = colcomplete[i];
+			SC dlt = min - d[j1];
+			total -= dlt;
 			dlt = std::max(dlt, eps);
-#endif
 			total_eps -= dlt;
 			v[j1] -= dlt;
 		}
@@ -333,8 +344,7 @@ namespace lap
 					else
 					{
 						if ((total_d <= SC(0)) || (total_eps <= SC(0)))  epsilon = SC(0);
-						else if (total_eps < SC(16) * total_d) epsilon = epsilon / SC(16);
-						else epsilon = std::max(epsilon / SC(64), std::min(epsilon / SC(16), epsilon * total_d / total_eps));
+						epsilon = std::min(epsilon / SC(4), (SC(4) * total_eps - total_d) / (SC(4) * total_eps + total_d));
 						allow_reset = false;
 					}
 				}
@@ -381,9 +391,8 @@ namespace lap
 					}
 					else
 					{
-						if ((total_d == 0) || (total_eps == 0)) epsilon = 0;
-						else if (total_eps < (total_d << 4)) epsilon = epsilon >> 4;
-						else epsilon = std::max(1ll, std::max(epsilon >> 6, std::min(epsilon >> 4, (long long)(((long double)epsilon) * ((long double)total_d) / ((long double)total_eps)))));
+						if ((total_d == 0) || (total_eps == 0))  epsilon = 0;
+						epsilon = std::max(1ll, std::min(epsilon >> 2, ((total_eps << 2) - total_d) / ((total_eps << 2) + total_d)));
 						allow_reset = false;
 					}
 				}
@@ -430,9 +439,8 @@ namespace lap
 					}
 					else
 					{
-						if ((total_d == 0) || (total_eps == 0)) epsilon = 0;
-						else if (total_eps < (total_d << 4)) epsilon = epsilon >> 4;
-						else epsilon = std::max(1, std::max(epsilon >> 6, std::min(epsilon >> 4, (int)(((double)epsilon) * ((double)total_d) / ((double)total_eps)))));
+						if ((total_d == 0) || (total_eps == 0))  epsilon = 0;
+						epsilon = std::max(1, std::min(epsilon >> 2, ((total_eps << 2) - total_d) / ((total_eps << 2) + total_d)));
 						allow_reset = false;
 					}
 				}
@@ -742,7 +750,8 @@ namespace lap
 				// update column prices. can increase or decrease
 				if (epsilon > SC(0))
 				{
-					updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
+					if (first) updateColumnPricesClamp(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
+					else updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
 				}
 				else
 				{
@@ -783,17 +792,11 @@ namespace lap
 
 			if (dim_limit < dim2)
 			{
-				int j = 0;
-				for (int f = dim_limit; f < dim2; f++)
+				total_eps -= SC(dim2 - dim_limit) * epsilon;
+				// fix v in unassigned columns
+				for (int j = 0; j < dim2; j++)
 				{
-					while (colsol[j] >= 0) j++;
-					colsol[j] = f;
-					rowsol[f] = j;
-					if (epsilon > SC(0))
-					{
-						total_eps -= epsilon;
-						v[j] -= epsilon;
-					}
+					if (colsol[j] < 0) v[j] -= epsilon;
 				}
 			}
 
