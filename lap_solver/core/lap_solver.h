@@ -312,7 +312,7 @@ namespace lap
 		bool reset = false;
 		if (epsilon > SC(0))
 		{
-			if (epsilon <= epsilon_lower)
+			if (!first)
 			{
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
@@ -323,31 +323,15 @@ namespace lap
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
 					reset = true;
+					epsilon = std::max(epsilon / SC(1024), std::min(epsilon / SC(2), total_d / (SC(8) * SC(dim2))));
 				}
-				epsilon = SC(0);
-			}
-			else
-			{
-				if (!first)
+				else
 				{
-#ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
-#endif
-					if ((allow_reset) && (SC(dim2) * epsilon > SC(4) * total_d))
-					{
-#ifdef LAP_DEBUG
-						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
-#endif
-						reset = true;
-						epsilon = std::max(epsilon / SC(1024), std::min(epsilon / SC(2), total_d / (SC(8) * SC(dim2))));
-					}
-					else
-					{
-						if ((total_d <= SC(0)) || (total_eps <= SC(0)))  epsilon = SC(0);
-						epsilon = std::min(epsilon / SC(4), std::min((SC(4) * total_eps - total_d) / (SC(4) * total_eps + total_d), (SC(4) * total_d - total_eps) / (SC(4) * total_d + total_eps)));
-						allow_reset = false;
-					}
+					if ((total_d <= SC(0)) || (total_eps <= SC(0)))  epsilon = SC(0);
+					epsilon = std::max(SC(0), std::min(epsilon / SC(4), std::min((SC(4) * total_eps - total_d) / (SC(4) * total_eps + total_d), (SC(16) * total_d - total_eps) / (SC(16) * total_d + total_eps))));
+					allow_reset = false;
 				}
+				if (epsilon <= epsilon_lower) epsilon = SC(0);
 			}
 		}
 		return reset;
@@ -392,7 +376,7 @@ namespace lap
 					else
 					{
 						if ((total_d == 0) || (total_eps == 0))  epsilon = 0;
-						epsilon = std::max(1ll, std::min(epsilon >> 2, std::min(((total_eps << 2) - total_d) / ((total_eps << 2) + total_d), ((total_d << 2) - total_eps) / ((total_d << 2) + total_eps))));
+						epsilon = std::max(1ll, std::min(epsilon >> 2, std::min(((total_eps << 2) - total_d) / ((total_eps << 2) + total_d), ((total_d << 4) - total_eps) / ((total_d << 4) + total_eps))));
 						allow_reset = false;
 					}
 				}
@@ -440,7 +424,7 @@ namespace lap
 					else
 					{
 						if ((total_d == 0) || (total_eps == 0))  epsilon = 0;
-						epsilon = std::max(1, std::min(epsilon >> 2, std::min(((total_eps << 2) - total_d) / ((total_eps << 2) + total_d), ((total_d << 2) - total_eps) / ((total_d << 2) + total_eps))));
+						epsilon = std::max(1, std::min(epsilon >> 2, std::min(((total_eps << 2) - total_d) / ((total_eps << 2) + total_d), ((total_d << 4) - total_eps) / ((total_d << 4) + total_eps))));
 						allow_reset = false;
 					}
 				}
