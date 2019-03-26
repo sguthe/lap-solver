@@ -523,7 +523,7 @@ namespace lap
 		while (epsilon >= SC(0))
 		{
 			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, v, dim2);
-			if ((!first) && (allow_reset)) clamp = false;
+			//if ((!first) && (allow_reset)) clamp = false;
 			total_d = SC(0);
 			total_eps = SC(0);
 #ifndef LAP_QUIET
