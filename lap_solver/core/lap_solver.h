@@ -328,7 +328,7 @@ namespace lap
 				else
 				{
 					if ((total_d <= SC(0)) || (total_eps <= SC(0)))  epsilon = SC(0);
-					epsilon = std::max(SC(0), std::min(epsilon / SC(4), std::min((SC(4) * total_eps - total_d) / (SC(4) * total_eps + total_d), (SC(16) * total_d - total_eps) / (SC(16) * total_d + total_eps))));
+					epsilon = std::max(SC(0), std::min(epsilon / SC(4), std::min((SC(4) * total_eps - total_d) / (SC(4) * total_eps + total_d), (SC(64) * total_d - total_eps) / (SC(64) * total_d + total_eps))));
 					allow_reset = false;
 				}
 				if (epsilon <= epsilon_lower) epsilon = SC(0);
@@ -376,7 +376,7 @@ namespace lap
 					else
 					{
 						if ((total_d == 0) || (total_eps == 0))  epsilon = 0;
-						epsilon = std::max(1ll, std::min(epsilon >> 2, std::min(((total_eps << 2) - total_d) / ((total_eps << 2) + total_d), ((total_d << 4) - total_eps) / ((total_d << 4) + total_eps))));
+						epsilon = std::max(1ll, std::min(epsilon >> 2, std::min(((total_eps << 2) - total_d) / ((total_eps << 2) + total_d), ((total_d << 6) - total_eps) / ((total_d << 6) + total_eps))));
 						allow_reset = false;
 					}
 				}
@@ -424,7 +424,7 @@ namespace lap
 					else
 					{
 						if ((total_d == 0) || (total_eps == 0))  epsilon = 0;
-						epsilon = std::max(1, std::min(epsilon >> 2, std::min(((total_eps << 2) - total_d) / ((total_eps << 2) + total_d), ((total_d << 4) - total_eps) / ((total_d << 4) + total_eps))));
+						epsilon = std::max(1, std::min(epsilon >> 2, std::min(((total_eps << 2) - total_d) / ((total_eps << 2) + total_d), ((total_d << 6) - total_eps) / ((total_d << 6) + total_eps))));
 						allow_reset = false;
 					}
 				}
@@ -514,6 +514,7 @@ namespace lap
 
 		bool first = true;
 		bool allow_reset = true;
+		bool clamp = true;
 
 		memset(v, 0, dim2 * sizeof(SC));
 
@@ -522,6 +523,7 @@ namespace lap
 		while (epsilon >= SC(0))
 		{
 			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, v, dim2);
+			if ((!first) && (allow_reset)) clamp = false;
 			total_d = SC(0);
 			total_eps = SC(0);
 #ifndef LAP_QUIET
@@ -734,7 +736,7 @@ namespace lap
 				// update column prices. can increase or decrease
 				if (epsilon > SC(0))
 				{
-					if (first) updateColumnPricesClamp(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
+					if (clamp) updateColumnPricesClamp(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
 					else updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
 				}
 				else

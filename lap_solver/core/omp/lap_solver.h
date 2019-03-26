@@ -134,6 +134,7 @@ namespace lap
 
 			bool first = true;
 			bool allow_reset = true;
+			bool clamp = true;
 
 			memset(v, 0, dim2 * sizeof(SC));
 
@@ -142,6 +143,7 @@ namespace lap
 			while (epsilon >= SC(0))
 			{
 				lap::getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, v, dim2);
+				if ((!first) && (allow_reset)) clamp = false;
 				total_d = SC(0);
 				total_eps = SC(0);
 #ifndef LAP_QUIET
@@ -419,7 +421,7 @@ namespace lap
 							// update column prices. can increase or decrease
 							if (epsilon > SC(0))
 							{
-								if (first) updateColumnPricesClamp(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
+								if (clamp) updateColumnPricesClamp(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
 								else updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
 							}
 							else
