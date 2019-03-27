@@ -307,6 +307,7 @@ namespace lap
 	template <class SC>
 	bool getNextEpsilon(SC &epsilon, SC epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_reset, int dim2)
 	{
+		//allow_reset = false;
 		total_eps = total_d - total_eps;
 		total_d = -total_d;
 		bool reset = false;
@@ -314,24 +315,40 @@ namespace lap
 		{
 			if (!first)
 			{
-#ifdef LAP_DEBUG
-				lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
-#endif
-				if ((allow_reset) && (SC(dim2) * epsilon > SC(4) * total_d))
+				if (epsilon <= epsilon_lower)
 				{
 #ifdef LAP_DEBUG
-					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-					reset = true;
-					epsilon = std::max(epsilon / SC(1024), std::min(epsilon / SC(2), total_d / (SC(8) * SC(dim2))));
+					if ((allow_reset) && (SC(dim2) * epsilon >= total_d))
+					{
+#ifdef LAP_DEBUG
+						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+#endif
+						reset = true;
+					}
+					epsilon = SC(0);
 				}
 				else
 				{
-					if ((total_d <= SC(0)) || (total_eps <= SC(0)))  epsilon = SC(0);
-					epsilon = std::max(SC(0), std::min(epsilon / SC(4), std::min((SC(4) * total_eps - total_d) / (SC(4) * total_eps + total_d), (SC(64) * total_d - total_eps) / (SC(64) * total_d + total_eps))));
-					allow_reset = false;
+#ifdef LAP_DEBUG
+					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
+#endif
+					if ((allow_reset) && (SC(dim2) * epsilon >= total_d))
+					{
+#ifdef LAP_DEBUG
+						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
+#endif
+						reset = true;
+						epsilon = epsilon / SC(4);
+					}
+					else
+					{
+						if ((total_d <= SC(0)) || (total_eps <= SC(0)))  epsilon = SC(0);
+						else epsilon = epsilon / SC(4);
+						allow_reset = false;
+					}
 				}
-				if (epsilon <= epsilon_lower) epsilon = SC(0);
 			}
 		}
 		return reset;
@@ -349,7 +366,7 @@ namespace lap
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-				if ((allow_reset) && (total_eps > (total_d << 4)))
+				if ((allow_reset) && (dim2 * epsilon >= total_d))
 				{
 #ifdef LAP_DEBUG
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -365,18 +382,18 @@ namespace lap
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-					if ((allow_reset) && (total_eps > (total_d << 4)))
+					if ((allow_reset) && (dim2 * epsilon >= total_d))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
 						reset = true;
-						epsilon = std::max(1ll, std::max(epsilon >> 10, std::min(epsilon >> 4, (long long)(((long double)epsilon) * ((long double)total_d) / ((long double)total_eps)))));
+						epsilon = std::max(1ll, epsilon >> 2);
 					}
 					else
 					{
 						if ((total_d == 0) || (total_eps == 0))  epsilon = 0;
-						epsilon = std::max(1ll, std::min(epsilon >> 2, std::min(((total_eps << 2) - total_d) / ((total_eps << 2) + total_d), ((total_d << 6) - total_eps) / ((total_d << 6) + total_eps))));
+						else epsilon = std::max(1ll, epsilon >> 2);
 						allow_reset = false;
 					}
 				}
@@ -397,7 +414,7 @@ namespace lap
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-				if ((allow_reset) && (total_eps > (total_d << 4)))
+				if ((allow_reset) && (dim2 * epsilon >= total_d))
 				{
 #ifdef LAP_DEBUG
 					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
@@ -413,18 +430,18 @@ namespace lap
 #ifdef LAP_DEBUG
 					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
 #endif
-					if ((allow_reset) && (total_eps > (total_d << 4)))
+					if ((allow_reset) && (dim2 * epsilon >= total_d))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
 						reset = true;
-						epsilon = std::max(1, std::max(epsilon >> 10, std::min(epsilon >> 4, (int)(((double)epsilon) * ((double)total_d) / ((double)total_eps)))));
+						epsilon = std::max(1, epsilon >> 2);
 					}
 					else
 					{
 						if ((total_d == 0) || (total_eps == 0))  epsilon = 0;
-						epsilon = std::max(1, std::min(epsilon >> 2, std::min(((total_eps << 2) - total_d) / ((total_eps << 2) + total_d), ((total_d << 6) - total_eps) / ((total_d << 6) + total_eps))));
+						else epsilon = std::max(1, epsilon >> 2);
 						allow_reset = false;
 					}
 				}
