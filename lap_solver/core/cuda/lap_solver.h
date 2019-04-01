@@ -873,6 +873,32 @@ namespace lap
 			state_out->i = -1;
 		}
 
+		template <class SC>
+		__global__ void markedSkippedColumns_kernel(char *colactive, SC min_n, int jmin, int *colsol, SC *d, int dim, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+			if (j >= size) return;
+
+			// ignore any columns assigned to virtual rows
+			if ((j == jmin) || ((colsol[j] >= dim) && (d[j] <= min_n)))
+			{
+				colactive[j] = 0;
+			}
+		}
+
+		template <class SC>
+		__global__ void markedSkippedColumnsUpdate_kernel(char *colactive, SC min_n, int jmin, int *colsol, SC *d, int dim, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+			if (j >= size) return;
+
+			// ignore any columns assigned to virtual rows
+			if ((j == jmin) || ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min_n)))
+			{
+				colactive[j] = 0;
+			}
+		}
+
 		template <class SC, class TC, class CF, class I>
 		void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol)
 
@@ -1187,7 +1213,8 @@ namespace lap
 						}
 #endif
 
-						setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+						if (f >= dim) markedSkippedColumns_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, csol_private[t], d_private[t], dim, size);
+						else setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 
 						while (!unassignedfound)
 						{
@@ -1266,7 +1293,8 @@ namespace lap
 							}
 #endif
 
-							setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+							if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, csol_private[t], d_private[t], dim, size);
+							else setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 						}
 
 						// update column prices. can increase or decrease
@@ -1417,11 +1445,10 @@ namespace lap
 								}
 							}
 #endif
-							// mark last column scanned (single device)
-							if ((jmin >= start) && (jmin < end))
-							{
-								setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
-							}
+							// mark last column scanned
+							if (f >= dim) markedSkippedColumns_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, csol_private[t], d_private[t], dim, size);
+							else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
+
 							while (!unassignedfound)
 							{
 								// update 'distances' between freerow and all unscanned columns, via next scanned column.
@@ -1538,11 +1565,9 @@ namespace lap
 									}
 								}
 #endif
-								// mark last column scanned (single device)
-								if ((jmin >= start) && (jmin < end))
-								{
-									setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
-								}
+								// mark last column scanned
+								if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, csol_private[t], d_private[t], dim, size);
+								else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 							}
 
 							// update column prices. can increase or decrease
@@ -1674,7 +1699,16 @@ namespace lap
 						{
 							unassignedfound = false;
 						}
-						// mark last column scanned (single device)
+						if (f >= dim)
+						{
+							cudaSetDevice(iterator.ws.device[t]);
+							int start = iterator.ws.part[t].first;
+							int end = iterator.ws.part[t].second;
+							int size = end - start;
+							cudaStream_t stream = iterator.ws.stream[t];
+							markedSkippedColumns_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, csol_private[t], d_private[t], dim, size);
+						}
+						else 
 						{
 							int t = iterator.ws.find(jmin);
 							cudaSetDevice(iterator.ws.device[t]);
@@ -1851,6 +1885,16 @@ namespace lap
 							}
 
 							// mark last column scanned (single device)
+							if (i >= dim)
+							{
+								cudaSetDevice(iterator.ws.device[t]);
+								int start = iterator.ws.part[t].first;
+								int end = iterator.ws.part[t].second;
+								int size = end - start;
+								cudaStream_t stream = iterator.ws.stream[t];
+								markedSkippedColumnsUpdate_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, csol_private[t], d_private[t], dim, size);
+							}
+							else 
 							{
 								int t = iterator.ws.find(jmin);
 								cudaSetDevice(iterator.ws.device[t]);
