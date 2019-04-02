@@ -8,6 +8,8 @@
 //#define LAP_ROWS_SCANNED
 //#define LAP_VERIFY_RESULT
 
+//#define INITIALIZE_V
+
 //#define RANDOM_SEED 1234
 
 #include "../lap.h"
@@ -138,9 +140,22 @@ void solveTableOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bo
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
+#ifdef INITIALIZE_V
+	SC *initial_v = 0;
+
+	lapAlloc(initial_v, N2, __FILE__, __LINE__);
+	lap::omp::initializeV<SC>(initial_v, N1, N2, iterator);
+
+	// estimating epsilon
+	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(initial_v, N1, N2, iterator));
+	lap::omp::solve<SC>(N1, N2, costMatrix, iterator, rowsol, initial_v);
+
+	lapFree(initial_v);
+#else
 	// estimating epsilon
 	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator));
 	lap::omp::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
+#endif
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::omp::cost<SC>(N1, N2, costMatrix, rowsol);
@@ -157,9 +172,22 @@ void solveTable(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool 
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
+#ifdef INITIALIZE_V
+	SC *initial_v = 0;
+
+	lapAlloc(initial_v, N2, __FILE__, __LINE__);
+	lap::initializeV<SC>(initial_v, N1, N2, iterator);
+
+	// estimating epsilon
+	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::guessEpsilon<SC>(initial_v, N1, N2, iterator));
+	lap::solve<SC>(N1, N2, costMatrix, iterator, rowsol, initial_v);
+
+	lapFree(initial_v);
+#else
 	// estimating epsilon
 	if (epsilon) costMatrix.setInitialEpsilon((TC)lap::guessEpsilon<SC>(N1, N2, iterator));
 	lap::solve<SC>(N1, N2, costMatrix, iterator, rowsol);
+#endif
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costMatrix, rowsol);
@@ -179,9 +207,22 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 
 		lap::displayTime(start_time, "setup complete", std::cout);
 
+#ifdef INITIALIZE_V
+		SC *initial_v = 0;
+
+		lapAlloc(initial_v, N2, __FILE__, __LINE__);
+		lap::omp::initializeV<SC>(initial_v, N1, N2, iterator);
+
+		// estimating epsilon
+		if (epsilon) costFunction.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(initial_v, N1, N2, iterator));
+		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol, initial_v);
+
+		lapFree(initial_v);
+#else
 		// estimating epsilon
 		if (epsilon) costFunction.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator));
 		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol);
+#endif
 	}
 	else
 	{
@@ -189,9 +230,22 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 
 		lap::displayTime(start_time, "setup complete", std::cout);
 
+#ifdef INITIALIZE_V
+		SC *initial_v = 0;
+
+		lapAlloc(initial_v, N2, __FILE__, __LINE__);
+		lap::omp::initializeV<SC>(initial_v, N1, N2, iterator);
+
+		// estimating epsilon
+		if (epsilon) costFunction.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(initial_v, N1, N2, iterator));
+		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol, initial_v);
+
+		lapFree(initial_v);
+#else
 		// estimating epsilon
 		if (epsilon) costFunction.setInitialEpsilon((TC)lap::omp::guessEpsilon<SC>(N1, N2, iterator));
 		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol);
+#endif
 	}
 
 	std::stringstream ss;
@@ -211,9 +265,22 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 
 		lap::displayTime(start_time, "setup complete", std::cout);
 
+#ifdef INITIALIZE_V
+		SC *initial_v = 0;
+
+		lapAlloc(initial_v, N2, __FILE__, __LINE__);
+		lap::initializeV<SC>(initial_v, N1, N2, iterator);
+
+		// estimating epsilon
+		if (epsilon) costFunction.setInitialEpsilon((TC)lap::guessEpsilon<SC>(initial_v, N1, N2, iterator));
+		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol, initial_v);
+
+		lapFree(initial_v);
+#else
 		// estimating epsilon
 		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator));
 		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol);
+#endif
 	}
 	else
 	{
@@ -221,9 +288,22 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 
 		lap::displayTime(start_time, "setup complete", std::cout);
 
+#ifdef INITIALIZE_V
+		SC *initial_v = 0;
+
+		lapAlloc(initial_v, N2, __FILE__, __LINE__);
+		lap::initializeV<SC>(initial_v, N1, N2, iterator);
+
+		// estimating epsilon
+		if (epsilon) costFunction.setInitialEpsilon((TC)lap::guessEpsilon<SC>(initial_v, N1, N2, iterator));
+		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol, initial_v);
+
+		lapFree(initial_v);
+#else
 		// estimating epsilon
 		if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<TC>(N1, N2, iterator));
 		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol);
+#endif
 	}
 
 	std::stringstream ss;

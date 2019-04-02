@@ -198,7 +198,7 @@ namespace lap
 		}
 
 		template <class SC, class TC, class I>
-		SC guessEpsilon(int x_size, int y_size, I& iterator)
+		SC guessEpsilon(int dim, int dim2, I& iterator)
 		{
 			SC epsilon(0);
 			int devices = (int)iterator.ws.device.size();
@@ -208,7 +208,7 @@ namespace lap
 #endif
 			TC* minmax_cost;
 			TC** d_out;
-			cudaMallocHost(&minmax_cost, 2 * x_size * devices * sizeof(TC));
+			cudaMallocHost(&minmax_cost, 2 * dim * devices * sizeof(TC));
 			lapAlloc(d_out, devices, __FILE__, __LINE__);
 			memset(minmax_cost, 0, 2 * sizeof(TC) * devices);
 			memset(d_out, 0, sizeof(TC*) * devices);
@@ -217,25 +217,25 @@ namespace lap
 				cudaSetDevice(iterator.ws.device[0]);
 				int num_items = iterator.ws.part[0].second - iterator.ws.part[0].first;
 				cudaStream_t stream = iterator.ws.stream[0];
-				cudaMalloc(&(d_out[0]), 2 * x_size * sizeof(TC));
+				cudaMalloc(&(d_out[0]), 2 * dim * sizeof(TC));
 				dim3 block_size, grid_size, grid_size_min;
 				block_size.x = 256;
-				grid_size.x = (x_size + block_size.x - 1) / block_size.x;
+				grid_size.x = (dim + block_size.x - 1) / block_size.x;
 				grid_size_min.x = std::min((num_items + block_size.x - 1) / block_size.x, (unsigned int)iterator.ws.sm_count[0] *
 					std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
-				initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[0], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), x_size);
-				for (int x = x_size - 1; x >= 0; --x)
+				initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[0], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), dim);
+				for (int i = dim - 1; i >= 0; --i)
 				{
-					auto tt = iterator.getRow(0, x);
-					minMax_kernel<<<grid_size_min, block_size, 0, stream>>>(d_out[0] + 2 * x, tt, std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), num_items);
+					auto tt = iterator.getRow(0, i);
+					minMax_kernel<<<grid_size_min, block_size, 0, stream>>>(d_out[0] + 2 * i, tt, std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), num_items);
 				}
-				cudaMemcpyAsync(minmax_cost, d_out[0], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
+				cudaMemcpyAsync(minmax_cost, d_out[0], 2 * dim * sizeof(TC), cudaMemcpyDeviceToHost, stream);
 				cudaStreamSynchronize(stream);
-				for (int x = 0; x < x_size; x++)
+				for (int i = 0; i < dim; i++)
 				{
 					SC min_cost, max_cost;
-					min_cost = (SC)minmax_cost[2 * x];
-					max_cost = (SC)minmax_cost[2 * x + 1];
+					min_cost = (SC)minmax_cost[2 * i];
+					max_cost = (SC)minmax_cost[2 * i + 1];
 					epsilon += max_cost - min_cost;
 				}
 			}
@@ -248,19 +248,19 @@ namespace lap
 					cudaSetDevice(iterator.ws.device[t]);
 					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					cudaStream_t stream = iterator.ws.stream[t];
-					cudaMalloc(&(d_out[t]), 2 * x_size * sizeof(TC));
+					cudaMalloc(&(d_out[t]), 2 * dim * sizeof(TC));
 					dim3 block_size, grid_size, grid_size_min;
 					block_size.x = 256;
-					grid_size.x = (x_size + block_size.x - 1) / block_size.x;
+					grid_size.x = (dim + block_size.x - 1) / block_size.x;
 					grid_size_min.x = std::min((num_items + block_size.x - 1) / block_size.x, (unsigned int)iterator.ws.sm_count[t] *
 						std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (8u * (unsigned int)iterator.ws.sm_count[t])), 1u));
-					initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[t], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), x_size);
-					for (int x = x_size - 1; x >= 0; --x)
+					initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[t], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), dim);
+					for (int i = dim - 1; i >= 0; --i)
 					{
-						auto tt = iterator.getRow(t, x);
-						minMax_kernel<<<grid_size_min, block_size, 0, stream>>>(d_out[t] + 2 * x, tt, std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), num_items);
+						auto tt = iterator.getRow(t, i);
+						minMax_kernel<<<grid_size_min, block_size, 0, stream>>>(d_out[t] + 2 * i, tt, std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), num_items);
 					}
-					cudaMemcpyAsync(&(minmax_cost[2 * t * x_size]), d_out[t], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
+					cudaMemcpyAsync(&(minmax_cost[2 * t * dim]), d_out[t], 2 * dim * sizeof(TC), cudaMemcpyDeviceToHost, stream);
 					cudaStreamSynchronize(stream);
 				}
 #else
@@ -268,44 +268,44 @@ namespace lap
 				{
 					cudaSetDevice(iterator.ws.device[t]);
 					cudaStream_t stream = iterator.ws.stream[t];
-					cudaMalloc(&(d_out[t]), 2 * x_size * sizeof(TC));
+					cudaMalloc(&(d_out[t]), 2 * dim * sizeof(TC));
 					dim3 block_size, grid_size;
 					block_size.x = 256;
-					grid_size.x = (x_size + block_size.x - 1) / block_size.x;
-					initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[t], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), x_size);
+					grid_size.x = (dim + block_size.x - 1) / block_size.x;
+					initMinMax_kernel<<<grid_size, block_size, 0, stream>>>(d_out[t], std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), dim);
 				}
-				for (int x = x_size - 1; x >= 0; --x)
+				for (int i = dim - 1; i >= 0; --i)
 				{
 					for (int t = 0; t < devices; t++)
 					{
 						cudaSetDevice(iterator.ws.device[t]);
 						int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 						cudaStream_t stream = iterator.ws.stream[t];
-						auto tt = iterator.getRow(t, x);
+						auto tt = iterator.getRow(t, i);
 						dim3 block_size, grid_size_min;
 						block_size.x = 256;
 						grid_size_min.x = std::min((num_items + block_size.x - 1) / block_size.x, (unsigned int)iterator.ws.sm_count[t] *
 							std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), ((num_items + block_size.x - 1) / block_size.x) / (8u * (unsigned int)iterator.ws.sm_count[t])), 1u));
-						minMax_kernel<<<grid_size_min, block_size, 0, stream>>>(d_out[t] + 2 * x, tt, std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), num_items);
+						minMax_kernel<<<grid_size_min, block_size, 0, stream>>>(d_out[t] + 2 * i, tt, std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), num_items);
 					}
 				}
 				for (int t = 0; t < devices; t++)
 				{
 					cudaSetDevice(iterator.ws.device[t]);
 					cudaStream_t stream = iterator.ws.stream[t];
-					cudaMemcpyAsync(&(minmax_cost[2 * t * x_size]), d_out[t], 2 * x_size * sizeof(TC), cudaMemcpyDeviceToHost, stream);
+					cudaMemcpyAsync(&(minmax_cost[2 * t * dim]), d_out[t], 2 * dim * sizeof(TC), cudaMemcpyDeviceToHost, stream);
 				}
 				for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
 #endif
-				for (int x = 0; x < x_size; x++)
+				for (int i = 0; i < dim; i++)
 				{
 					SC min_cost, max_cost;
-					min_cost = (SC)minmax_cost[2 * x];
-					max_cost = (SC)minmax_cost[2 * x + 1];
+					min_cost = (SC)minmax_cost[2 * i];
+					max_cost = (SC)minmax_cost[2 * i + 1];
 					for (int t = 1; t < devices; t++)
 					{
-						min_cost = std::min(min_cost, (SC)minmax_cost[2 * (t * x_size + x)]);
-						max_cost = std::max(max_cost, (SC)minmax_cost[2 * (t * x_size + x) + 1]);
+						min_cost = std::min(min_cost, (SC)minmax_cost[2 * (t * dim + i)]);
+						max_cost = std::max(max_cost, (SC)minmax_cost[2 * (t * dim + i) + 1]);
 					}
 					epsilon += max_cost - min_cost;
 				}
@@ -315,7 +315,7 @@ namespace lap
 #ifdef LAP_CUDA_OPENMP
 			omp_set_num_threads(old_threads);
 #endif
-			return epsilon / (SC(8) * SC(x_size));
+			return epsilon / (SC(8) * SC(dim));
 		}
 
 		template <class SC>
