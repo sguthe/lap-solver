@@ -305,6 +305,12 @@ namespace lap
 	}
 
 	template <class SC>
+	SC getEpsilonLower(SC epsilon, int dim2)
+	{
+		return epsilon / SC(4 * dim2);
+	}
+
+	template <class SC>
 	bool getNextEpsilon(SC &epsilon, SC epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_reset, int dim2)
 	{
 		//allow_reset = false;
@@ -318,7 +324,7 @@ namespace lap
 				if (epsilon <= epsilon_lower)
 				{
 #ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
+					lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon << std::endl;
 #endif
 					if ((allow_reset) && (SC(dim2) * epsilon >= total_d))
 					{
@@ -332,19 +338,30 @@ namespace lap
 				else
 				{
 #ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
+					lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon << std::endl;
 #endif
-					if ((allow_reset) && (SC(dim2) * epsilon >= total_d))
+					if ((allow_reset) && (SC(dim2) * epsilon >= SC(4) * total_d))
 					{
 #ifdef LAP_DEBUG
 						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
 #endif
 						reset = true;
+#if 1
+						// assume that total_d stays and we need to scale epsilon to total_d
+						epsilon = std::max(epsilon / SC(1024), std::min(epsilon / SC(4), total_d / SC(dim2)));
+#else
 						epsilon = epsilon / SC(4);
+#endif
 					}
 					else
 					{
-						if ((total_d <= SC(0)) || (total_eps <= SC(0)))  epsilon = SC(0);
+						if ((total_d <= SC(0)) || (total_eps <= SC(0)) || (total_eps <= SC(16 * dim2) * epsilon_lower))
+						{
+#ifdef LAP_DEBUG
+							lapDebug << "modification mostly based on d -> setting epsilon to 0." << std::endl;
+#endif
+							epsilon = SC(0);
+						}
 						else epsilon = epsilon / SC(4);
 						allow_reset = false;
 					}
@@ -527,7 +544,7 @@ namespace lap
 
 		// this is the upper bound
 		SC epsilon = (SC)costfunc.getInitialEpsilon();
-		SC epsilon_lower = epsilon / SC(dim2);
+		SC epsilon_lower = getEpsilonLower(epsilon, dim2);
 
 		bool first = true;
 		bool allow_reset = true;

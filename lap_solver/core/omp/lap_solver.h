@@ -130,7 +130,7 @@ namespace lap
 
 			// this is the upper bound
 			SC epsilon = (SC)costfunc.getInitialEpsilon();
-			SC epsilon_lower = epsilon / SC(dim2);
+			SC epsilon_lower = getEpsilonLower(epsilon, dim2);
 
 			bool first = true;
 			bool allow_reset = true;
