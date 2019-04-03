@@ -205,35 +205,105 @@ namespace lap
 	}
 
 	template <class SC, class I>
-	SC guessEpsilon(int x_size, int y_size, I& iterator)
+	SC guessEpsilon(int dim, int dim2, I& iterator)
 	{
 		SC epsilon(0);
 		SC *min_cost;
 		SC *max_cost;
-		lapAlloc(min_cost, x_size, __FILE__, __LINE__);
-		lapAlloc(max_cost, x_size, __FILE__, __LINE__);
+		lapAlloc(min_cost, dim, __FILE__, __LINE__);
+		lapAlloc(max_cost, dim, __FILE__, __LINE__);
 		// reverse order to avoid cachethrashing
-		for (int x = x_size - 1; x >= 0; --x)
+		for (int i = dim - 1; i >= 0; --i)
 		{
-			const auto *tt = iterator.getRow(x);
+			const auto *tt = iterator.getRow(i);
 			SC min_cost_l, max_cost_l;
 			min_cost_l = max_cost_l = (SC)tt[0];
-			for (int y = 1; y < y_size; y++)
+			for (int j = 1; j < dim2; j++)
 			{
-				SC cost_l = (SC)tt[y];
+				SC cost_l = (SC)tt[j];
 				min_cost_l = std::min(min_cost_l, cost_l);
 				max_cost_l = std::max(max_cost_l, cost_l);
 			}
-			max_cost[x] = max_cost_l;
-			min_cost[x] = min_cost_l;
+			max_cost[i] = max_cost_l;
+			min_cost[i] = min_cost_l;
 		}
-		for (int x = 0; x < x_size; x++)
+		for (int i = 0; i < dim; i++)
 		{
-			epsilon += max_cost[x] - min_cost[x];
+			epsilon += max_cost[i] - min_cost[i];
 		}
 		lapFree(min_cost);
 		lapFree(max_cost);
-		return epsilon / (SC(8) * SC(x_size));
+		return epsilon / (SC(8) * SC(dim));
+	}
+
+	template <class SC, class I>
+	void initializeV(SC *v, int dim, int dim2, I& iterator)
+	{
+		SC *min_cost;
+		SC *max_cost;
+		lapAlloc(min_cost, dim2, __FILE__, __LINE__);
+		lapAlloc(max_cost, dim2, __FILE__, __LINE__);
+		for (int i = 0; i < dim; i++)
+		{
+			const auto *tt = iterator.getRow(i);
+			if (i == 0)
+			{
+				for (int j = 0; j < dim2; j++) min_cost[j] = max_cost[j] = (SC)tt[j];
+			}
+			else
+			{
+				for (int j = 0; j < dim2; j++)
+				{
+					SC cost_l = (SC)tt[j];
+					min_cost[j] = std::min(min_cost[j], cost_l);
+					max_cost[j] = std::max(max_cost[j], cost_l);
+				}
+			}
+		}
+		SC mean(0);
+		for (int j = 0; j < dim2; j++)
+		{
+			mean = std::max(mean, max_cost[j] - min_cost[j]);
+		}
+		mean /= SC(2);
+		for (int j = 0; j < dim2; j++)
+		{
+			v[j] = (max_cost[j] + min_cost[j]) / SC(2) - mean;
+		}
+		lapFree(min_cost);
+		lapFree(max_cost);
+	}
+
+	template <class SC, class I>
+	SC guessEpsilon(SC *v, int dim, int dim2, I& iterator)
+	{
+		SC epsilon(0);
+		SC *min_cost;
+		SC *max_cost;
+		lapAlloc(min_cost, dim, __FILE__, __LINE__);
+		lapAlloc(max_cost, dim, __FILE__, __LINE__);
+		// reverse order to avoid cachethrashing
+		for (int i = dim - 1; i >= 0; --i)
+		{
+			const auto *tt = iterator.getRow(i);
+			SC min_cost_l, max_cost_l;
+			min_cost_l = max_cost_l = (SC)tt[0] - v[0];
+			for (int j = 1; j < dim2; j++)
+			{
+				SC cost_l = (SC)tt[j] - v[j];
+				min_cost_l = std::min(min_cost_l, cost_l);
+				max_cost_l = std::max(max_cost_l, cost_l);
+			}
+			max_cost[i] = max_cost_l;
+			min_cost[i] = min_cost_l;
+		}
+		for (int i = 0; i < dim; i++)
+		{
+			epsilon += max_cost[i] - min_cost[i];
+		}
+		lapFree(min_cost);
+		lapFree(max_cost);
+		return epsilon / (SC(8) * SC(dim));
 	}
 
 #if defined(__GNUC__)
@@ -468,16 +538,17 @@ namespace lap
 	}
 
 	template <class SC>
-	void getNextEpsilon(SC &epsilon, SC epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_reset, SC *v, int dim2)
+	void getNextEpsilon(SC &epsilon, SC epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_reset, SC *v, int dim2, SC *initial_v)
 	{
 		if (getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, dim2))
 		{
-			memset(v, 0, dim2 * sizeof(SC));
+			if (initial_v == 0) memset(v, 0, dim2 * sizeof(SC));
+			else memcpy(v, initial_v, dim2 * sizeof(SC));
 		}
 	}
 
 	template <class SC, class CF, class I>
-	void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol)
+	void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, SC *initial_v)
 
 		// input:
 		// dim        - problem size
@@ -550,13 +621,14 @@ namespace lap
 		bool allow_reset = true;
 		bool clamp = true;
 
-		memset(v, 0, dim2 * sizeof(SC));
+		if (initial_v == 0) memset(v, 0, dim2 * sizeof(SC));
+		else memcpy(v, initial_v, dim2 * sizeof(SC));
 
 		SC total_d = SC(0);
 		SC total_eps = SC(0);
 		while (epsilon >= SC(0))
 		{
-			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, v, dim2);
+			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, v, dim2, initial_v);
 			//if ((!first) && (allow_reset)) clamp = false;
 			total_d = SC(0);
 			total_eps = SC(0);
@@ -926,9 +998,9 @@ namespace lap
 
 	// shortcut for square problems
 	template <class SC, class CF, class I>
-	void solve(int dim, CF &costfunc, I &iterator, int *rowsol)
+	void solve(int dim, CF &costfunc, I &iterator, int *rowsol, SC *initial_v)
 	{
-		solve<SC>(dim, dim, costfunc, iterator, rowsol);
+		solve<SC>(dim, dim, costfunc, iterator, rowsol, initial_v);
 	}
 
 	template <class SC, class CF>
