@@ -210,8 +210,11 @@ namespace lap
 		SC epsilon(0);
 		SC *min_cost;
 		SC *max_cost;
+		unsigned long long *min_count;
 		lapAlloc(min_cost, dim, __FILE__, __LINE__);
 		lapAlloc(max_cost, dim, __FILE__, __LINE__);
+		lapAlloc(min_count, dim2, __FILE__, __LINE__);
+		memset(min_count, 0, dim2 * sizeof(unsigned long long));
 		// reverse order to avoid cachethrashing
 		for (int i = dim - 1; i >= 0; --i)
 		{
@@ -224,6 +227,11 @@ namespace lap
 				min_cost_l = std::min(min_cost_l, cost_l);
 				max_cost_l = std::max(max_cost_l, cost_l);
 			}
+			for (int j = 0; j < dim2; j++)
+			{
+				SC cost_l = (SC)tt[j];
+				if (cost_l == min_cost_l) min_count[j]++;
+			}
 			max_cost[i] = max_cost_l;
 			min_cost[i] = min_cost_l;
 		}
@@ -231,47 +239,68 @@ namespace lap
 		{
 			epsilon += max_cost[i] - min_cost[i];
 		}
+		unsigned long long coll = min_count[0];
+		unsigned long long total = min_count[0];
+		for (int j = 1; j < dim2; j++)
+		{
+			coll = std::max(coll, min_count[j]);
+			total += min_count[j];
+		}
 		lapFree(min_cost);
 		lapFree(max_cost);
-		return epsilon / (SC(8) * SC(dim));
+		lapFree(min_count);
+		long double r_col = ((long double)coll - (long double)total / (long double)dim) / (long double)total;
+		long double r_eps = (long double)epsilon / (long double)(4 * dim);
+		return (SC)std::max(0.0l, r_col * r_eps);
 	}
 
 	template <class SC, class I>
 	void initializeV(SC *v, int dim, int dim2, I& iterator)
 	{
-		SC *min_cost;
-		SC *max_cost;
-		lapAlloc(min_cost, dim2, __FILE__, __LINE__);
-		lapAlloc(max_cost, dim2, __FILE__, __LINE__);
+		SC *mean_cost;
+		SC *var_cost;
+		lapAlloc(mean_cost, dim2, __FILE__, __LINE__);
+		lapAlloc(var_cost, dim2, __FILE__, __LINE__);
 		for (int i = 0; i < dim; i++)
 		{
 			const auto *tt = iterator.getRow(i);
 			if (i == 0)
 			{
-				for (int j = 0; j < dim2; j++) min_cost[j] = max_cost[j] = (SC)tt[j];
+				for (int j = 0; j < dim2; j++)
+				{
+					SC cost_l = (SC)tt[j];
+					mean_cost[j] = cost_l;
+					var_cost[j] = cost_l * cost_l;
+				}
 			}
 			else
 			{
 				for (int j = 0; j < dim2; j++)
 				{
 					SC cost_l = (SC)tt[j];
-					min_cost[j] = std::min(min_cost[j], cost_l);
-					max_cost[j] = std::max(max_cost[j], cost_l);
+					mean_cost[j] += cost_l;
+					var_cost[j] += cost_l * cost_l;
 				}
 			}
+		}
+		for (int j = 0; j < dim2; j++)
+		{
+			mean_cost[j] /= (SC)dim2;
+			var_cost[j] /= (SC)dim2;
 		}
 		SC mean(0);
 		for (int j = 0; j < dim2; j++)
 		{
-			mean = std::max(mean, max_cost[j] - min_cost[j]);
+			SC tmp_l = var_cost[j] - mean_cost[j] * mean_cost[j];
+			if (tmp_l > SC(0)) var_cost[j] = (SC)sqrt(tmp_l); else var_cost[j] = SC(0);
+			mean = std::max(mean, mean_cost[j] + SC(3) * var_cost[j]);
 		}
-		mean /= SC(2);
 		for (int j = 0; j < dim2; j++)
 		{
-			v[j] = (max_cost[j] + min_cost[j]) / SC(2) - mean;
+			v[j] = mean_cost[j] + SC(3) * var_cost[j] - mean;
 		}
-		lapFree(min_cost);
-		lapFree(max_cost);
+		lapFree(mean_cost);
+		lapFree(var_cost);
 	}
 
 	template <class SC, class I>
@@ -280,8 +309,11 @@ namespace lap
 		SC epsilon(0);
 		SC *min_cost;
 		SC *max_cost;
+		unsigned long long *min_count;
 		lapAlloc(min_cost, dim, __FILE__, __LINE__);
 		lapAlloc(max_cost, dim, __FILE__, __LINE__);
+		lapAlloc(min_count, dim2, __FILE__, __LINE__);
+		memset(min_count, 0, dim2 * sizeof(unsigned long long));
 		// reverse order to avoid cachethrashing
 		for (int i = dim - 1; i >= 0; --i)
 		{
@@ -294,6 +326,11 @@ namespace lap
 				min_cost_l = std::min(min_cost_l, cost_l);
 				max_cost_l = std::max(max_cost_l, cost_l);
 			}
+			for (int j = 0; j < dim2; j++)
+			{
+				SC cost_l = (SC)tt[j] - v[j];
+				if (cost_l == min_cost_l) min_count[j]++;
+			}
 			max_cost[i] = max_cost_l;
 			min_cost[i] = min_cost_l;
 		}
@@ -301,9 +338,20 @@ namespace lap
 		{
 			epsilon += max_cost[i] - min_cost[i];
 		}
+		epsilon /= SC(dim);
+		unsigned long long coll = min_count[0];
+		unsigned long long total = min_count[0];
+		for (int j = 1; j < dim2; j++)
+		{
+			coll = std::max(coll, min_count[j]);
+			total += min_count[j];
+		}
 		lapFree(min_cost);
 		lapFree(max_cost);
-		return epsilon / (SC(8) * SC(dim));
+		lapFree(min_count);
+		long double r_col = ((long double)coll - (long double)total / (long double)dim) / (long double)total;
+		long double r_eps = (long double)epsilon / (long double)(4 * dim);
+		return (SC)std::max(0.0l, r_col * r_eps);
 	}
 
 #if defined(__GNUC__)
@@ -377,11 +425,11 @@ namespace lap
 	template <class SC>
 	SC getEpsilonLower(SC epsilon, int dim2)
 	{
-		return epsilon / SC(4 * dim2);
+		return epsilon / SC(64 * dim2);
 	}
 
 	template <class SC>
-	bool getNextEpsilon(SC &epsilon, SC epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_reset, int dim2)
+	bool getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_continue, int dim2)
 	{
 		//allow_reset = false;
 		total_eps = total_d - total_eps;
@@ -391,146 +439,27 @@ namespace lap
 		{
 			if (!first)
 			{
+#ifdef LAP_DEBUG
+				lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon << std::endl;
+#endif
 				if (epsilon <= epsilon_lower)
 				{
-#ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon << std::endl;
-#endif
-					if ((allow_reset) && (SC(dim2) * epsilon >= total_d))
-					{
-#ifdef LAP_DEBUG
-						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
-#endif
-						reset = true;
-					}
 					epsilon = SC(0);
 				}
 				else
 				{
-#ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon << std::endl;
-#endif
-					if ((allow_reset) && (SC(dim2) * epsilon >= SC(4) * total_d))
+					if (allow_continue)
 					{
-#ifdef LAP_DEBUG
-						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
-#endif
-						reset = true;
-#if 1
-						// assume that total_d stays and we need to scale epsilon to total_d
-						epsilon = std::max(epsilon / SC(1024), std::min(epsilon / SC(4), total_d / SC(dim2)));
-#else
-						epsilon = epsilon / SC(4);
-#endif
+						// first round
+						if (((total_d <= SC(0)) || (total_eps <= SC(0)) || (total_d > total_eps)) && (total_eps < SC(dim2 * 8) * epsilon)) allow_continue = false;
 					}
 					else
 					{
-						if ((total_d <= SC(0)) || (total_eps <= SC(0)) || (total_eps <= SC(16 * dim2) * epsilon_lower))
-						{
-#ifdef LAP_DEBUG
-							lapDebug << "modification mostly based on d -> setting epsilon to 0." << std::endl;
-#endif
-							epsilon = SC(0);
-						}
-						else epsilon = epsilon / SC(4);
-						allow_reset = false;
+						// second round
+						if (((total_d <= SC(0)) || (total_eps <= SC(0)) || (total_d > total_eps)) && (total_eps < SC(dim2 * 8) * epsilon)) epsilon = SC(0);
+						else allow_continue = true;
 					}
-				}
-			}
-		}
-		return reset;
-	}
-
-	bool getNextEpsilon(long long &epsilon, long long epsilon_lower, long long total_d, long long total_eps, bool first, bool &allow_reset, int dim2)
-	{
-		total_eps = total_d - total_eps;
-		total_d = -total_d;
-		bool reset = false;
-		if (epsilon > 0)
-		{
-			if (epsilon == 1)
-			{
-#ifdef LAP_DEBUG
-				lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
-#endif
-				if ((allow_reset) && (dim2 * epsilon >= total_d))
-				{
-#ifdef LAP_DEBUG
-					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
-#endif
-					reset = true;
-				}
-				epsilon = 0;
-			}
-			else
-			{
-				if (!first)
-				{
-#ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
-#endif
-					if ((allow_reset) && (dim2 * epsilon >= total_d))
-					{
-#ifdef LAP_DEBUG
-						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
-#endif
-						reset = true;
-						epsilon = std::max(1ll, epsilon >> 2);
-					}
-					else
-					{
-						if ((total_d == 0) || (total_eps == 0))  epsilon = 0;
-						else epsilon = std::max(1ll, epsilon >> 2);
-						allow_reset = false;
-					}
-				}
-			}
-		}
-		return reset;
-	}
-
-	bool getNextEpsilon(int &epsilon, int epsilon_lower, int total_d, int total_eps, bool first, bool &allow_reset, int dim2)
-	{
-		total_eps = total_d - total_eps;
-		total_d = -total_d;
-		bool reset = false;
-		if (epsilon > 0)
-		{
-			if (epsilon == 1)
-			{
-#ifdef LAP_DEBUG
-				lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
-#endif
-				if ((allow_reset) && (dim2 * epsilon >= total_d))
-				{
-#ifdef LAP_DEBUG
-					lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
-#endif
-					reset = true;
-				}
-				epsilon = 0;
-			}
-			else
-			{
-				if (!first)
-				{
-#ifdef LAP_DEBUG
-					lapDebug << "  v_d = " << total_d << " v_eps = " << total_eps << std::endl;
-#endif
-					if ((allow_reset) && (dim2 * epsilon >= total_d))
-					{
-#ifdef LAP_DEBUG
-						lapDebug << "modification mostly based on epsilon -> reverting v." << std::endl;
-#endif
-						reset = true;
-						epsilon = std::max(1, epsilon >> 2);
-					}
-					else
-					{
-						if ((total_d == 0) || (total_eps == 0))  epsilon = 0;
-						else epsilon = std::max(1, epsilon >> 2);
-						allow_reset = false;
-					}
+					epsilon = epsilon / SC(4);
 				}
 			}
 		}
@@ -538,7 +467,7 @@ namespace lap
 	}
 
 	template <class SC>
-	void getNextEpsilon(SC &epsilon, SC epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_reset, SC *v, int dim2, SC *initial_v)
+	void getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_reset, SC *v, int dim2, SC *initial_v)
 	{
 		if (getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, dim2))
 		{

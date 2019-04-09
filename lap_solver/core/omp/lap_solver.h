@@ -13,8 +13,11 @@ namespace lap
 			SC epsilon(0);
 			SC *min_cost;
 			SC *max_cost;
+			unsigned long long *min_count;
 			lapAlloc(min_cost, omp_get_max_threads() * dim, __FILE__, __LINE__);
 			lapAlloc(max_cost, omp_get_max_threads() * dim, __FILE__, __LINE__);
+			lapAlloc(min_count, dim2, __FILE__, __LINE__);
+			memset(min_count, 0, dim2 * sizeof(unsigned long long));
 #pragma omp parallel
 			{
 				int t = omp_get_thread_num();
@@ -32,38 +35,55 @@ namespace lap
 					}
 					min_cost[i + dim * t] = min_cost_l;
 					max_cost[i + dim * t] = max_cost_l;
-				}
 #pragma omp barrier
-#pragma omp for
-				for (int i = 0; i < dim; i++)
-				{
-					SC max_c = max_cost[i];
-					SC min_c = min_cost[i];
-					for (int xx = 0; xx < omp_get_max_threads(); xx++)
+#pragma omp master
 					{
-						max_c = std::max(max_c, max_cost[i + dim * xx]);
-						min_c = std::min(min_c, min_cost[i + dim * xx]);
+						SC max_c = max_cost[i];
+						SC min_c = min_cost[i];
+						for (int xx = 0; xx < omp_get_max_threads(); xx++)
+						{
+							max_c = std::max(max_c, max_cost[i + dim * xx]);
+							min_c = std::min(min_c, min_cost[i + dim * xx]);
+						}
+						max_cost[i] = max_c;
+						min_cost[i] = min_c;
 					}
-					max_cost[i] = max_c;
-					min_cost[i] = min_c;
+#pragma omp barrier
+					min_cost_l = min_cost[i];
+					for (int j = 0; j < iterator.ws.part[t].second - iterator.ws.part[t].first; j++)
+					{
+						SC cost_l = (SC)tt[j];
+						if (cost_l == min_cost_l) min_count[j]++;
+					}
+
 				}
 			}
 			for (int i = 0; i < dim; i++)
 			{
 				epsilon += max_cost[i] - min_cost[i];
 			}
+			unsigned long long coll = min_count[0];
+			unsigned long long total = min_count[0];
+			for (int j = 1; j < dim2; j++)
+			{
+				coll = std::max(coll, min_count[j]);
+				total += min_count[j];
+			}
 			lapFree(min_cost);
 			lapFree(max_cost);
-			return epsilon / (SC(8) * SC(dim));
+			lapFree(min_count);
+			long double r_col = ((long double)coll - (long double)total / (long double)dim) / (long double)total;
+			long double r_eps = (long double)epsilon / (long double)(4 * dim);
+			return (SC)std::max(0.0l, r_col * r_eps);
 		}
 
 		template <class SC, class I>
 		void initializeV(SC *v, int dim, int dim2, I& iterator)
 		{
-			SC *min_cost;
-			SC *max_cost;
-			lapAlloc(min_cost, dim2, __FILE__, __LINE__);
-			lapAlloc(max_cost, dim2, __FILE__, __LINE__);
+			SC *mean_cost;
+			SC *var_cost;
+			lapAlloc(mean_cost, dim2, __FILE__, __LINE__);
+			lapAlloc(var_cost, dim2, __FILE__, __LINE__);
 #pragma omp parallel
 			{
 				int t = omp_get_thread_num();
@@ -72,31 +92,42 @@ namespace lap
 					const auto *tt = iterator.getRow(t, i);
 					if (i == 0)
 					{
-						for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++) min_cost[j] = max_cost[j] = (SC)tt[j - iterator.ws.part[t].first];
+						for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
+						{
+							SC cost_l = (SC)tt[j - iterator.ws.part[t].first];
+							mean_cost[j] = cost_l;
+							var_cost[j] = cost_l * cost_l;
+						}
 					}
 					else
 					{
 						for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
 						{
 							SC cost_l = (SC)tt[j - iterator.ws.part[t].first];
-							min_cost[j] = std::min(min_cost[j], cost_l);
-							max_cost[j] = std::max(max_cost[j], cost_l);
+							mean_cost[j] += cost_l;
+							var_cost[j] += cost_l * cost_l;
 						}
 					}
 				}
 			}
+			for (int j = 0; j < dim2; j++)
+			{
+				mean_cost[j] /= (SC)dim2;
+				var_cost[j] /= (SC)dim2;
+			}
 			SC mean(0);
 			for (int j = 0; j < dim2; j++)
 			{
-				mean = std::max(mean, max_cost[j] - min_cost[j]);
+				SC tmp_l = var_cost[j] - mean_cost[j] * mean_cost[j];
+				if (tmp_l > SC(0)) var_cost[j] = (SC)sqrt(tmp_l); else var_cost[j] = SC(0);
+				mean = std::max(mean, mean_cost[j] + SC(3) * var_cost[j]);
 			}
-			mean /= SC(2);
 			for (int j = 0; j < dim2; j++)
 			{
-				v[j] = (max_cost[j] + min_cost[j]) / SC(2) - mean;
+				v[j] = mean_cost[j] + SC(3) * var_cost[j] - mean;
 			}
-			lapFree(min_cost);
-			lapFree(max_cost);
+			lapFree(mean_cost);
+			lapFree(var_cost);
 		}
 
 		template <class SC, class I>
@@ -105,8 +136,11 @@ namespace lap
 			SC epsilon(0);
 			SC *min_cost;
 			SC *max_cost;
+			unsigned long long *min_count;
 			lapAlloc(min_cost, omp_get_max_threads() * dim, __FILE__, __LINE__);
 			lapAlloc(max_cost, omp_get_max_threads() * dim, __FILE__, __LINE__);
+			lapAlloc(min_count, dim2, __FILE__, __LINE__);
+			memset(min_count, 0, dim2 * sizeof(unsigned long long));
 #pragma omp parallel
 			{
 				int t = omp_get_thread_num();
@@ -124,29 +158,46 @@ namespace lap
 					}
 					min_cost[i + dim * t] = min_cost_l;
 					max_cost[i + dim * t] = max_cost_l;
-				}
 #pragma omp barrier
-#pragma omp for
-				for (int i = 0; i < dim; i++)
-				{
-					SC max_c = max_cost[i];
-					SC min_c = min_cost[i];
-					for (int xx = 0; xx < omp_get_max_threads(); xx++)
+#pragma omp master
 					{
-						max_c = std::max(max_c, max_cost[i + dim * xx]);
-						min_c = std::min(min_c, min_cost[i + dim * xx]);
+						SC max_c = max_cost[i];
+						SC min_c = min_cost[i];
+						for (int xx = 0; xx < omp_get_max_threads(); xx++)
+						{
+							max_c = std::max(max_c, max_cost[i + dim * xx]);
+							min_c = std::min(min_c, min_cost[i + dim * xx]);
+						}
+						max_cost[i] = max_c;
+						min_cost[i] = min_c;
 					}
-					max_cost[i] = max_c;
-					min_cost[i] = min_c;
+#pragma omp barrier
+					min_cost_l = min_cost[i];
+					for (int j = 0; j < iterator.ws.part[t].second - iterator.ws.part[t].first; j++)
+					{
+						SC cost_l = (SC)tt[j] - v[j + iterator.ws.part[t].first];
+						if (cost_l == min_cost_l) min_count[j]++;
+					}
+
 				}
 			}
 			for (int i = 0; i < dim; i++)
 			{
 				epsilon += max_cost[i] - min_cost[i];
 			}
+			unsigned long long coll = min_count[0];
+			unsigned long long total = min_count[0];
+			for (int j = 1; j < dim2; j++)
+			{
+				coll = std::max(coll, min_count[j]);
+				total += min_count[j];
+			}
 			lapFree(min_cost);
 			lapFree(max_cost);
-			return epsilon / (SC(8) * SC(dim));
+			lapFree(min_count);
+			long double r_col = ((long double)coll - (long double)total / (long double)dim) / (long double)total;
+			long double r_eps = (long double)epsilon / (long double)(4 * dim);
+			return (SC)std::max(0.0l, r_col * r_eps);
 		}
 
 		template <class SC, class CF, class I>
