@@ -276,7 +276,7 @@ namespace lap
 			SC epsilon_lower = getEpsilonLower(epsilon, dim2);
 
 			bool first = true;
-			bool allow_reset = true;
+			bool allow_continue = true;
 			bool clamp = true;
 
 			if (initial_v == 0) memset(v, 0, dim2 * sizeof(SC));
@@ -286,8 +286,8 @@ namespace lap
 			SC total_eps = SC(0);
 			while (epsilon >= SC(0))
 			{
-				lap::getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, v, dim2, initial_v);
-				//if ((!first) && (allow_reset)) clamp = false;
+				lap::getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_continue, v, dim2, initial_v);
+				//if ((!first) && (allow_continue)) clamp = false;
 				total_d = SC(0);
 				total_eps = SC(0);
 #ifndef LAP_QUIET
@@ -319,7 +319,7 @@ namespace lap
 				min = std::numeric_limits<SC>::max();
 				//SC h2_global;
 				SC tt_jmin_global;
-				int dim_limit = ((epsilon > SC(0)) && (allow_reset)) ? dim : dim2;
+				int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
 
 #pragma omp parallel
 				{

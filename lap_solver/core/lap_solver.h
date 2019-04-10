@@ -431,7 +431,7 @@ namespace lap
 	template <class SC>
 	bool getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_continue, int dim2)
 	{
-		//allow_reset = false;
+		//allow_continue = false;
 		total_eps = total_d - total_eps;
 		total_d = -total_d;
 		bool reset = false;
@@ -467,9 +467,9 @@ namespace lap
 	}
 
 	template <class SC>
-	void getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_reset, SC *v, int dim2, SC *initial_v)
+	void getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_continue, SC *v, int dim2, SC *initial_v)
 	{
-		if (getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, dim2))
+		if (getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_continue, dim2))
 		{
 			if (initial_v == 0) memset(v, 0, dim2 * sizeof(SC));
 			else memcpy(v, initial_v, dim2 * sizeof(SC));
@@ -547,7 +547,7 @@ namespace lap
 		SC epsilon_lower = getEpsilonLower(epsilon, dim2);
 
 		bool first = true;
-		bool allow_reset = true;
+		bool allow_continue = true;
 		bool clamp = true;
 
 		if (initial_v == 0) memset(v, 0, dim2 * sizeof(SC));
@@ -557,8 +557,8 @@ namespace lap
 		SC total_eps = SC(0);
 		while (epsilon >= SC(0))
 		{
-			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, v, dim2, initial_v);
-			//if ((!first) && (allow_reset)) clamp = false;
+			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_continue, v, dim2, initial_v);
+			//if ((!first) && (allow_continue)) clamp = false;
 			total_d = SC(0);
 			total_eps = SC(0);
 #ifndef LAP_QUIET
@@ -585,7 +585,7 @@ namespace lap
 #ifndef LAP_QUIET
 			displayProgress(start_time, elapsed, 0, dim2, " rows");
 #endif
-			int dim_limit = ((epsilon > SC(0)) && (allow_reset)) ? dim : dim2;
+			int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
 			for (int f = 0; f < dim_limit; f++)
 			{
 #ifndef LAP_QUIET

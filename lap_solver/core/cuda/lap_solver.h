@@ -1043,15 +1043,15 @@ namespace lap
 			SC epsilon_lower = getEpsilonLower(epsilon, dim2);
 
 			bool first = true;
-			bool allow_reset = true;
+			bool allow_continue = true;
 			bool clamp = true;
 
 			SC total_d = SC(0);
 			SC total_eps = SC(0);
 			while (epsilon >= SC(0))
 			{
-				bool reset = getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_reset, dim2);
-				//if ((!first) && (allow_reset)) clamp = false;
+				bool reset = getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_continue, dim2);
+				//if ((!first) && (allow_continue)) clamp = false;
 				total_d = SC(0);
 				total_eps = SC(0);
 #ifndef LAP_QUIET
@@ -1125,7 +1125,7 @@ namespace lap
 				long long count = 0ll;
 				//SC h2(0);
 
-				int dim_limit = ((epsilon > SC(0)) && (allow_reset)) ? dim : dim2;
+				int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
 
 				if (devices == 1)
 				{
