@@ -14,12 +14,15 @@ namespace lap
 			GETCOSTROW getcostrow;
 			GETCOST getcost;
 			TC initialEpsilon;
+			TC lowerEpsilon;
 		public:
-			RowCostFunction(GETCOSTROW &getcostrow, GETCOST &getcost) : getcostrow(getcostrow), getcost(getcost), initialEpsilon(0) {}
+			RowCostFunction(GETCOSTROW &getcostrow, GETCOST &getcost) : getcostrow(getcostrow), getcost(getcost), initialEpsilon(0), lowerEpsilon(0) {}
 			~RowCostFunction() {}
 		public:
 			__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
+			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
+			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
 			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end) const { getcostrow(row, t, stream, x, start, end); }
 			__forceinline void getCost(TC *row, cudaStream_t stream, int *rowsol, int dim) const { getcost(row, stream, rowsol, dim); }
 		};
@@ -53,12 +56,15 @@ namespace lap
 			GETCOST getcost;
 			STATE *state;
 			TC initialEpsilon;
+			TC lowerEpsilon;
 		public:
-			SimpleCostFunction(GETCOST &getcost, STATE *state) : getcost(getcost), state(state), initialEpsilon(0) {}
+			SimpleCostFunction(GETCOST &getcost, STATE *state) : getcost(getcost), state(state), initialEpsilon(0), lowerEpsilon(0) {}
 			~SimpleCostFunction() {}
 		public:
 			__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
+			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
+			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
 			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end) const
 			{
 				dim3 block_size, grid_size;

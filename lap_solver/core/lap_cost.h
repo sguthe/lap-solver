@@ -11,13 +11,16 @@ namespace lap
 	protected:
 		GETCOST getcost;
 		TC initialEpsilon;
+		TC lowerEpsilon;
 	public:
-		SimpleCostFunction(GETCOST &getcost) : getcost(getcost), initialEpsilon(0) {}
+		SimpleCostFunction(GETCOST &getcost) : getcost(getcost), initialEpsilon(0), lowerEpsilon(0) {}
 		~SimpleCostFunction() {}
 	public:
 		__forceinline const TC getCost(int x, int y) const { return getcost(x, y); }
 		__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
 		__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
+		__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
+		__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
 		__forceinline void getCostRow(TC *row, int x, int start, int end) const { for (int y = start; y < end; y++) row[y - start] = getCost(x, y); }
 	};
 
@@ -52,6 +55,7 @@ namespace lap
 		int y_size;
 		TC *c;
 		TC initialEpsilon;
+		TC lowerEpsilon;
 		bool free_in_destructor;
 	protected:
 		template <class DirectCost>
@@ -70,16 +74,18 @@ namespace lap
 			free_in_destructor = true;
 		}
 	public:
-		template <class DirectCost> TableCost(int x_size, int y_size, DirectCost &cost) : x_size(x_size), y_size(y_size), initialEpsilon(0) { initTable(cost); }
-		template <class DirectCost> TableCost(int size, DirectCost &cost) : x_size(size), y_size(size), initialEpsilon(0) { initTable(cost); }
-		TableCost(int x_size, int y_size) : x_size(x_size), y_size(y_size), initialEpsilon(0) { createTable(); }
-		TableCost(int size) : x_size(size), y_size(size), initialEpsilon(0) { createTable(); }
-		TableCost(int x_size, int y_size, TC* tab) : x_size(x_size), y_size(y_size), c(tab), initialEpsilon(0) { free_in_destructor = false; }
-		TableCost(int size, TC* tab) : x_size(size), y_size(size), c(tab), initialEpsilon(0) { free_in_destructor = false; }
+		template <class DirectCost> TableCost(int x_size, int y_size, DirectCost &cost) : x_size(x_size), y_size(y_size), initialEpsilon(0), lowerEpsilon(0) { initTable(cost); }
+		template <class DirectCost> TableCost(int size, DirectCost &cost) : x_size(size), y_size(size), initialEpsilon(0), lowerEpsilon(0) { initTable(cost); }
+		TableCost(int x_size, int y_size) : x_size(x_size), y_size(y_size), initialEpsilon(0), lowerEpsilon(0) { createTable(); }
+		TableCost(int size) : x_size(size), y_size(size), initialEpsilon(0), lowerEpsilon(0) { createTable(); }
+		TableCost(int x_size, int y_size, TC* tab) : x_size(x_size), y_size(y_size), c(tab), initialEpsilon(0), lowerEpsilon(0) { free_in_destructor = false; }
+		TableCost(int size, TC* tab) : x_size(size), y_size(size), c(tab), initialEpsilon(0), lowerEpsilon(0) { free_in_destructor = false; }
 		~TableCost() { if (free_in_destructor) lapFree(c); }
 	public:
 		__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
 		__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
+		__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
+		__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
 		// This should never be used so it's commented out
 		//__forceinline void getCostRow(TC *row, int x, int start, int end) const { memcpy(row, &(getRow(x)[start]), (end - start) * sizeof(TC)); }
 		__forceinline const TC *getRow(int x) const { return &(c[(long long)x * (long long)y_size]); }

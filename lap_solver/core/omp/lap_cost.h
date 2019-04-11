@@ -32,6 +32,7 @@ namespace lap
 			TC **cc;
 			int *stride;
 			TC initialEpsilon;
+			TC lowerEpsilon;
 			bool free_in_destructor;
 			Worksharing &ws;
 		protected:
@@ -108,13 +109,13 @@ namespace lap
 			}
 		public:
 			template <class DirectCost> TableCost(int x_size, int y_size, DirectCost &cost, Worksharing &ws) :
-				x_size(x_size), y_size(y_size), initialEpsilon(0), ws(ws) { initTable(cost); }
+				x_size(x_size), y_size(y_size), initialEpsilon(0), lowerEpsilon(0), ws(ws) { initTable(cost); }
 			template <class DirectCost> TableCost(int size, DirectCost &cost, Worksharing &ws) :
-				x_size(size), y_size(size), initialEpsilon(0), ws(ws) { initTable(cost); }
-			TableCost(int x_size, int y_size, Worksharing &ws) : x_size(x_size), y_size(y_size), initialEpsilon(0), ws(ws) { createTable(); }
-			TableCost(int size, Worksharing &ws) : x_size(size), y_size(size), initialEpsilon(0), ws(ws) { createTable(); }
-			TableCost(int x_size, int y_size, TC* tab, Worksharing &ws) : x_size(x_size), y_size(y_size), initialEpsilon(0), ws(ws) { referenceTable(tab); }
-			TableCost(int size, TC* tab, Worksharing &ws) : x_size(size), y_size(size), initialEpsilon(0), ws(ws) { referenceTable(tab); }
+				x_size(size), y_size(size), initialEpsilon(0), lowerEpsilon(0), ws(ws) { initTable(cost); }
+			TableCost(int x_size, int y_size, Worksharing &ws) : x_size(x_size), y_size(y_size), initialEpsilon(0), lowerEpsilon(0), ws(ws) { createTable(); }
+			TableCost(int size, Worksharing &ws) : x_size(size), y_size(size), initialEpsilon(0), lowerEpsilon(0), ws(ws) { createTable(); }
+			TableCost(int x_size, int y_size, TC* tab, Worksharing &ws) : x_size(x_size), y_size(y_size), initialEpsilon(0), lowerEpsilon(0), ws(ws) { referenceTable(tab); }
+			TableCost(int size, TC* tab, Worksharing &ws) : x_size(size), y_size(size), initialEpsilon(0), lowerEpsilon(0), ws(ws) { referenceTable(tab); }
 			~TableCost()
 			{
 				if (free_in_destructor)
@@ -128,6 +129,8 @@ namespace lap
 			public:
 			__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
+			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
+			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
 			// These should never be used so it's commented out
 			//__forceinline void getCostRow(TC *row, int x, int start, int end) const { memcpy(row, &(getRow(x)[start]), (end - start) * sizeof(TC)); }
 			__forceinline const TC *getRow(int t, int x) const { return cc[t] + (long long)x * (long long)stride[t]; }

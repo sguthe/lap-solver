@@ -29,6 +29,8 @@
 #define lapFree lap::free
 #endif
 
+#include <tuple>
+
 namespace lap
 {
 	// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
@@ -36,7 +38,7 @@ namespace lap
 	template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, SC *initial_v = 0);
 	template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
 	template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
-	template <class SC, class I> SC guessEpsilon(int dim, int dim2, I& iterator);
+	template <class SC, class I> std::pair<SC, SC> guessEpsilon(int dim, int dim2, I& iterator);
 
 	// Cost functions, including tabulated costs
 	template <class TC, typename GETCOST> class SimpleCostFunction;
@@ -63,7 +65,7 @@ namespace lap
 		template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, SC *initial_v = 0);
 		template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
 		template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
-		template <class SC, class I> SC guessEpsilon(int dim, int dim2, I& iterator);
+		template <class SC, class I> std::pair<SC, SC> guessEpsilon(int dim, int dim2, I& iterator);
 
 		// Cost functions, including tabulated costs
 		template <class TC, typename GETCOST> class SimpleCostFunction;
@@ -84,7 +86,7 @@ namespace lap
 		template <class SC, class TC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol);
 		template <class SC, class TC, class CF> SC cost(int dim, CF &costfunc, int *rowsol, cudaStream_t stream);
 		template <class SC, class TC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol, cudaStream_t stream);
-		template <class SC, class TC, class I> SC guessEpsilon(int dim, int dim2, I& iterator);
+		template <class SC, class TC, class I> std::pair<SC, SC> guessEpsilon(int dim, int dim2, I& iterator);
 
 		// Iterator classes used for accessing the cost functions
 		template <class SC, class TC, class CF> class DirectIterator;

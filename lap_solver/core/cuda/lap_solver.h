@@ -228,7 +228,7 @@ namespace lap
 		}
 
 		template <class SC, class TC, class I>
-		SC guessEpsilon(int dim, int dim2, I& iterator)
+		std::pair<SC, SC> guessEpsilon(int dim, int dim2, I& iterator)
 		{
 			SC epsilon(0);
 			int devices = (int)iterator.ws.device.size();
@@ -417,10 +417,12 @@ namespace lap
 			}
 			unsigned long long coll = min_count[0];
 			unsigned long long total = min_count[0];
+			unsigned long long zero = (min_count[0] == 0) ? 1 : 0;
 			for (int j = 1; j < dim2; j++)
 			{
 				coll = std::max(coll, min_count[j]);
 				total += min_count[j];
+				if (min_count[j] == 0) zero++;
 			}
 			cudaFreeHost(minmax_cost);
 			cudaFreeHost(min_count);
@@ -430,8 +432,9 @@ namespace lap
 			omp_set_num_threads(old_threads);
 #endif
 			long double r_col = ((long double)coll - (long double)total / (long double)dim) / (long double)total;
+			long double r_zero = 0.5l + 0.5l * (long double)(zero + dim - dim2) / (long double)dim;
 			long double r_eps = (long double)epsilon / (long double)(4 * dim);
-			return (SC)std::max(0.0l, r_col * r_eps);
+			return std::pair<SC, SC>((SC)std::max(0.0l, r_col * r_zero * r_eps), (SC)std::max(0.0l, r_eps / SC(32 * dim)));
 		}
 
 		template <class SC>
@@ -1156,7 +1159,7 @@ namespace lap
 
 			// this is the upper bound
 			SC epsilon = (SC)costfunc.getInitialEpsilon();
-			SC epsilon_lower = getEpsilonLower(epsilon, dim2);
+			SC epsilon_lower = (SC)costfunc.getLowerEpsilon();
 
 			bool first = true;
 			bool allow_continue = true;

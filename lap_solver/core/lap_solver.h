@@ -205,7 +205,7 @@ namespace lap
 	}
 
 	template <class SC, class I>
-	SC guessEpsilon(int dim, int dim2, I& iterator)
+	std::pair<SC, SC> guessEpsilon(int dim, int dim2, I& iterator)
 	{
 		SC epsilon(0);
 		SC *min_cost;
@@ -241,17 +241,20 @@ namespace lap
 		}
 		unsigned long long coll = min_count[0];
 		unsigned long long total = min_count[0];
+		unsigned long long zero = (min_count[0] == 0) ? 1 : 0;
 		for (int j = 1; j < dim2; j++)
 		{
 			coll = std::max(coll, min_count[j]);
 			total += min_count[j];
+			if (min_count[j] == 0) zero++;
 		}
 		lapFree(min_cost);
 		lapFree(max_cost);
 		lapFree(min_count);
 		long double r_col = ((long double)coll - (long double)total / (long double)dim) / (long double)total;
+		long double r_zero = 0.5l + 0.5l * (long double)(zero + dim - dim2) / (long double)dim;
 		long double r_eps = (long double)epsilon / (long double)(4 * dim);
-		return (SC)std::max(0.0l, r_col * r_eps);
+		return std::pair<SC, SC>((SC)std::max(0.0l, r_col * r_zero * r_eps), (SC)std::max(0.0l, r_eps / SC(32 * dim)));
 	}
 
 #if defined(__GNUC__)
@@ -323,12 +326,6 @@ namespace lap
 	}
 
 	template <class SC>
-	SC getEpsilonLower(SC epsilon, int dim2)
-	{
-		return epsilon / SC(64 * dim2);
-	}
-
-	template <class SC>
 	bool getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_continue, int dim2)
 	{
 		//allow_continue = false;
@@ -342,24 +339,36 @@ namespace lap
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon << std::endl;
 #endif
+				epsilon = std::min(total_eps / SC(16 * dim2), epsilon / SC(4));
 				if (epsilon <= epsilon_lower)
 				{
 					epsilon = SC(0);
 				}
 				else
 				{
-					if (allow_continue)
+#if 0
+					if (total_eps < SC(dim2 * 8) * epsilon)
 					{
-						// first round
-						if (((total_d <= SC(0)) || (total_eps <= SC(0)) || (total_d > total_eps)) && (total_eps < SC(dim2 * 8) * epsilon)) allow_continue = false;
-					}
-					else
-					{
-						// second round
-						if (((total_d <= SC(0)) || (total_eps <= SC(0)) || (total_d > total_eps)) && (total_eps < SC(dim2 * 8) * epsilon)) epsilon = SC(0);
-						else allow_continue = true;
+						//if (total_d * SC(8) < SC(dim2) * epsilon)
+						//{
+						//	allow_continue = false;
+						//	epsilon = SC(0);
+						//}
+						//else
+						if (allow_continue)
+						{
+							// first round
+							if ((total_d <= SC(0)) || (total_eps <= SC(0)) || (total_d > total_eps)/* || (total_d > SC(dim2) * epsilon)*/) allow_continue = false;
+						}
+						else
+						{
+							// second round
+							if ((total_d <= SC(0)) || (total_eps <= SC(0)) || (total_d > total_eps)/* || (total_d > SC(dim2) * epsilon)*/) epsilon = SC(0);
+							else allow_continue = true;
+						}
 					}
 					epsilon = epsilon / SC(4);
+#endif
 				}
 			}
 		}
@@ -444,7 +453,7 @@ namespace lap
 
 		// this is the upper bound
 		SC epsilon = (SC)costfunc.getInitialEpsilon();
-		SC epsilon_lower = getEpsilonLower(epsilon, dim2);
+		SC epsilon_lower = (SC)costfunc.getLowerEpsilon();
 
 		bool first = true;
 		bool allow_continue = true;
