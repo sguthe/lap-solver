@@ -361,8 +361,8 @@ namespace lap
 					cudaSetDevice(iterator.ws.device[t]);
 					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					cudaStream_t stream = iterator.ws.stream[t];
-					cudaMalloc(&(d_min_count[0]), num_items * sizeof(unsigned long long));
-					cudaMemset(d_min_count[0], 0, num_items * sizeof(unsigned long long));
+					cudaMalloc(&(d_min_count[t]), num_items * sizeof(unsigned long long));
+					cudaMemset(d_min_count[t], 0, num_items * sizeof(unsigned long long));
 					dim3 block_size, grid_size, grid_size_min;
 					block_size.x = 256;
 					grid_size.x = (dim + block_size.x - 1) / block_size.x;
@@ -383,8 +383,8 @@ namespace lap
 					cudaSetDevice(iterator.ws.device[t]);
 					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					cudaStream_t stream = iterator.ws.stream[t];
-					cudaMalloc(&(d_min_count[0]), num_items * sizeof(unsigned long long));
-					cudaMemset(d_min_count[0], 0, num_items * sizeof(unsigned long long));
+					cudaMalloc(&(d_min_count[t]), num_items * sizeof(unsigned long long));
+					cudaMemset(d_min_count[t], 0, num_items * sizeof(unsigned long long));
 				}
 				for (int i = dim - 1; i >= 0; --i)
 				{
