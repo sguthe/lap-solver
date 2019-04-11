@@ -15,9 +15,6 @@
     <Filter Include="core\omp">
       <UniqueIdentifier>{ed124daf-e917-4ca8-a157-b2205806e7c5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="core\cuda">
-      <UniqueIdentifier>{0082ca88-4b99-441c-bf8d-5b25450fa832}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\test\test_cpu.cpp">
@@ -63,24 +60,6 @@
     </ClInclude>
     <ClInclude Include="..\..\core\omp\lap_worksharing.h">
       <Filter>core\omp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\cuda\lap_cache.h">
-      <Filter>core\cuda</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\cuda\lap_caching_iterator.h">
-      <Filter>core\cuda</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\cuda\lap_worksharing.h">
-      <Filter>core\cuda</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\cuda\lap_cost.h">
-      <Filter>core\cuda</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\cuda\lap_direct_iterator.h">
-      <Filter>core\cuda</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\cuda\lap_solver.h">
-      <Filter>core\cuda</Filter>
     </ClInclude>
     <ClInclude Include="..\..\test\image.h">
       <Filter>Header Files</Filter>

@@ -158,12 +158,6 @@
     <ClCompile Include="..\..\test\test_cpu.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\core\cuda\lap_cache.h" />
-    <ClInclude Include="..\..\core\cuda\lap_caching_iterator.h" />
-    <ClInclude Include="..\..\core\cuda\lap_cost.h" />
-    <ClInclude Include="..\..\core\cuda\lap_direct_iterator.h" />
-    <ClInclude Include="..\..\core\cuda\lap_solver.h" />
-    <ClInclude Include="..\..\core\cuda\lap_worksharing.h" />
     <ClInclude Include="..\..\core\lap_cache.h" />
     <ClInclude Include="..\..\core\lap_caching_iterator.h" />
     <ClInclude Include="..\..\core\lap_cost.h" />

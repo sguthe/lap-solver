@@ -25,11 +25,6 @@
     <ClInclude Include="..\..\core\lap_cost.h" />
     <ClInclude Include="..\..\core\lap_direct_iterator.h" />
     <ClInclude Include="..\..\core\lap_solver.h" />
-    <ClInclude Include="..\..\core\omp\lap_cache.h" />
-    <ClInclude Include="..\..\core\omp\lap_caching_iterator.h" />
-    <ClInclude Include="..\..\core\omp\lap_cost.h" />
-    <ClInclude Include="..\..\core\omp\lap_direct_iterator.h" />
-    <ClInclude Include="..\..\core\omp\lap_solver.h" />
     <ClInclude Include="..\..\lap.h" />
     <ClInclude Include="..\..\test\image.h" />
     <ClInclude Include="..\..\test\test_options.h" />

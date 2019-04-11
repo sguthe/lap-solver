@@ -12,9 +12,6 @@
     <Filter Include="core">
       <UniqueIdentifier>{59e27d53-0397-452d-8c35-d3c48265b4d4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="core\omp">
-      <UniqueIdentifier>{e75fa28e-2b4a-4c02-b2d2-c26fc2c4fc4b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="core\cuda">
       <UniqueIdentifier>{c36b662e-b00b-40ea-80fc-49941e07b0d0}</UniqueIdentifier>
     </Filter>
@@ -45,21 +42,6 @@
     </ClInclude>
     <ClInclude Include="..\..\core\lap_cache.h">
       <Filter>core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\omp\lap_cache.h">
-      <Filter>core\omp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\omp\lap_caching_iterator.h">
-      <Filter>core\omp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\omp\lap_cost.h">
-      <Filter>core\omp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\omp\lap_direct_iterator.h">
-      <Filter>core\omp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\core\omp\lap_solver.h">
-      <Filter>core\omp</Filter>
     </ClInclude>
     <ClInclude Include="..\..\core\cuda\lap_cache.h">
       <Filter>core\cuda</Filter>
