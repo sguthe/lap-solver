@@ -1332,7 +1332,7 @@ namespace lap
 						}
 #endif
 
-						if (f >= dim) markedSkippedColumns_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, csol_private[t], d_private[t], dim, size);
+						if (f >= dim) markedSkippedColumns_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
 						else setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 
 						while (!unassignedfound)
@@ -1412,7 +1412,7 @@ namespace lap
 							}
 #endif
 
-							if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, csol_private[t], d_private[t], dim, size);
+							if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
 							else setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 						}
 
@@ -1565,7 +1565,7 @@ namespace lap
 							}
 #endif
 							// mark last column scanned
-							if (f >= dim) markedSkippedColumns_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, csol_private[t], d_private[t], dim, size);
+							if (f >= dim) markedSkippedColumns_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
 							else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 
 							while (!unassignedfound)
@@ -1685,7 +1685,7 @@ namespace lap
 								}
 #endif
 								// mark last column scanned
-								if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, csol_private[t], d_private[t], dim, size);
+								if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
 								else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, iterator.ws.stream[t]>>>(colactive_private[t], jmin - start);
 							}
 
@@ -1825,7 +1825,7 @@ namespace lap
 							int end = iterator.ws.part[t].second;
 							int size = end - start;
 							cudaStream_t stream = iterator.ws.stream[t];
-							markedSkippedColumns_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, csol_private[t], d_private[t], dim, size);
+							markedSkippedColumns_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
 						}
 						else 
 						{
@@ -2011,7 +2011,7 @@ namespace lap
 								int end = iterator.ws.part[t].second;
 								int size = end - start;
 								cudaStream_t stream = iterator.ws.stream[t];
-								markedSkippedColumnsUpdate_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, csol_private[t], d_private[t], dim, size);
+								markedSkippedColumnsUpdate_kernel<<<grid_size_min, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
 							}
 							else 
 							{

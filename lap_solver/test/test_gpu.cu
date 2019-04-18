@@ -121,12 +121,9 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-//template <class SC, class TC, class RCF, class CF, class TP>
-//void solveCachingCUDA(TP &start_time, int N1, int N2, RCF &get_cost_row, CF &get_cost, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon)
 template <class SC, class TC, class CF, class STATE, class TP>
 void solveCachingCUDA(TP &start_time, int N1, int N2, CF &get_cost, STATE *state, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon)
 {
-	//lap::cuda::RowCostFunction<TC, decltype(get_cost_row), decltype(get_cost)> costFunction(get_cost_row, get_cost);
 	lap::cuda::SimpleCostFunction<TC, CF, STATE> costFunction(get_cost, state);
 
 	// different cache size, so always use SLRU
