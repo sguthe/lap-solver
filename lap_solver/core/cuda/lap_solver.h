@@ -431,10 +431,10 @@ namespace lap
 #ifdef LAP_CUDA_OPENMP
 			omp_set_num_threads(old_threads);
 #endif
-			long double r_col = ((long double)coll - (long double)total / (long double)dim2) / (long double)total;
-			long double r_zero = 0.5l + 0.5l * (long double)(zero + dim - dim2) / (long double)dim2;
-			long double r_eps = (long double)epsilon / (long double)(4 * dim2);
-			return std::pair<SC, SC>((SC)std::max(0.0l, r_col * r_zero * r_eps), (SC)std::max(0.0l, r_eps / SC(32 * dim2)));
+			long double r_col = ((long double)coll - (long double)total / (long double)dim2) / (long double)total * ((long double)dim / (long double)dim2);
+			long double r_zero = (0.5l + 0.5l * (long double)(zero + dim - dim2) / (long double)dim) * ((long double)dim / (long double)dim2);
+			long double r_eps = (long double)epsilon / (long double)(4 * dim);
+			return std::pair<SC, SC>((SC)std::max(0.0l, r_col * r_zero * r_eps), (SC)std::max(0.0l, r_eps / SC(32 * dim)));
 		}
 
 		template <class SC>
