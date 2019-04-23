@@ -869,8 +869,9 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 						img[1][t].height = img_a.height;
 						img[1][t].max_val = img_a.max_val;
 						cudaMalloc(&img[1][t].raw, img[1][t].width * img[1][t].height * 3);
-						cudaMemcpyAsync(img[1][t].raw, buf_b, img[1][t].width * img[1][t].height * 3, cudaMemcpyHostToDevice);
+						cudaMemcpyAsync(img[1][t].raw, buf_a, img[1][t].width * img[1][t].height * 3, cudaMemcpyHostToDevice);
 					}
+					checkCudaErrors(cudaDeviceSynchronize());
 				}
 				delete[] buf_a;
 				delete[] buf_b;
@@ -888,12 +889,12 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 				int size_1 = img[1][0].width * img[1][0].height;
 				for (int t = 0; t < num_devices; t++)
 				{
-					d_state[t].c00 = img[0][0].raw;
-					d_state[t].c01 = img[0][0].raw + size_0;
-					d_state[t].c02 = img[0][0].raw + 2 * size_0;
-					d_state[t].c10 = img[1][0].raw;
-					d_state[t].c11 = img[1][0].raw + size_1;
-					d_state[t].c12 = img[1][0].raw + 2 * size_1;
+					d_state[t].c00 = img[0][t].raw;
+					d_state[t].c01 = img[0][t].raw + size_0;
+					d_state[t].c02 = img[0][t].raw + 2 * size_0;
+					d_state[t].c10 = img[1][t].raw;
+					d_state[t].c11 = img[1][t].raw + size_1;
+					d_state[t].c12 = img[1][t].raw + 2 * size_1;
 				}
 
 				auto get_cost = [w0, h0, mval0, w1, h1, mval1] __device__(int x, int y, State &state)

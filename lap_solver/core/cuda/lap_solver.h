@@ -268,7 +268,7 @@ namespace lap
 				}
 				cudaMemcpyAsync(minmax_cost, d_out[0], 2 * dim * sizeof(TC), cudaMemcpyDeviceToHost, stream);
 				cudaMemcpyAsync(min_count, d_min_count[0], dim2 * sizeof(unsigned long long), cudaMemcpyDeviceToHost, stream);
-				cudaStreamSynchronize(stream);
+				checkCudaErrors(cudaStreamSynchronize(stream));
 				for (int i = 0; i < dim; i++)
 				{
 					SC min_cost, max_cost;
@@ -299,7 +299,7 @@ namespace lap
 						minMax_kernel<<<grid_size_min, block_size, 0, stream>>>(d_out[t] + 2 * i, tt, std::numeric_limits<TC>::max(), std::numeric_limits<TC>::lowest(), num_items);
 					}
 					cudaMemcpyAsync(&(minmax_cost[2 * t * dim]), d_out[t], 2 * dim * sizeof(TC), cudaMemcpyDeviceToHost, stream);
-					cudaStreamSynchronize(stream);
+					checkCudaErrors(cudaStreamSynchronize(stream));
 					cudaFree(d_out[t]);
 				}
 #else
@@ -336,7 +336,7 @@ namespace lap
 				}
 				for (int t = 0; t < devices; t++)
 				{
-					cudaStreamSynchronize(iterator.ws.stream[t]);
+					checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 					cudaFree(d_out[t]);
 				}
 #endif
@@ -374,7 +374,7 @@ namespace lap
 						countMin_kernel<<<grid_size_min, block_size, 0, stream>>>(d_min_count[t], minmax_cost[2 * i], tt, num_items);
 					}
 					cudaMemcpyAsync(min_count + iterator.ws.part[t].first, d_min_count[t], num_items * sizeof(unsigned long long), cudaMemcpyDeviceToHost, stream);
-					cudaStreamSynchronize(stream);
+					checkCudaErrors(cudaStreamSynchronize(stream));
 					cudaFree(d_min_count[t]);
 				}
 #else
@@ -410,7 +410,7 @@ namespace lap
 				}
 				for (int t = 0; t < devices; t++)
 				{
-					cudaStreamSynchronize(iterator.ws.stream[t]);
+					checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 					cudaFree(d_min_count[t]);
 				}
 #endif
@@ -1273,7 +1273,7 @@ namespace lap
 						if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 						else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 						else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
-						cudaStreamSynchronize(stream);
+						checkCudaErrors(cudaStreamSynchronize(stream));
 #ifndef LAP_QUIET
 						if (f < dim) total_rows++; else total_virtual++;
 #else
@@ -1309,7 +1309,7 @@ namespace lap
 							cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream);
 							cudaMemcpyAsync(colactive_tmp, colactive_private[t], dim2 * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
 							cudaMemcpyAsync(colsol_tmp, colsol_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
-							cudaStreamSynchronize(stream);
+							checkCudaErrors(cudaStreamSynchronize(stream));
 							SC min_tmp = std::numeric_limits<SC>::max();
 							int jmin_tmp = dim2;
 							int colsol_old_tmp = 0;
@@ -1354,7 +1354,7 @@ namespace lap
 							if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
-							cudaStreamSynchronize(stream);
+							checkCudaErrors(cudaStreamSynchronize(stream));
 #ifndef LAP_QUIET
 							if (i < dim) total_rows++; else total_virtual++;
 #else
@@ -1389,7 +1389,7 @@ namespace lap
 								cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream);
 								cudaMemcpyAsync(colactive_tmp, colactive_private[t], dim2 * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
 								cudaMemcpyAsync(colsol_tmp, colsol_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
-								cudaStreamSynchronize(stream);
+								checkCudaErrors(cudaStreamSynchronize(stream));
 								SC min_tmp = std::numeric_limits<SC>::max();
 								int jmin_tmp = dim2;
 								int colsol_old_tmp = 0;
@@ -1456,7 +1456,7 @@ namespace lap
 #ifdef LAP_DEBUG
 					cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
 #endif
-					cudaStreamSynchronize(stream);
+					checkCudaErrors(cudaStreamSynchronize(stream));
 				}
 				else
 				{
@@ -1488,7 +1488,7 @@ namespace lap
 							if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
-							cudaStreamSynchronize(stream);
+							checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 #pragma omp master
 							{
@@ -1538,7 +1538,7 @@ namespace lap
 								cudaMemcpyAsync(&(d_tmp[start]), d_private[t], size * sizeof(SC), cudaMemcpyDeviceToHost, stream);
 								cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], size * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
 								cudaMemcpyAsync(&(colsol_tmp[start]), colsol_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
-								cudaStreamSynchronize(stream);
+								checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 #pragma omp master
 								{
@@ -1581,7 +1581,7 @@ namespace lap
 									{
 										cudaMemcpyAsync(tt_jmin, &(tt[jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
 										cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
-										cudaStreamSynchronize(stream);
+										checkCudaErrors(cudaStreamSynchronize(stream));
 										//h2 = tt_jmin[0] - v_jmin[0] - min;
 									}
 									// propagate h2
@@ -1595,7 +1595,7 @@ namespace lap
 									if ((jmin >= start) && (jmin < end))
 									{
 										cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
-										cudaStreamSynchronize(stream);
+										checkCudaErrors(cudaStreamSynchronize(stream));
 										//h2 = -v_jmin[0] - min;
 									}
 									// propagate h2
@@ -1609,7 +1609,7 @@ namespace lap
 								if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 								else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 								else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
-								cudaStreamSynchronize(stream);
+								checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 #pragma omp master
 								{
@@ -1658,7 +1658,7 @@ namespace lap
 									cudaMemcpyAsync(&(d_tmp[start]), d_private[t], size * sizeof(SC), cudaMemcpyDeviceToHost, stream);
 									cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], size * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
 									cudaMemcpyAsync(&(colsol_tmp[start]), colsol_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
-									cudaStreamSynchronize(stream);
+									checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 #pragma omp master
 									{
@@ -1703,18 +1703,18 @@ namespace lap
 							if ((endofpath >= start) && (endofpath < end))
 							{
 								resetRowColumnAssignment_kernel<<<1, 1, 0, stream>>>(pred_private[t], colsol_private[t], rowsol_private[t], host_reset, start, end, endofpath, f);
-								cudaStreamSynchronize(stream);
+								checkCudaErrors(cudaStreamSynchronize(stream));
 							}
 #pragma omp barrier
 							while (host_reset[0].i != -1)
 							{
 								resetRowColumnAssignmentContinue_kernel<<<1, 1, 0, stream>>>(pred_private[t], colsol_private[t], rowsol_private[t], &(host_reset[0]), &(host_reset[1]), start, end, f);
-								cudaStreamSynchronize(stream);
+								checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 								if (host_reset[1].i != -1)
 								{
 									resetRowColumnAssignmentContinue_kernel<<<1, 1, 0, stream>>>(pred_private[t], colsol_private[t], rowsol_private[t], &(host_reset[1]), &(host_reset[0]), start, end, f);
-									cudaStreamSynchronize(stream);
+									checkCudaErrors(cudaStreamSynchronize(stream));
 								}
 								else
 								{
@@ -1751,7 +1751,7 @@ namespace lap
 #ifdef LAP_DEBUG
 						cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
 #endif
-						cudaStreamSynchronize(stream);
+						checkCudaErrors(cudaStreamSynchronize(stream));
 					} // end of #pragma omp parallel
 #else
 					for (int f = 0; f < dim_limit; f++)
@@ -1779,7 +1779,7 @@ namespace lap
 							else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 						}
-						for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
+						for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 #ifndef LAP_QUIET
 						if (f < dim) total_rows++; else total_virtual++;
 #else
@@ -1849,7 +1849,7 @@ namespace lap
 								cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], size * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
 								cudaMemcpyAsync(&(colsol_tmp[start]), colsol_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
 							}
-							for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
+							for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 							SC min_tmp = std::numeric_limits<SC>::max();
 							int jmin_tmp = dim2;
 							int colsol_old_tmp = 0;
@@ -1898,7 +1898,7 @@ namespace lap
 									}
 								}
 								// single device
-								cudaStreamSynchronize(iterator.ws.stream[iterator.ws.find(jmin)]);
+								checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[iterator.ws.find(jmin)]));
 								//h2 = tt_jmin[0] - v_jmin[0] - min;
 								for (int t = 0; t < devices; t++)
 								{
@@ -1925,7 +1925,7 @@ namespace lap
 									int start = iterator.ws.part[t].first;
 									cudaStream_t stream = iterator.ws.stream[t];
 									cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
-									cudaStreamSynchronize(stream);
+									checkCudaErrors(cudaStreamSynchronize(stream));
 								}
 								//h2 = -v_jmin[0] - min;
 								for (int t = 0; t < devices; t++)
@@ -1963,7 +1963,7 @@ namespace lap
 								else if (min_count <= 256) findMinMedium_kernel<<<1, 256, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 								else findMinLarge_kernel<<<1, 1024, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							}
-							for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
+							for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 #ifndef LAP_QUIET
 							if (i < dim) total_rows++; else total_virtual++;
 #else
@@ -2034,7 +2034,7 @@ namespace lap
 									cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], size * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
 									cudaMemcpyAsync(&(colsol_tmp[start]), colsol_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
 								}
-								for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
+								for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 								SC min_tmp = std::numeric_limits<SC>::max();
 								int jmin_tmp = dim2;
 								int colsol_old_tmp = 0;
@@ -2089,7 +2089,7 @@ namespace lap
 								int end = iterator.ws.part[t].second;
 								cudaStream_t stream = iterator.ws.stream[t];
 								resetRowColumnAssignment_kernel<<<1, 1, 0, stream>>>(pred_private[t], colsol_private[t], rowsol_private[t], host_reset, start, end, endofpath, f);
-								cudaStreamSynchronize(stream);
+								checkCudaErrors(cudaStreamSynchronize(stream));
 							}
 							while (host_reset->i != -1)
 							{
@@ -2101,7 +2101,7 @@ namespace lap
 									cudaStream_t stream = iterator.ws.stream[t];
 									resetRowColumnAssignmentContinue_kernel<<<1, 1, 0, stream>>>(pred_private[t], colsol_private[t], rowsol_private[t], &(host_reset[0]), &(host_reset[1]), start, end, f);
 								}
-								for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
+								for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 								std::swap(host_reset[0], host_reset[1]);
 							}
 						}
@@ -2140,7 +2140,7 @@ namespace lap
 						cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
 #endif
 					}
-					for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
+					for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 #endif
 				}
 				// get total_d and total_eps (total_eps was already fixed for the dim2 != dim_limit case
@@ -2231,7 +2231,7 @@ namespace lap
 					cudaStream_t stream = iterator.ws.stream[t];
 					cudaMemcpyAsync(&(colsol[start]), colsol_private[t], sizeof(int) * size, cudaMemcpyDeviceToHost, stream);
 				}
-				for (int t = 0; t < devices; t++) cudaStreamSynchronize(iterator.ws.stream[t]);
+				for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 				for (int j = 0; j < dim2; j++) rowsol[colsol[j]] = j;
 				cudaFreeHost(colsol);
 			}
@@ -2300,7 +2300,7 @@ namespace lap
 			cudaMemcpyAsync(d_rowsol, rowsol, dim * sizeof(int), cudaMemcpyHostToDevice, stream);
 			costfunc.getCost(d_row, stream, d_rowsol, dim);
 			cudaMemcpyAsync(row, d_row, dim * sizeof(SC), cudaMemcpyDeviceToHost, stream);
-			cudaStreamSynchronize(stream);
+			checkCudaErrors(cudaStreamSynchronize(stream));
 			cudaFree(d_row);
 			cudaFree(d_rowsol);
 			for (int i = 0; i < dim; i++) my_cost += row[i];
