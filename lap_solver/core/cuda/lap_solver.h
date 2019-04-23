@@ -2308,7 +2308,7 @@ namespace lap
 			cudaMalloc(&d_row, dim * sizeof(TC));
 			cudaMemcpyAsync(d_rowsol, rowsol, dim * sizeof(int), cudaMemcpyHostToDevice, stream);
 			costfunc.getCost(d_row, stream, d_rowsol, dim);
-			cudaMemcpyAsync(row, d_row, dim * sizeof(SC), cudaMemcpyDeviceToHost, stream);
+			cudaMemcpyAsync(row, d_row, dim * sizeof(TC), cudaMemcpyDeviceToHost, stream);
 			checkCudaErrors(cudaStreamSynchronize(stream));
 			cudaFree(d_row);
 			cudaFree(d_rowsol);
