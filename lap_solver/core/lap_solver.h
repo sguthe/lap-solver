@@ -243,7 +243,7 @@ namespace lap
 			double p1 = 1.0 / (128.0 * sqrt((double)valid_dim));
 			double p2 = -pow((double)valid_dim, 1.0/8.0);// -2.5;
 			double p3 = 1.0 / sqrt((double)valid_dim);
-			double p4 = 1.0 / sqrt((double)valid_dim);
+			double p4 = 4.0 / sqrt((double)valid_dim);
 			double rate = 1.0 / (p1 * pow(x, p2) + p3) + p4 * x;
 			rate = std::max(0.125, rate);
 			for (int i = 0; i < dim; i++)
