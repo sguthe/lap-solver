@@ -204,57 +204,217 @@ namespace lap
 #endif
 	}
 
-	template <class SC, class I>
-	std::pair<SC, SC> guessEpsilon(int dim, int dim2, I& iterator)
+	double find_root(double a, double b, double c, double d, double y)
 	{
-		SC epsilon(0);
-		SC *min_cost;
-		SC *max_cost;
-		unsigned long long *min_count;
-		lapAlloc(min_cost, dim, __FILE__, __LINE__);
-		lapAlloc(max_cost, dim, __FILE__, __LINE__);
-		lapAlloc(min_count, dim2, __FILE__, __LINE__);
-		memset(min_count, 0, dim2 * sizeof(unsigned long long));
-		// reverse order to avoid cachethrashing
+		if (y == 0.0) return 0.0;
+		else if (y == 1.0) return 1.0;
+		double x = 0.0;
+		double diff;
+		double y_p;
+		do {
+			y_p = ((((a / 4.0) * x + (b / 3.0)) * x + (c / 2.0)) * x + d) * x;
+			diff = y - y_p;
+			double y_d = ((a * x + b) * x + c) * x + d;
+			if (y_d < 1.0) y_d = 1.0;
+			x += diff / y_d;
+			if ((x > 2.0 * y) || (x > 1.0)) return std::min(1.0, 2.0 * y);
+		} while (diff > 1.0e-6);
+		return x;
+	}
+
+	void estimateBounds(double &lower, double &upper, double *moments, int *flag, int valid_dim, int dim, int dim2)
+	{
+		int unique_min = 0;
+		int unique_second = 0;
+		int colliding_second = 0;
+		for (int j = 0; j < dim2; j++)
+		{
+			if ((flag[j] & 1) == 1) unique_min++;
+			if (flag[j] == 2) unique_second++;
+			if (flag[j] == 3) colliding_second++;
+		}
+		if (unique_min + unique_second == valid_dim)
+		{
+			upper = lower = 0.0;
+		}
+		else
+		{
+			double x = (double)(valid_dim - unique_min - unique_second) / (double)(unique_min + unique_second);
+			double p1 = 1.0 / (128.0 * sqrt((double)valid_dim));
+			double p2 = -pow((double)valid_dim, 1.0/8.0);// -2.5;
+			double p3 = 1.0 / sqrt((double)valid_dim);
+			double p4 = 1.0 / sqrt((double)valid_dim);
+			double rate = 1.0 / (p1 * pow(x, p2) + p3) + p4 * x;
+			rate = std::max(0.125, rate);
+			for (int i = 0; i < dim; i++)
+			{
+				if (moments[i + dim * 4] > 0.0)
+				{
+					double m0 = moments[i] / moments[i + dim * 4];
+					double m1 = moments[i + dim] / (moments[i + dim * 4] * moments[i + dim * 4]);
+					double m2 = moments[i + dim * 2] / (moments[i + dim * 4] * moments[i + dim * 4] * moments[i + dim * 4]);
+					double m3 = moments[i + dim * 3] / (moments[i + dim * 4] * moments[i + dim * 4] * moments[i + dim * 4] * moments[i + dim * 4]);
+					double a = -1120.0 * m0 + 8400.0 * m1 - 16800.0 * m2 + 9800.0 * m3;
+					double b = 2100.0 * m0 - 15120.0 * m1 + 29400.0 * m2 - 16800.0 * m3;
+					double c = -1200.0 * m0 + 8100.0 * m1 - 15120.0 * m2 + 8400.0 * m3;
+					double d = 200.0 * m0 - 1200.0 * m1 + 2100.0 * m2 - 1120.0 * m3;
+					moments[i] = find_root(a, b, c, d, 0.5 / (double)dim2) * moments[i + dim * 4];
+					moments[i + dim] = find_root(a, b, c, d, rate / (double)dim2) * moments[i + dim * 4];
+				}
+				else
+				{
+					moments[i] = moments[i + dim] = 0.0;
+				}
+			}
+			std::sort(moments, moments + dim, std::less<double>());
+			std::sort(moments + dim, moments + 2 * dim, std::less<double>());
+			// skip the two lowest and the last quartile of the upper rows
+			//int num = (valid_dim + 3) >> 2;
+			int num = (int)ceil(sqrt((double)valid_dim));
+			//lower = moments[2 + dim - valid_dim];
+			lower = moments[num + dim - valid_dim];
+			upper = moments[2 * dim - num - 1];
+		}
+	}
+
+	template <class SC, class I>
+	std::pair<SC, SC> estimateEpsilon(int dim, int dim2, I& iterator, SC *v, bool estimate_v)
+	{
+		if (estimate_v)
+		{
+			SC *min_v;
+			lapAlloc(min_v, dim2, __FILE__, __LINE__);
+			// initialize using mean
+			for (int i = 0; i < dim; i++)
+			{
+				const auto *tt = iterator.getRow(i);
+				SC min_cost_l;
+				min_cost_l = (SC)tt[0];
+				for (int j = 1; j < dim2; j++)
+				{
+					SC cost_l = (SC)tt[j];
+					min_cost_l = std::min(min_cost_l, cost_l);
+				}
+				if (i == 0)
+				{
+					for (int j = 0; j < dim2; j++) min_v[j] = (SC)tt[j] - min_cost_l;
+				}
+				else if (i == 1)
+				{
+					for (int j = 0; j < dim2; j++)
+					{
+						SC tmp = (SC)tt[j] - min_cost_l;
+						if (tmp < min_v[j])
+						{
+							v[j] = min_v[j];
+							min_v[j] = tmp;
+						}
+						else v[j] = tmp;
+					}
+				}
+				else
+				{
+					for (int j = 0; j < dim2; j++)
+					{
+						SC tmp = (SC)tt[j] - min_cost_l;
+						if (tmp < min_v[j])
+						{
+							v[j] = min_v[j];
+							min_v[j] = tmp;
+						}
+						else v[j] = std::min(v[j], tmp);
+					}
+				}
+			}
+			// make sure all j are < 0
+			SC max_v = v[0];
+			for (int j = 1; j < dim2; j++) max_v = std::max(max_v, v[j]);
+			for (int j = 0; j < dim2; j++) v[j] = v[j] - max_v;
+			lapFree(min_v);
+		}
+
+		double *moments;
+		lapAlloc(moments, 5 * dim, __FILE__, __LINE__);
+		memset(moments, 0, 5 * dim * sizeof(double));
+
+		int *flag;
+		lapAlloc(flag, dim2, __FILE__, __LINE__);
+		memset(flag, 0, dim2 * sizeof(int));
+
+		int valid_dim = dim;
+
+		// reverse order to avoid cache thrashing
 		for (int i = dim - 1; i >= 0; --i)
 		{
 			const auto *tt = iterator.getRow(i);
-			SC min_cost_l, max_cost_l;
-			min_cost_l = max_cost_l = (SC)tt[0];
+			SC min_cost_l, max_cost_l, second_cost_l;
+			int min_idx = 0;
+			int second_idx = -1;
+			min_cost_l = max_cost_l = (SC)tt[0] - v[0];
+			double moments_l[4] = { 0.0, 0.0, 0.0, 0.0 };
 			for (int j = 1; j < dim2; j++)
 			{
-				SC cost_l = (SC)tt[j];
-				min_cost_l = std::min(min_cost_l, cost_l);
+				SC cost_l = (SC)tt[j] - v[j];
+				if (cost_l < min_cost_l)
+				{
+					second_cost_l = min_cost_l;
+					min_cost_l = cost_l;
+					second_idx = min_idx;
+					min_idx = j;
+				}
+				else
+				{
+					if (second_idx < 0)
+					{
+						if (cost_l > min_cost_l)
+						{
+							second_cost_l = cost_l;
+							second_idx = j;
+						}
+					}
+					else
+					{
+						if ((cost_l > min_cost_l) && (cost_l < second_cost_l))
+						{
+							second_cost_l = cost_l;
+							second_idx = j;
+						}
+					}
+				}
 				max_cost_l = std::max(max_cost_l, cost_l);
 			}
-			for (int j = 0; j < dim2; j++)
+			flag[min_idx] |= 1;
+			if (second_idx >= 0) flag[second_idx] |= 2;
+			if (max_cost_l == min_cost_l)
 			{
-				SC cost_l = (SC)tt[j];
-				if (cost_l == min_cost_l) min_count[j]++;
+				valid_dim--;
 			}
-			max_cost[i] = max_cost_l;
-			min_cost[i] = min_cost_l;
+			else
+			{
+				double var_l = 0.0;
+				for (int j = 0; j < dim2; j++)
+				{
+					SC cost_l = (SC)tt[j] - v[j];
+					double x = (double)(cost_l - min_cost_l);
+					moments_l[0] += x;
+					moments_l[1] += x * x;
+					moments_l[2] += x * x * x;
+					moments_l[3] += x * x * x * x;
+				}
+				for (int j = 0; j < 4; j++) moments_l[j] /= (double)(dim2 - 1);
+			}
+			
+			for (int j = 0; j < 4; j++) moments[i + dim * j] = moments_l[j];
+			moments[i + dim * 4] = (double)(max_cost_l - min_cost_l);
 		}
-		for (int i = 0; i < dim; i++)
-		{
-			epsilon += max_cost[i] - min_cost[i];
-		}
-		unsigned long long coll = min_count[0];
-		unsigned long long total = min_count[0];
-		unsigned long long zero = (min_count[0] == 0) ? 1 : 0;
-		for (int j = 1; j < dim2; j++)
-		{
-			coll = std::max(coll, min_count[j]);
-			total += min_count[j];
-			if (min_count[j] == 0) zero++;
-		}
-		lapFree(min_cost);
-		lapFree(max_cost);
-		lapFree(min_count);
-		long double r_col = ((long double)coll - (long double)total / (long double)dim2) / (long double)total * ((long double)dim / (long double)dim2);
-		long double r_zero = (0.5l + 0.5l * (long double)(zero + dim - dim2) / (long double)dim) * ((long double)dim / (long double)dim2);
-		long double r_eps = (long double)epsilon / (long double)(4 * dim);
-		return std::pair<SC, SC>((SC)std::max(0.0l, r_col * r_zero * r_eps), (SC)std::max(0.0l, r_eps / SC(32 * dim)));
+
+		double lower, upper;
+
+		estimateBounds(lower, upper, moments, flag, valid_dim, dim, dim2);
+
+		lapFree(flag);
+		lapFree(moments);
+		return std::pair<SC, SC>((SC)upper, (SC)lower);
 	}
 
 #if defined(__GNUC__)
@@ -326,67 +486,34 @@ namespace lap
 	}
 
 	template <class SC>
-	bool getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_continue, int dim2)
+	void getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, int dim2)
 	{
-		//allow_continue = false;
 		total_eps = total_d - total_eps;
 		total_d = -total_d;
-		bool reset = false;
 		if (epsilon > SC(0))
 		{
 			if (!first)
 			{
 #ifdef LAP_DEBUG
-				lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon << std::endl;
+				lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon;
 #endif
-				epsilon = std::min(total_eps / SC(16 * dim2), epsilon / SC(4));
-				if (epsilon <= epsilon_lower)
+				epsilon = std::min(epsilon / SC(4), total_eps / SC(16 * dim2));
+#ifdef LAP_DEBUG
+				lapDebug << " -> " << epsilon;
+#endif
+				if (epsilon < epsilon_lower)
 				{
 					epsilon = SC(0);
 				}
-				else
-				{
-#if 0
-					if (total_eps < SC(dim2 * 8) * epsilon)
-					{
-						//if (total_d * SC(8) < SC(dim2) * epsilon)
-						//{
-						//	allow_continue = false;
-						//	epsilon = SC(0);
-						//}
-						//else
-						if (allow_continue)
-						{
-							// first round
-							if ((total_d <= SC(0)) || (total_eps <= SC(0)) || (total_d > total_eps)/* || (total_d > SC(dim2) * epsilon)*/) allow_continue = false;
-						}
-						else
-						{
-							// second round
-							if ((total_d <= SC(0)) || (total_eps <= SC(0)) || (total_d > total_eps)/* || (total_d > SC(dim2) * epsilon)*/) epsilon = SC(0);
-							else allow_continue = true;
-						}
-					}
-					epsilon = epsilon / SC(4);
+#ifdef LAP_DEBUG
+				lapDebug << " -> " << epsilon << std::endl;
 #endif
-				}
 			}
-		}
-		return reset;
-	}
-
-	template <class SC>
-	void getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool &allow_continue, SC *v, int dim2, SC *initial_v)
-	{
-		if (getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_continue, dim2))
-		{
-			if (initial_v == 0) memset(v, 0, dim2 * sizeof(SC));
-			else memcpy(v, initial_v, dim2 * sizeof(SC));
 		}
 	}
 
 	template <class SC, class CF, class I>
-	void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, SC *initial_v)
+	void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon, SC epsilon_upper, SC epsilon_lower, SC *v)
 
 		// input:
 		// dim        - problem size
@@ -409,6 +536,9 @@ namespace lap
 		long long total_rows = 0LL;
 		long long total_virtual = 0LL;
 
+		long long last_rows = 0LL;
+		long long last_virtual = 0LL;
+
 		int elapsed = -1;
 #else
 #ifdef LAP_DISPLAY_EVALUATED
@@ -427,7 +557,6 @@ namespace lap
 		int completecount;
 		SC *d;
 		int *colsol;
-		SC *v;
 
 #ifdef LAP_DEBUG
 		std::vector<SC *> v_list;
@@ -438,8 +567,6 @@ namespace lap
 		lapAlloc(colcomplete, dim2, __FILE__, __LINE__);
 		lapAlloc(d, dim2, __FILE__, __LINE__);
 		lapAlloc(pred, dim2, __FILE__, __LINE__);
-		lapAlloc(v, dim2, __FILE__, __LINE__);
-		//lapAlloc(u, dim2, __FILE__, __LINE__);
 		lapAlloc(colsol, dim2, __FILE__, __LINE__);
 
 #ifdef LAP_ROWS_SCANNED
@@ -450,24 +577,48 @@ namespace lap
 		memset(scancount, 0, dim2 * sizeof(unsigned long long));
 		memset(pathlength, 0, dim2 * sizeof(unsigned long long));
 #endif
+		bool initialize_v = (v == 0);
+		if (initialize_v) lapAlloc(v, dim2, __FILE__, __LINE__);
 
-		// this is the upper bound
-		SC epsilon = (SC)costfunc.getInitialEpsilon();
-		SC epsilon_lower = (SC)costfunc.getLowerEpsilon();
+		SC epsilon;
+
+		if (use_epsilon)
+		{
+			if (epsilon_upper == SC(0))
+			{
+				std::pair<SC, SC> eps = estimateEpsilon(dim, dim2, iterator, v, initialize_v);
+				epsilon_upper = eps.first;
+				epsilon_lower = eps.second;
+			}
+			epsilon = epsilon_upper;
+		}
+		else
+		{
+			if (initialize_v) memset(v, 0, dim2 * sizeof(SC));
+			epsilon = SC(0);
+		}
 
 		bool first = true;
-		bool allow_continue = true;
 		bool clamp = true;
-
-		if (initial_v == 0) memset(v, 0, dim2 * sizeof(SC));
-		else memcpy(v, initial_v, dim2 * sizeof(SC));
+		bool restore_allowed = true;
 
 		SC total_d = SC(0);
 		SC total_eps = SC(0);
 		while (epsilon >= SC(0))
 		{
-			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_continue, v, dim2, initial_v);
+#ifdef LAP_DEBUG
+			if (first)
+			{
+				SC *vv;
+				lapAlloc(vv, dim2, __FILE__, __LINE__);
+				v_list.push_back(vv);
+				eps_list.push_back(epsilon);
+				memcpy(v_list.back(), v, sizeof(SC) * dim2);
+			}
+#endif
+			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, dim2);
 			//if ((!first) && (allow_continue)) clamp = false;
+
 			total_d = SC(0);
 			total_eps = SC(0);
 #ifndef LAP_QUIET
@@ -730,6 +881,15 @@ namespace lap
 				}
 			}
 
+#ifdef LAP_MINIMIZE_V
+			if (epsilon > SC(0))
+			{
+				SC min_v = v[0];
+				for (int i = 1; i < dim2; i++) min_v = std::max(min_v, v[i]);
+				for (int i = 0; i < dim2; i++) v[i] -= min_v;
+			}
+#endif
+
 #ifdef LAP_DEBUG
 			if (epsilon > SC(0))
 			{
@@ -764,7 +924,11 @@ namespace lap
 			first = false;
 #ifndef LAP_QUIET
 			lapInfo << "  rows evaluated: " << total_rows;
+			if (last_rows > 0LL) lapInfo << " (+" << total_rows - last_rows << ")";
+			last_rows = total_rows;
 			if (total_virtual > 0) lapInfo << " virtual rows evaluated: " << total_virtual;
+			if (last_virtual > 0LL) lapInfo << " (+" << total_virtual - last_virtual << ")";
+			last_virtual = total_virtual;
 			lapInfo << std::endl;
 			if ((total_hit != 0) || (total_miss != 0)) lapInfo << "  hit: " << total_hit << " miss: " << total_miss << std::endl;
 #endif
@@ -830,15 +994,19 @@ namespace lap
 		lapFree(colactive);
 		lapFree(colcomplete);
 		lapFree(d);
-		lapFree(v);
+		if (initialize_v)
+		{
+			lapFree(v);
+			v = 0;
+		}
 		lapFree(colsol);
 	}
 
 	// shortcut for square problems
 	template <class SC, class CF, class I>
-	void solve(int dim, CF &costfunc, I &iterator, int *rowsol, SC *initial_v)
+	void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon, SC epsilon_upper, SC epsilon_lower, SC *inivtial_v)
 	{
-		solve<SC>(dim, dim, costfunc, iterator, rowsol, initial_v);
+		solve<SC>(dim, dim, costfunc, iterator, rowsol, use_epsilon, epsilon_upper, epsilon_lower, v);
 	}
 
 	template <class SC, class CF>

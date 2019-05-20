@@ -64,5 +64,8 @@
     <ClInclude Include="..\..\test\image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_cuda_helper.h">
+      <Filter>core\cuda</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

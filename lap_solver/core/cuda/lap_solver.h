@@ -1019,7 +1019,7 @@ namespace lap
 		}
 
 		template <class SC, class TC, class CF, class I>
-		void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol)
+		void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon)
 
 			// input:
 			// dim        - problem size
@@ -1162,14 +1162,13 @@ namespace lap
 			SC epsilon_lower = (SC)costfunc.getLowerEpsilon();
 
 			bool first = true;
-			bool allow_continue = true;
 			bool clamp = true;
 
 			SC total_d = SC(0);
 			SC total_eps = SC(0);
 			while (epsilon >= SC(0))
 			{
-				bool reset = getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, allow_continue, dim2);
+				getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, dim2);
 				//if ((!first) && (allow_continue)) clamp = false;
 				total_d = SC(0);
 				total_eps = SC(0);
@@ -1187,12 +1186,10 @@ namespace lap
 #ifdef LAP_CUDA_OPENMP
 				if (devices == 1)
 				{
-					// upload v to devices
 					int t = 0;
 					cudaSetDevice(iterator.ws.device[t]);
 					int size = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					cudaStream_t stream = iterator.ws.stream[t];
-					if (reset) cudaMemsetAsync(v_private[t], 0, sizeof(SC) * size, stream);
 					cudaMemsetAsync(total_d_private[t], 0, sizeof(SC) * size, stream);
 					cudaMemsetAsync(total_eps_private[t], 0, sizeof(SC) * size, stream);
 					cudaMemsetAsync(rowsol_private[t], -1, dim2 * sizeof(int), stream);
@@ -1200,14 +1197,12 @@ namespace lap
 				}
 				else
 				{
-					// upload v to devices
 #pragma omp parallel for
 					for (int t = 0; t < devices; t++)
 					{
 						cudaSetDevice(iterator.ws.device[t]);
 						int size = iterator.ws.part[t].second - iterator.ws.part[t].first;
 						cudaStream_t stream = iterator.ws.stream[t];
-						if (reset) cudaMemsetAsync(v_private[t], 0, sizeof(SC) * size, stream);
 						cudaMemsetAsync(total_d_private[t], 0, sizeof(SC) * size, stream);
 						cudaMemsetAsync(total_eps_private[t], 0, sizeof(SC) * size, stream);
 						cudaMemsetAsync(rowsol_private[t], -1, dim2 * sizeof(int), stream);
@@ -2319,9 +2314,9 @@ namespace lap
 
 		// shortcut for square problems
 		template <class SC, class TC, class CF, class I>
-		void solve(int dim, CF &costfunc, I &iterator, int *rowsol)
+		void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon)
 		{
-			lap::cuda::solve<SC, TC>(dim, dim, costfunc, iterator, rowsol);
+			lap::cuda::solve<SC, TC>(dim, dim, costfunc, iterator, rowsol, use_epsilon);
 		}
 
 		// shortcut for square problems

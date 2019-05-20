@@ -17,10 +17,6 @@ namespace lap
 		~SimpleCostFunction() {}
 	public:
 		__forceinline const TC getCost(int x, int y) const { return getcost(x, y); }
-		__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
-		__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
-		__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
-		__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
 		__forceinline void getCostRow(TC *row, int x, int start, int end) const { for (int y = start; y < end; y++) row[y - start] = getCost(x, y); }
 	};
 
@@ -40,8 +36,6 @@ namespace lap
 			getcostrow(&r, x, y, y + 1);
 			return r;
 		}
-		__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
-		__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
 		__forceinline void getCostRow(TC *row, int x, int start, int end) const { getcostrow(row, x, start, end); }
 	};
 
@@ -82,12 +76,6 @@ namespace lap
 		TableCost(int size, TC* tab) : x_size(size), y_size(size), c(tab), initialEpsilon(0), lowerEpsilon(0) { free_in_destructor = false; }
 		~TableCost() { if (free_in_destructor) lapFree(c); }
 	public:
-		__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
-		__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
-		__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
-		__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
-		// This should never be used so it's commented out
-		//__forceinline void getCostRow(TC *row, int x, int start, int end) const { memcpy(row, &(getRow(x)[start]), (end - start) * sizeof(TC)); }
 		__forceinline const TC *getRow(int x) const { return &(c[(long long)x * (long long)y_size]); }
 		__forceinline const TC getCost(int x, int y) const { return getRow(x)[y]; }
 		__forceinline void setRow(int x, TC *v) { memcpy(&(c[(long long)x * (long long)y_size]), v, y_size * sizeof(TC)); }

@@ -17,6 +17,7 @@
     <ClInclude Include="..\..\core\cuda\lap_cache.h" />
     <ClInclude Include="..\..\core\cuda\lap_caching_iterator.h" />
     <ClInclude Include="..\..\core\cuda\lap_cost.h" />
+    <ClInclude Include="..\..\core\cuda\lap_cuda_helper.h" />
     <ClInclude Include="..\..\core\cuda\lap_direct_iterator.h" />
     <ClInclude Include="..\..\core\cuda\lap_solver.h" />
     <ClInclude Include="..\..\core\cuda\lap_worksharing.h" />

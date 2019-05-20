@@ -129,14 +129,8 @@ void solveCachingCUDA(TP &start_time, int N1, int N2, CF &get_cost, STATE *state
 	// different cache size, so always use SLRU
 	lap::cuda::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costFunction, ws);
 	lap::displayTime(start_time, "setup complete", std::cout);
-	if (epsilon)
-	{
-		std::pair<SC, SC> epsilon = lap::cuda::guessEpsilon<SC, TC>(N1, N2, iterator);
-		costFunction.setInitialEpsilon(epsilon.first);
-		costFunction.setLowerEpsilon(epsilon.second);
-	}
 
-	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol);
+	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cuda::cost<SC, TC>(N1, N2, costFunction, rowsol, ws.stream[0]);
@@ -166,14 +160,8 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	// different cache size, so always use SLRU
 	lap::cuda::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costFunction, ws);
 	lap::displayTime(start_time, "setup complete", std::cout);
-	if (epsilon)
-	{
-		std::pair<SC, SC> epsilon = lap::cuda::guessEpsilon<SC, TC>(N1, N2, iterator);
-		costFunction.setInitialEpsilon((TC)epsilon.first);
-		costFunction.setLowerEpsilon((TC)epsilon.second);
-	}
 
-	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol);
+	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costMatrix, rowsol);
