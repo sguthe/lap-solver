@@ -198,7 +198,6 @@ namespace lap
 					}
 					if (max_cost_l != min_cost_l)
 					{
-						double var_l = 0.0;
 						for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
 						{
 							SC cost_l = (SC)tt[j - iterator.ws.part[t].first] - v[j] - min_cost_l;

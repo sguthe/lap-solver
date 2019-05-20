@@ -391,7 +391,6 @@ namespace lap
 			}
 			else
 			{
-				double var_l = 0.0;
 				for (int j = 0; j < dim2; j++)
 				{
 					SC cost_l = (SC)tt[j] - v[j];
