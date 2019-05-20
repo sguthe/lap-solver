@@ -599,7 +599,6 @@ namespace lap
 
 		bool first = true;
 		bool clamp = true;
-		bool restore_allowed = true;
 
 		SC total_d = SC(0);
 		SC total_eps = SC(0);
