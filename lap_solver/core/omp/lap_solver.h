@@ -325,7 +325,6 @@ namespace lap
 			}
 
 			bool first = true;
-			bool allow_continue = true;
 			bool clamp = true;
 
 			SC total_d = SC(0);
@@ -343,7 +342,6 @@ namespace lap
 				}
 #endif
 				lap::getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, dim2);
-				//if ((!first) && (allow_continue)) clamp = false;
 				total_d = SC(0);
 				total_eps = SC(0);
 #ifndef LAP_QUIET

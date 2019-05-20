@@ -615,7 +615,6 @@ namespace lap
 			}
 #endif
 			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, dim2);
-			//if ((!first) && (allow_continue)) clamp = false;
 
 			total_d = SC(0);
 			total_eps = SC(0);
