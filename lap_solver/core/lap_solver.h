@@ -1004,7 +1004,7 @@ namespace lap
 
 	// shortcut for square problems
 	template <class SC, class CF, class I>
-	void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon, SC epsilon_upper, SC epsilon_lower, SC *inivtial_v)
+	void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon, SC epsilon_upper, SC epsilon_lower, SC *v)
 	{
 		solve<SC>(dim, dim, costfunc, iterator, rowsol, use_epsilon, epsilon_upper, epsilon_lower, v);
 	}
