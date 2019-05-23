@@ -6,229 +6,178 @@ namespace lap
 {
 	namespace omp
 	{
+		template <class SC, typename COST>
+		void updateEstimatedV(SC* v, SC *min_v, int i, int t, int start, int end, int threads, SC *merge_cost, COST &cost)
+		{
+			SC min_cost_l;
+			min_cost_l = cost(start, start);
+			for (int j = start + 1; j < end; j++)
+			{
+				SC cost_l = cost(j, start);
+				min_cost_l = std::min(min_cost_l, cost_l);
+			}
+			merge_cost[t << 3] = min_cost_l;
+#pragma omp barrier
+			min_cost_l = merge_cost[0];
+			for (int xx = 1; xx < threads; xx++) min_cost_l = std::min(min_cost_l, merge_cost[xx << 3]);
+
+			if (i == 0)
+			{
+				for (int j = start; j < end; j++)
+				{
+					SC tmp = cost(j, start) - min_cost_l;
+					min_v[j] = tmp;
+				}
+			}
+			else if (i == 1)
+			{
+				for (int j = start; j < end; j++)
+				{
+					SC tmp = cost(j, start) - min_cost_l;
+					if (tmp < min_v[j])
+					{
+						v[j] = min_v[j];
+						min_v[j] = tmp;
+					}
+					else v[j] = tmp;
+				}
+			}
+			else
+			{
+				for (int j = start; j < end; j++)
+				{
+					SC tmp = cost(j, start) - min_cost_l;
+					if (tmp < min_v[j])
+					{
+						v[j] = min_v[j];
+						min_v[j] = tmp;
+					}
+					else v[j] = std::min(v[j], tmp);
+				}
+			}
+		}
+
 		template <class SC, class I>
 		std::pair<SC, SC> estimateEpsilon(int dim, int dim2, I& iterator, SC *v, bool estimate_v)
 		{
+			SC *min_v;
+			lapAlloc(min_v, dim2, __FILE__, __LINE__);
 			SC *merge_cost;
 			lapAlloc(merge_cost, omp_get_max_threads() << 3, __FILE__, __LINE__);
 			int *merge_idx;
 			lapAlloc(merge_idx, omp_get_max_threads() << 3, __FILE__, __LINE__);
-			double *merge_moments;
-			lapAlloc(merge_moments, omp_get_max_threads() << 3, __FILE__, __LINE__);
+
 			if (estimate_v)
 			{
-				SC *min_v;
-				lapAlloc(min_v, dim2, __FILE__, __LINE__);
 				// initialize using mean
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
+					int threads = omp_get_num_threads();
 					for (int i = 0; i < dim; i++)
 					{
 #pragma omp barrier
 						auto *tt = iterator.getRow(t, i);
-						SC min_cost_l;
-						min_cost_l = (SC)tt[0];
-						for (int j = 1; j < iterator.ws.part[t].second - iterator.ws.part[t].first; j++)
-						{
-							SC cost_l = (SC)tt[j];
-							min_cost_l = std::min(min_cost_l, cost_l);
-						}
-						merge_cost[t << 3] = min_cost_l;
-#pragma omp barrier
-						min_cost_l = merge_cost[0];
-						for (int xx = 1; xx < omp_get_max_threads(); xx++) min_cost_l = std::min(min_cost_l, merge_cost[xx << 3]);
-
-						if (i == 0)
-						{
-							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
-							{
-								min_v[j] = (SC)tt[j - iterator.ws.part[t].first] - min_cost_l;
-							}
-						}
-						else if (i == 1)
-						{
-							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
-							{
-								SC tmp = (SC)tt[j - iterator.ws.part[t].first] - min_cost_l;
-								if (tmp < min_v[j])
-								{
-									v[j] = min_v[j];
-									min_v[j] = tmp;
-								}
-								else v[j] = tmp;
-							}
-						}
-						else
-						{
-							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
-							{
-								SC tmp = (SC)tt[j - iterator.ws.part[t].first] - min_cost_l;
-								if (tmp < min_v[j])
-								{
-									v[j] = min_v[j];
-									min_v[j] = tmp;
-								}
-								else v[j] = std::min(v[j], tmp);
-							}
-						}
+						updateEstimatedV(v, min_v, i, t, iterator.ws.part[t].first, iterator.ws.part[t].second, threads, merge_cost, [&tt](int j, int start) -> SC { return (SC)tt[j - start]; });
 					}
 				}
 				// make sure all j are < 0
 				SC max_v = v[0];
 				for (int j = 1; j < dim2; j++) max_v = std::max(max_v, v[j]);
 				for (int j = 0; j < dim2; j++) v[j] = v[j] - max_v;
-				lapFree(min_v);
 			}
 
-			double *moments;
-			lapAlloc(moments, 5 * dim, __FILE__, __LINE__);
-			memset(moments, 0, 5 * dim * sizeof(double));
+			std::fill(min_v, min_v + dim2, SC(-1));
 
-			int *flag;
-			lapAlloc(flag, dim2, __FILE__, __LINE__);
-			memset(flag, 0, dim2 * sizeof(int));
+			SC upper, lower;
 
-			int valid_dim = dim;
-
-#pragma omp parallel
+			// greedy search
 			{
-				int t = omp_get_thread_num();
-				// reverse order to avoid cache thrashing
-				for (int i = dim - 1; i >= 0; --i)
+				SC lower_bound = SC(0);
+				SC upper_bound = SC(0);
+#pragma omp parallel
 				{
-					const auto *tt = iterator.getRow(t, i);
-					SC min_cost_l, max_cost_l, second_cost_l = SC(0);
-					int min_idx = iterator.ws.part[t].first;
-					int second_idx = -1;
-					min_cost_l = max_cost_l = (SC)tt[0] - v[iterator.ws.part[t].first];
-					double moments_l[4] = { 0.0, 0.0, 0.0, 0.0 };
-					for (int j = iterator.ws.part[t].first + 1; j < iterator.ws.part[t].second; j++)
+					int t = omp_get_thread_num();
+					int threads = omp_get_num_threads();
+					for (int i = 0; i < dim; i++)
 					{
-						SC cost_l = (SC)tt[j - iterator.ws.part[t].first] - v[j];
-						if (cost_l < min_cost_l)
-						{
-							second_cost_l = min_cost_l;
-							min_cost_l = cost_l;
-							second_idx = min_idx;
-							min_idx = j;
-						}
-						else
-						{
-							if (second_idx < 0)
-							{
-								if (cost_l > min_cost_l)
-								{
-									second_cost_l = cost_l;
-									second_idx = j;
-								}
-							}
-							else
-							{
-								if ((cost_l > min_cost_l) && (cost_l < second_cost_l))
-								{
-									second_cost_l = cost_l;
-									second_idx = j;
-								}
-							}
-						}
-						max_cost_l = std::max(max_cost_l, cost_l);
-					}
-					merge_cost[t << 3] = min_cost_l;
-					merge_cost[(t << 3) + 1] = second_cost_l;
-					merge_cost[(t << 3) + 2] = max_cost_l;
-					merge_idx[t << 3] = min_idx;
-					merge_idx[(t << 3) + 1] = second_idx;
 #pragma omp barrier
-					min_cost_l = merge_cost[0];
-					second_cost_l = merge_cost[1];
-					max_cost_l = merge_cost[2];
-					min_idx = merge_idx[0];
-					second_idx = merge_idx[1];
-					for (int xx = 1; xx < omp_get_num_threads(); xx++)
-					{
-						SC cost_l = merge_cost[xx << 3];
-						int idx_l = merge_idx[xx << 3];
-						if (cost_l < min_cost_l)
-						{
-							int tmp_idx = merge_idx[(xx << 3) + 1];
-							SC tmp_cost = merge_cost[(xx << 3) + 1];
-							if ((tmp_idx < 0) || (min_cost_l <= tmp_cost))
-							{
-								second_cost_l = min_cost_l;
-								second_idx = min_idx;
-							}
-							else
-							{
-								second_cost_l = tmp_cost;
-								second_idx = tmp_idx;
-							}
-							min_cost_l = cost_l;
-							min_idx = idx_l;
-						}
-						else
-						{
-							if (second_idx < 0)
-							{
-								if (cost_l > min_cost_l)
-								{
-									second_cost_l = cost_l;
-									second_idx = idx_l;
-								}
-							}
-							else
-							{
-								if ((cost_l > min_cost_l) && (cost_l < second_cost_l))
-								{
-									second_cost_l = cost_l;
-									second_idx = idx_l;
-								}
-							}
-						}
-						max_cost_l = std::max(max_cost_l, merge_cost[(xx << 3) + 2]);
-					}
-					if (t == 0)
-					{
-						flag[min_idx] |= 1;
-						if (second_idx >= 0) flag[second_idx] |= 2;
-						if (max_cost_l == min_cost_l)
-						{
-							valid_dim--;
-						}
-					}
-					if (max_cost_l != min_cost_l)
-					{
+						// reverse order
+						const auto *tt = iterator.getRow(t, dim - 1 - i);
+						int j_min = dim2;
+						SC min_cost = std::numeric_limits<SC>::max();
+						SC min_cost2 = std::numeric_limits<SC>::max();
+						SC min_cost_real = std::numeric_limits<SC>::max();
 						for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
 						{
-							SC cost_l = (SC)tt[j - iterator.ws.part[t].first] - v[j] - min_cost_l;
-							double x = (double)(cost_l - min_cost_l);
-							moments_l[0] += x;
-							moments_l[1] += x * x;
-							moments_l[2] += x * x * x;
-							moments_l[3] += x * x * x * x;
+							SC cost_l = (SC)tt[j - iterator.ws.part[t].first] - v[j];
+							if (min_v[j] < SC(0))
+							{
+								if (cost_l < min_cost)
+								{
+									min_cost = cost_l;
+									j_min = j;
+								}
+							}
+							// used modified costs with v instead
+							min_cost_real = std::min(min_cost_real, cost_l);
+							if (min_v[j] > SC(0)) cost_l += min_v[j];
+							min_cost2 = std::min(min_cost2, cost_l);
 						}
-						for (int j = 0; j < 4; j++) moments_l[j] /= (double)(dim2 - 1);
-					}
-					for (int j = 0; j < 4; j++) merge_moments[(t << 3) + j] = moments_l[j];
+						merge_cost[t << 3] = min_cost;
+						merge_cost[(t << 3) + 1] = min_cost2;
+						merge_cost[(t << 3) + 2] = min_cost_real;
+						merge_idx[t << 3] = j_min;
 #pragma omp barrier
-					if (t == 0)
-					{
-						for (int j = 0; j < 4; j++) moments_l[j] = merge_moments[j];
-						for (int xx = 1; xx < omp_get_num_threads(); xx++) for (int j = 0; j < 4; j++) moments_l[j] += merge_moments[(xx << 3) + j];
-						for (int j = 0; j < 4; j++) moments[i + dim * j] = moments_l[j];
-						moments[i + dim * 4] = (double)(max_cost_l - min_cost_l);
+						min_cost = merge_cost[0];
+						min_cost2 = merge_cost[1];
+						min_cost_real = merge_cost[2];
+						j_min = merge_idx[0];
+						for (int xx = 0; xx < threads; xx++)
+						{
+							if (merge_cost[xx << 3] < min_cost)
+							{
+								min_cost = merge_cost[xx << 3];
+								j_min = merge_idx[xx << 3];
+							}
+							min_cost2 = std::min(min_cost2, merge_cost[(xx << 3) + 1]);
+							min_cost_real = std::min(min_cost_real, merge_cost[(xx << 3) + 2]);
+						}
+						if (t == 0)
+						{
+							upper_bound += min_cost;
+							lower_bound += min_cost_real;
+						}
+						SC gap = min_cost - min_cost2;
+						if (gap > SC(0))
+						{
+							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
+							{
+								if (min_v[j] >= SC(0))
+								{
+									min_v[j] += gap;
+								}
+							}
+						}
+						if ((j_min >= iterator.ws.part[t].first) && (j_min < iterator.ws.part[t].second)) min_v[j_min] = SC(0);
 					}
 				}
+				lower = min_v[0];
+				SC off = min_v[0];
+				for (int j = 1; j < dim2; j++)
+				{
+					off = std::min(off, min_v[j]);
+					lower = std::max(lower, min_v[j]);
+				}
+				lower = (lower - off) / SC(16 * dim2);
+
+				upper = (upper_bound - lower_bound) / (SC)(4 * dim2);
 			}
-			double lower, upper;
 
-			lap::estimateBounds(lower, upper, moments, flag, valid_dim, dim, dim2);
-
-			lapFree(flag);
-			lapFree(moments);
-			lapFree(merge_cost);
 			lapFree(merge_idx);
-			lapFree(merge_moments);
+			lapFree(merge_cost);
+			lapFree(min_v);
+
 			return std::pair<SC, SC>((SC)upper, (SC)lower);
 		}
 

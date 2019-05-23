@@ -97,7 +97,7 @@ namespace lap
 			current += s * sizeof(T);
 			peak = std::max(peak, current);
 			allocated.push_back((void *)a);
-			size.push_back(s);
+			size.push_back(s * sizeof(T));
 			alloc_file.push_back((char *)file);
 			alloc_line.push_back(line);
 		}
@@ -204,215 +204,133 @@ namespace lap
 #endif
 	}
 
-	double find_root(double a, double b, double c, double d, double y)
+	template <class SC, typename COST>
+	void updateEstimatedV(SC* v, SC *min_v, int i, int dim2, COST &cost)
 	{
-		if (y == 0.0) return 0.0;
-		else if (y == 1.0) return 1.0;
-		double x = 0.0;
-		double diff;
-		double y_p;
-		do {
-			y_p = ((((a / 4.0) * x + (b / 3.0)) * x + (c / 2.0)) * x + d) * x;
-			diff = y - y_p;
-			double y_d = ((a * x + b) * x + c) * x + d;
-			if (y_d < 1.0) y_d = 1.0;
-			x += diff / y_d;
-			if ((x > 2.0 * y) || (x > 1.0)) return std::min(1.0, 2.0 * y);
-		} while (diff > 1.0e-6);
-		return x;
-	}
-
-	void estimateBounds(double &lower, double &upper, double *moments, int *flag, int valid_dim, int dim, int dim2)
-	{
-		int unique_min = 0;
-		int unique_second = 0;
-		int colliding_second = 0;
-		for (int j = 0; j < dim2; j++)
+		SC min_cost_l;
+		min_cost_l = cost(0);
+		for (int j = 1; j < dim2; j++)
 		{
-			if ((flag[j] & 1) == 1) unique_min++;
-			if (flag[j] == 2) unique_second++;
-			if (flag[j] == 3) colliding_second++;
+			SC cost_l = cost(j);
+			min_cost_l = std::min(min_cost_l, cost_l);
 		}
-		if (unique_min + unique_second == valid_dim)
+		if (i == 0)
 		{
-			upper = lower = 0.0;
+			for (int j = 0; j < dim2; j++)
+			{
+				SC tmp = cost(j) - min_cost_l;
+				min_v[j] = tmp;
+			}
+		}
+		else if (i == 1)
+		{
+			for (int j = 0; j < dim2; j++)
+			{
+				SC tmp = cost(j) - min_cost_l;
+				if (tmp < min_v[j])
+				{
+					v[j] = min_v[j];
+					min_v[j] = tmp;
+				}
+				else v[j] = tmp;
+			}
 		}
 		else
 		{
-			double x = (double)(valid_dim - unique_min - unique_second) / (double)(unique_min + unique_second);
-			double p1 = 1.0 / (128.0 * sqrt((double)valid_dim));
-			double p2 = -pow((double)valid_dim, 1.0/8.0);// -2.5;
-			double p3 = 1.0 / sqrt((double)valid_dim);
-			double p4 = 4.0 / sqrt((double)valid_dim);
-			double rate = 1.0 / (p1 * pow(x, p2) + p3) + p4 * x;
-			rate = std::max(0.125, rate);
-			for (int i = 0; i < dim; i++)
+			for (int j = 0; j < dim2; j++)
 			{
-				if (moments[i + dim * 4] > 0.0)
+				SC tmp = cost(j) - min_cost_l;
+				if (tmp < min_v[j])
 				{
-					double m0 = moments[i] / moments[i + dim * 4];
-					double m1 = moments[i + dim] / (moments[i + dim * 4] * moments[i + dim * 4]);
-					double m2 = moments[i + dim * 2] / (moments[i + dim * 4] * moments[i + dim * 4] * moments[i + dim * 4]);
-					double m3 = moments[i + dim * 3] / (moments[i + dim * 4] * moments[i + dim * 4] * moments[i + dim * 4] * moments[i + dim * 4]);
-					double a = -1120.0 * m0 + 8400.0 * m1 - 16800.0 * m2 + 9800.0 * m3;
-					double b = 2100.0 * m0 - 15120.0 * m1 + 29400.0 * m2 - 16800.0 * m3;
-					double c = -1200.0 * m0 + 8100.0 * m1 - 15120.0 * m2 + 8400.0 * m3;
-					double d = 200.0 * m0 - 1200.0 * m1 + 2100.0 * m2 - 1120.0 * m3;
-					moments[i] = find_root(a, b, c, d, 0.5 / (double)dim2) * moments[i + dim * 4];
-					moments[i + dim] = find_root(a, b, c, d, rate / (double)dim2) * moments[i + dim * 4];
+					v[j] = min_v[j];
+					min_v[j] = tmp;
 				}
-				else
-				{
-					moments[i] = moments[i + dim] = 0.0;
-				}
+				else v[j] = std::min(v[j], tmp);
 			}
-			std::sort(moments, moments + dim, std::less<double>());
-			std::sort(moments + dim, moments + 2 * dim, std::less<double>());
-			// skip the two lowest and the last quartile of the upper rows
-			//int num = (valid_dim + 3) >> 2;
-			int num = (int)ceil(sqrt((double)valid_dim));
-			//lower = moments[2 + dim - valid_dim];
-			lower = moments[num + dim - valid_dim];
-			upper = moments[2 * dim - num - 1];
 		}
 	}
 
 	template <class SC, class I>
 	std::pair<SC, SC> estimateEpsilon(int dim, int dim2, I& iterator, SC *v, bool estimate_v)
 	{
+		SC *min_v;
+		lapAlloc(min_v, dim2, __FILE__, __LINE__);
+
 		if (estimate_v)
 		{
-			SC *min_v;
-			lapAlloc(min_v, dim2, __FILE__, __LINE__);
-			// initialize using mean
 			for (int i = 0; i < dim; i++)
 			{
 				const auto *tt = iterator.getRow(i);
-				SC min_cost_l;
-				min_cost_l = (SC)tt[0];
-				for (int j = 1; j < dim2; j++)
-				{
-					SC cost_l = (SC)tt[j];
-					min_cost_l = std::min(min_cost_l, cost_l);
-				}
-				if (i == 0)
-				{
-					for (int j = 0; j < dim2; j++) min_v[j] = (SC)tt[j] - min_cost_l;
-				}
-				else if (i == 1)
-				{
-					for (int j = 0; j < dim2; j++)
-					{
-						SC tmp = (SC)tt[j] - min_cost_l;
-						if (tmp < min_v[j])
-						{
-							v[j] = min_v[j];
-							min_v[j] = tmp;
-						}
-						else v[j] = tmp;
-					}
-				}
-				else
-				{
-					for (int j = 0; j < dim2; j++)
-					{
-						SC tmp = (SC)tt[j] - min_cost_l;
-						if (tmp < min_v[j])
-						{
-							v[j] = min_v[j];
-							min_v[j] = tmp;
-						}
-						else v[j] = std::min(v[j], tmp);
-					}
-				}
+				updateEstimatedV(v, min_v, i, dim2, [&tt](int j) -> SC { return (SC)tt[j]; });
 			}
 			// make sure all j are < 0
 			SC max_v = v[0];
 			for (int j = 1; j < dim2; j++) max_v = std::max(max_v, v[j]);
 			for (int j = 0; j < dim2; j++) v[j] = v[j] - max_v;
-			lapFree(min_v);
 		}
 
-		double *moments;
-		lapAlloc(moments, 5 * dim, __FILE__, __LINE__);
-		memset(moments, 0, 5 * dim * sizeof(double));
+		std::fill(min_v, min_v + dim2, SC(-1));
 
-		int *flag;
-		lapAlloc(flag, dim2, __FILE__, __LINE__);
-		memset(flag, 0, dim2 * sizeof(int));
+		SC upper, lower;
 
-		int valid_dim = dim;
-
-		// reverse order to avoid cache thrashing
-		for (int i = dim - 1; i >= 0; --i)
+		// greedy search
 		{
-			const auto *tt = iterator.getRow(i);
-			SC min_cost_l, max_cost_l, second_cost_l;
-			int min_idx = 0;
-			int second_idx = -1;
-			min_cost_l = max_cost_l = (SC)tt[0] - v[0];
-			double moments_l[4] = { 0.0, 0.0, 0.0, 0.0 };
-			for (int j = 1; j < dim2; j++)
+			SC lower_bound = SC(0);
+			SC upper_bound = SC(0);
+			for (int i = 0; i < dim; i++)
 			{
-				SC cost_l = (SC)tt[j] - v[j];
-				if (cost_l < min_cost_l)
-				{
-					second_cost_l = min_cost_l;
-					min_cost_l = cost_l;
-					second_idx = min_idx;
-					min_idx = j;
-				}
-				else
-				{
-					if (second_idx < 0)
-					{
-						if (cost_l > min_cost_l)
-						{
-							second_cost_l = cost_l;
-							second_idx = j;
-						}
-					}
-					else
-					{
-						if ((cost_l > min_cost_l) && (cost_l < second_cost_l))
-						{
-							second_cost_l = cost_l;
-							second_idx = j;
-						}
-					}
-				}
-				max_cost_l = std::max(max_cost_l, cost_l);
-			}
-			flag[min_idx] |= 1;
-			if (second_idx >= 0) flag[second_idx] |= 2;
-			if (max_cost_l == min_cost_l)
-			{
-				valid_dim--;
-			}
-			else
-			{
+				// reverse order
+				const auto *tt = iterator.getRow(dim - 1 - i);
+				int j_min = dim2;
+				SC min_cost = std::numeric_limits<SC>::max();
+				SC min_cost2 = std::numeric_limits<SC>::max();
+				SC min_cost_real = std::numeric_limits<SC>::max();
 				for (int j = 0; j < dim2; j++)
 				{
 					SC cost_l = (SC)tt[j] - v[j];
-					double x = (double)(cost_l - min_cost_l);
-					moments_l[0] += x;
-					moments_l[1] += x * x;
-					moments_l[2] += x * x * x;
-					moments_l[3] += x * x * x * x;
+					if (min_v[j] < SC(0))
+					{
+						if (cost_l < min_cost)
+						{
+							min_cost = cost_l;
+							j_min = j;
+						}
+					}
+					// used modified costs with v instead
+					min_cost_real = std::min(min_cost_real, cost_l);
+					if (min_v[j] > SC(0)) cost_l += min_v[j];
+					min_cost2 = std::min(min_cost2, cost_l);
 				}
-				for (int j = 0; j < 4; j++) moments_l[j] /= (double)(dim2 - 1);
+				upper_bound += min_cost;
+				lower_bound += min_cost_real;
+				SC gap = min_cost - min_cost2;
+				if (gap > SC(0))
+				{
+					for (int j = 0; j < dim2; j++)
+					{
+						if (min_v[j] >= SC(0))
+						{
+							min_v[j] += gap;
+						}
+					}
+				}
+				min_v[j_min] = SC(0);
 			}
-			
-			for (int j = 0; j < 4; j++) moments[i + dim * j] = moments_l[j];
-			moments[i + dim * 4] = (double)(max_cost_l - min_cost_l);
+			lower = min_v[0];
+			SC off = min_v[0];
+			for (int j = 1; j < dim2; j++)
+			{
+				off = std::min(off, min_v[j]);
+				lower = std::max(lower, min_v[j]);
+			}
+			lower = (lower - off) / SC(16 * dim2);
+
+			upper = (upper_bound - lower_bound) / (SC)(4 * dim2);
 		}
 
-		double lower, upper;
+		lapFree(min_v);
 
-		estimateBounds(lower, upper, moments, flag, valid_dim, dim, dim2);
-
-		lapFree(flag);
-		lapFree(moments);
+		std::cout << "upper = " << upper << " lower = " << lower << std::endl;
 		return std::pair<SC, SC>((SC)upper, (SC)lower);
 	}
 
@@ -496,7 +414,14 @@ namespace lap
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon;
 #endif
-				epsilon = std::min(epsilon / SC(4), total_eps / SC(16 * dim2));
+				if (epsilon * (dim2) >= total_eps)
+				{
+					epsilon = SC(0);
+				}
+				else
+				{
+					epsilon = std::min(epsilon / SC(4), total_eps / SC(16 * dim2));
+				}
 #ifdef LAP_DEBUG
 				lapDebug << " -> " << epsilon;
 #endif
