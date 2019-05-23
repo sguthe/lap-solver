@@ -261,7 +261,8 @@ namespace lap
 			for (int i = 0; i < dim; i++)
 			{
 				const auto *tt = iterator.getRow(i);
-				updateEstimatedV(v, min_v, i, dim2, [&tt](int j) -> SC { return (SC)tt[j]; });
+				auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
+				updateEstimatedV(v, min_v, i, dim2, cost);
 			}
 			// make sure all j are < 0
 			SC max_v = v[0];

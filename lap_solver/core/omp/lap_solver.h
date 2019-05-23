@@ -78,7 +78,8 @@ namespace lap
 					{
 #pragma omp barrier
 						auto *tt = iterator.getRow(t, i);
-						updateEstimatedV(v, min_v, i, t, iterator.ws.part[t].first, iterator.ws.part[t].second, threads, merge_cost, [&tt](int j, int start) -> SC { return (SC)tt[j - start]; });
+						auto cost = [&tt](int j, int start) -> SC { return (SC)tt[j - start]; };
+						updateEstimatedV(v, min_v, i, t, iterator.ws.part[t].first, iterator.ws.part[t].second, threads, merge_cost, cost);
 					}
 				}
 				// make sure all j are < 0
