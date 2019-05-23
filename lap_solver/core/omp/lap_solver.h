@@ -173,6 +173,7 @@ namespace lap
 				lower = (lower - off) / SC(16 * dim2);
 
 				upper = (upper_bound - lower_bound) / (SC)(4 * dim2);
+				lower = upper / (SC)(dim2 * dim2);
 			}
 
 			lapFree(merge_idx);

@@ -327,11 +327,11 @@ namespace lap
 			lower = (lower - off) / SC(16 * dim2);
 
 			upper = (upper_bound - lower_bound) / (SC)(4 * dim2);
+			lower = upper / (SC)(dim2 * dim2);
 		}
 
 		lapFree(min_v);
 
-		std::cout << "upper = " << upper << " lower = " << lower << std::endl;
 		return std::pair<SC, SC>((SC)upper, (SC)lower);
 	}
 
@@ -415,13 +415,13 @@ namespace lap
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon;
 #endif
-				if (epsilon * (dim2) >= total_eps)
+				if (epsilon * (2 * dim2) >= total_eps)
 				{
 					epsilon = SC(0);
 				}
 				else
 				{
-					epsilon = std::min(epsilon / SC(4), total_eps / SC(16 * dim2));
+					epsilon = std::min(epsilon / SC(4), total_eps / SC(8 * dim2));
 				}
 #ifdef LAP_DEBUG
 				lapDebug << " -> " << epsilon;
