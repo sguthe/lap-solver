@@ -217,10 +217,10 @@ namespace lap
 	}
 
 	template <class SC, typename COST>
-	void getMinMaxSecond(SC &min_cost_l, SC &max_cost_l, SC &second_cost_l, COST &cost, int count)
+	void getMinSecond(SC &min_cost_l, SC &second_cost_l, COST &cost, int count)
 	{
 		min_cost_l = std::min(cost(0), cost(1));
-		max_cost_l = second_cost_l = std::min(cost(0), cost(1));
+		second_cost_l = std::min(cost(0), cost(1));
 		for (int j = 2; j < count; j++)
 		{
 			SC cost_l = cost(j);
@@ -230,7 +230,6 @@ namespace lap
 				min_cost_l = cost_l;
 			}
 			else second_cost_l = std::min(second_cost_l, cost_l);
-			max_cost_l = std::max(max_cost_l, cost_l);
 		}
 	}
 
@@ -321,19 +320,19 @@ namespace lap
 			SC cost_l = cost(j);
 			update[j] = std::max(SC(0), cost_l);
 		}
-		if (i > 1)
+		if (i > 0)
 		{
 			SC up = update[picked[i - 1]];
+			mod_v[picked[i - 1]] += up;
 			for (int ii = i - 2; ii >= 0; --ii)
 			{
 				int j = picked[ii];
 				SC up_new = std::max(up - capacity[j], update[j]);
-				update[j] = up_new;
+				mod_v[j] += up_new;
 				capacity[j] += up_new - up;
 				up = up_new;
 			}
 		}
-		for (int ii = 0; ii < i; ii++) mod_v[picked[ii]] += update[picked[ii]];
 	}
 
 	template <class SC, class I>
@@ -380,9 +379,9 @@ namespace lap
 		for (int i = dim - 1; i >= 0; --i)
 		{
 			const auto *tt = iterator.getRow(i);
-			SC min_cost_l, max_cost_l, second_cost_l;
+			SC min_cost_l, second_cost_l;
 			auto cost = [&tt, &v](int j) -> SC { return (SC)tt[j] - v[j]; };
-			getMinMaxSecond(min_cost_l, max_cost_l, second_cost_l, cost, dim2);
+			getMinSecond(min_cost_l, second_cost_l, cost, dim2);
 			perm[i] = i;
 			mod_v[i] = second_cost_l - min_cost_l;
 		}
