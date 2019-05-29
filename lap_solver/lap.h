@@ -34,8 +34,8 @@
 namespace lap
 {
 	// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
-	template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon, SC epsilon_upper = SC(0), SC epsilon_lower = SC(0), SC *v = 0);
-	template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon, SC epsilon_upper = SC(0), SC epsilon_lower = SC(0), SC *v = 0);
+	template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
+	template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
 	template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
 	template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
 
@@ -60,8 +60,8 @@ namespace lap
 	namespace omp
 	{
 		// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
-		template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon, SC epsilon_upper = SC(0), SC epsilon_lower = SC(0), SC *v = 0);
-		template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon, SC epsilon_upper = SC(0), SC epsilon_lower = SC(0), SC *v = 0);
+		template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
+		template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
 		template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
 		template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
 
