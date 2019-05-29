@@ -978,7 +978,7 @@ namespace lap
 		template <class SC, class CF, class I>
 		void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon)
 		{
-			lap::omp::solve<SC>(dim, dim, costfunc, iterator, rowsol, use_epsilon, epsilon_upper, epsilon_lower, v);
+			lap::omp::solve<SC>(dim, dim, costfunc, iterator, rowsol, use_epsilon);
 		}
 
 		template <class SC, class CF>
