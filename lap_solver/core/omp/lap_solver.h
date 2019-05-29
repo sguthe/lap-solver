@@ -386,7 +386,6 @@ namespace lap
 					{
 						// reverse greedy order
 						const auto *tt = iterator.getRow(t, perm[i]);
-						int j_min = dim2;
 						SC min_cost;
 						if ((picked[i] >= iterator.ws.part[t].first) && (picked[i] < iterator.ws.part[t].second))
 						{

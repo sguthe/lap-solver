@@ -444,7 +444,6 @@ namespace lap
 			{
 				// reverse greedy order
 				const auto *tt = iterator.getRow(perm[i]);
-				int j_min = dim2;
 				SC min_cost = (SC)tt[picked[i]] - v[picked[i]];
 				SC min_cost_real = std::numeric_limits<SC>::max();
 				for (int j = 0; j < dim2; j++)
