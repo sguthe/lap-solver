@@ -9,6 +9,7 @@
 #include <deque>
 #include <mutex>
 #endif
+#include <math.h>
 
 namespace lap
 {
