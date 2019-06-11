@@ -182,22 +182,20 @@ namespace lap
 					{
 						// greedy order
 						const auto *tt = iterator.getRow(t, perm[i]);
-						int j_min, real_j_min;
+						int j_min;
 						SC min_cost, min_cost2, min_cost_real;
 #pragma omp barrier
 						auto cost = [&tt, &v, &iterator, &t](int j) -> SC { return (SC)tt[j] - v[j + iterator.ws.part[t].first]; };
-						getMinimalCost(j_min, real_j_min, min_cost, min_cost2, min_cost_real, cost, mod_v + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
+						getMinimalCost(j_min, min_cost, min_cost2, min_cost_real, cost, mod_v + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 						merge_cost[(t << 3)] = min_cost;
 						merge_cost[(t << 3) + 1] = min_cost2;
 						merge_cost[(t << 3) + 2] = min_cost_real;
 						merge_idx[(t << 3)] = j_min + iterator.ws.part[t].first;
-						merge_idx[(t << 3) + 1] = real_j_min + iterator.ws.part[t].first;
 #pragma omp barrier
 						min_cost = merge_cost[0];
 						min_cost2 = merge_cost[1];
 						min_cost_real = merge_cost[2];
 						j_min = merge_idx[0];
-						real_j_min = merge_idx[1];
 						for (int ii = 1; ii < threads; ii++)
 						{
 							if (merge_cost[(ii << 3)] < min_cost)
@@ -206,11 +204,7 @@ namespace lap
 								j_min = merge_idx[(ii << 3)];
 							}
 							min_cost2 = std::min(min_cost2, merge_cost[(ii << 3) + 1]);
-							if (merge_cost[(ii << 3) + 2] < min_cost_real)
-							{
-								min_cost_real = merge_cost[(ii << 3) + 2];
-								real_j_min = merge_idx[(ii << 3) + 1];
-							}
+							min_cost_real = std::min(min_cost_real, merge_cost[(ii << 3) + 2]);
 						}
 						SC gap = (i == 0) ? SC(0) : (min_cost - min_cost2);
 						if (gap > SC(0))
@@ -240,7 +234,6 @@ namespace lap
 							capacity[j_min] = std::max(SC(0), -gap);
 							upper_bound += min_cost + v[j_min];
 							// need to use the same v values in total
-							//lower_bound += min_cost_real + v[real_j_min];
 							lower_bound += min_cost_real + v[j_min];
 							picked[i] = j_min;
 						}
@@ -790,9 +783,7 @@ namespace lap
 #ifdef LAP_MINIMIZE_V
 				if (epsilon > SC(0))
 				{
-					SC min_v = v[0];
-					for (int i = 1; i < dim2; i++) min_v = std::max(min_v, v[i]);
-					for (int i = 0; i < dim2; i++) v[i] -= min_v;
+					normalizeV(v, dim2);
 				}
 #endif
 

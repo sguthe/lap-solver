@@ -9,6 +9,7 @@
 // enable one thread per GPU
 #define LAP_CUDA_OPENMP
 //#define LAP_CUDA_COMPARE_CPU
+#define LAP_MINIMIZE_V
 
 //#define RANDOM_SEED 1234
 

@@ -205,18 +205,6 @@ namespace lap
 	}
 
 	template <class SC, typename COST>
-	void getMinMax(SC &min_cost_l, SC &max_cost_l, COST &cost, int count)
-	{
-		min_cost_l = max_cost_l = cost(0);
-		for (int j = 1; j < count; j++)
-		{
-			SC cost_l = cost(j);
-			min_cost_l = std::min(min_cost_l, cost_l);
-			max_cost_l = std::max(max_cost_l, cost_l);
-		}
-	}
-
-	template <class SC, typename COST>
 	void getMinMaxBest(SC &min_cost_l, SC &max_cost_l, SC &picked_cost_l, int &j_min, COST &cost, int *taken, int count)
 	{
 		min_cost_l = max_cost_l = cost(0);
@@ -240,23 +228,6 @@ namespace lap
 				j_min = j;
 				picked_cost_l = cost_l;
 			}
-		}
-	}
-
-	template <class SC, typename COST>
-	void getMinSecond(SC &min_cost_l, SC &second_cost_l, COST &cost, int count)
-	{
-		min_cost_l = std::min(cost(0), cost(1));
-		second_cost_l = std::max(cost(0), cost(1));
-		for (int j = 2; j < count; j++)
-		{
-			SC cost_l = cost(j);
-			if (cost_l < min_cost_l)
-			{
-				second_cost_l = min_cost_l;
-				min_cost_l = cost_l;
-			}
-			else second_cost_l = std::min(second_cost_l, cost_l);
 		}
 	}
 
@@ -357,10 +328,9 @@ namespace lap
 	}
 
 	template <class SC, typename COST>
-	void getMinimalCost(int &j_min, int &real_j_min, SC &min_cost, SC &min_cost2, SC &min_cost_real, COST &cost, SC *mod_v, int count)
+	void getMinimalCost(int &j_min, SC &min_cost, SC &min_cost2, SC &min_cost_real, COST &cost, SC *mod_v, int count)
 	{
 		j_min = std::numeric_limits<int>::max();
-		real_j_min = std::numeric_limits<int>::max();
 		min_cost = std::numeric_limits<SC>::max();
 		min_cost2 = std::numeric_limits<SC>::max();
 		min_cost_real = std::numeric_limits<SC>::max();
@@ -379,11 +349,7 @@ namespace lap
 			{
 				min_cost2 = std::min(min_cost2, cost_l + mod_v[j]);
 			}
-			if (cost_l < min_cost_real)
-			{
-				min_cost_real = cost_l;
-				real_j_min = j;
-			}
+			min_cost_real = std::min(min_cost_real, cost_l);
 		}
 	}
 
@@ -505,13 +471,12 @@ namespace lap
 			{
 				// greedy order
 				const auto *tt = iterator.getRow(perm[i]);
-				int j_min, real_j_min;
+				int j_min;
 				SC min_cost, min_cost2, min_cost_real;
 				auto cost = [&tt, &v](int j) -> SC { return (SC)tt[j] - v[j]; };
-				getMinimalCost(j_min, real_j_min, min_cost, min_cost2, min_cost_real, cost, mod_v, dim2);
+				getMinimalCost(j_min, min_cost, min_cost2, min_cost_real, cost, mod_v, dim2);
 				upper_bound += min_cost + v[j_min];
 				// need to use the same v values in total
-				//lower_bound += min_cost_real + v[real_j_min];
 				lower_bound += min_cost_real + v[j_min];
 				SC gap = (i == 0) ? SC(0) : (min_cost - min_cost2);
 				if (gap > SC(0))
@@ -1076,9 +1041,7 @@ namespace lap
 #ifdef LAP_MINIMIZE_V
 			if (epsilon > SC(0))
 			{
-				SC min_v = v[0];
-				for (int i = 1; i < dim2; i++) min_v = std::max(min_v, v[i]);
-				for (int i = 0; i < dim2; i++) v[i] -= min_v;
+				normalizeV(v, dim2);
 			}
 #endif
 
