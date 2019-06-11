@@ -15,7 +15,7 @@ if (${CUDA_FOUND})
 endif (${CUDA_FOUND})
 SET(CMAKE_CXX_FLAGS "-Wall -O3 -Wfatal-errors -fstrict-aliasing -m64 -std=c++11 -fopenmp -flto -march=native -mfpmath=sse")
 if (${CUDA_FOUND})
-  SET(CUDA_NVCC_FLAGS "-arch=sm_52 --ptxas-options=-v -Xcompiler -Wall -O3 -std=c++11 -Xcompiler -fopenmp -Xcompiler -march=native -Xcompiler -mfpmath=sse")
+  SET(CUDA_NVCC_FLAGS "-arch=sm_52 --ptxas-options=-v -Xcompiler -Wall -O3 -std=c++11 -Xcompiler -fopenmp -Xcompiler -march=native -Xcompiler -mfpmath=sse --expt-extended-lambda")
 endif (${CUDA_FOUND})
 
 # Define where your executables should be put
@@ -37,8 +37,16 @@ if (${CUDA_FOUND})
   include_directories(../cub-1.8.0/)
 endif (${CUDA_FOUND})
 
-# this command creates your executable from the files specified in MyProject_SRCS
 ADD_EXECUTABLE(test_cpu ${test_cpu_SRCS})
+# second build for counting evaluations
+ADD_EXECUTABLE(test_cpu_evaluated ${test_cpu_SRCS})
+TARGET_COMPILE_DEFINITIONS(test_cpu_evaluated PUBLIC LAP_DISPLAY_EVALUATED)
+
 if (${CUDA_FOUND})
   CUDA_ADD_EXECUTABLE(test_gpu ${test_gpu_SRCS})
+  # second build for counting evaluations
+  CUDA_ADD_EXECUTABLE(test_gpu_evaluated ${test_gpu_SRCS})
+  target_compile_definitions(test_gpu_evaluated PUBLIC LAP_DISPLAY_EVALUATED)
 endif (${CUDA_FOUND})
+
+
