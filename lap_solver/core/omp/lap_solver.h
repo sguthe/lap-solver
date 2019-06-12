@@ -88,9 +88,6 @@ namespace lap
 			SC initial_gap = upper_bound - lower_bound;
 			SC greedy_gap = greedy_bound - lower_bound;
 
-			SC first_upper_bound = upper_bound;
-			SC first_lower_bound = lower_bound;
-
 #ifdef LAP_DEBUG
 			lapDebug << "  upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " initial_gap = " << initial_gap << std::endl;
 			lapDebug << "  upper_bound = " << greedy_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap << std::endl;
