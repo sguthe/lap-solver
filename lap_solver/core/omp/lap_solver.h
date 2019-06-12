@@ -308,17 +308,7 @@ namespace lap
 			}
 			else
 			{
-				double rate_lower = (double)(lower_bound - first_lower_bound);
-				double rate_upper = (double)(upper_bound - first_upper_bound);
-
-				double crossing = (double)(first_upper_bound - first_lower_bound) / (rate_lower - rate_upper);
-
-				SC estimate = (SC)((double)first_upper_bound + rate_upper * sqrt(crossing));
-#ifdef LAP_DEBUG
-				lapDebug << "  crossing = " << crossing << " estimate = " << estimate << std::endl;
-#endif
-
-				upper = (estimate - lower_bound) / (SC)(2 * dim2);
+				upper = greedy_gap / (SC)(8 * dim2);
 			}
 
 			lower = upper / (SC)(dim2 * dim2);
