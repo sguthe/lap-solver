@@ -2740,8 +2740,8 @@ namespace lap
 #endif
 			}
 
-			upper = greedy_gap / (SC)(16 * dim2);
-			lower = initial_gap / (SC)(dim2 * dim2);
+			upper = greedy_gap / (SC)(16) / SC(dim2);
+			lower = initial_gap / (SC)(dim2) / SC(dim2);
 			if (upper < lower) upper = lower = SC(0);
 
 #ifdef LAP_CUDA_OPENMP
