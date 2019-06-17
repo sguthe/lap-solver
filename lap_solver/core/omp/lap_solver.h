@@ -40,21 +40,16 @@ namespace lap
 					SC min_cost_l, max_cost_l, picked_cost_l;
 					int j_min;
 					const auto *tt = iterator.getRow(t, i);
+#pragma omp barrier
 					auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
 					getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					j_min += iterator.ws.part[t].first;
 					// a little hacky
 					if ((i >= iterator.ws.part[t].first) && (i < iterator.ws.part[t].second))
 					{
-						max_cost_l = cost(i - iterator.ws.part[t].first);
+						merge_cost[1] = cost(i - iterator.ws.part[t].first);
 					}
-					else
-					{
-						max_cost_l = std::numeric_limits<SC>::lowest();
-					}
-#pragma omp barrier
 					merge_cost[(t << 3)] = min_cost_l;
-					merge_cost[(t << 3) + 1] = max_cost_l;
 					merge_cost[(t << 3) + 2] = picked_cost_l;
 					merge_idx[(t << 3)] = j_min;
 #pragma omp barrier
@@ -65,14 +60,13 @@ namespace lap
 					for (int ii = 1; ii < threads; ii++)
 					{
 						min_cost_l = std::min(min_cost_l, merge_cost[(ii << 3)]);
-						max_cost_l = std::max(max_cost_l, merge_cost[(ii << 3) + 1]);
 						if (merge_cost[(ii << 3) + 2] < picked_cost_l)
 						{
 							picked_cost_l = merge_cost[(ii << 3) + 2];
 							j_min = merge_idx[(ii << 3)];
 						}
 					}
-					updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
+					updateEstimatedV(v + iterator.ws.part[t].first, cost, (i == 0), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					if (t == 0)
 					{
 						picked[j_min] = 1;
@@ -84,6 +78,8 @@ namespace lap
 			}
 			// make sure all j are < 0
 			normalizeV(v, dim2);
+
+			greedy_bound = std::min(greedy_bound, upper_bound);
 
 			SC initial_gap = upper_bound - lower_bound;
 			SC greedy_gap = greedy_bound - lower_bound;
@@ -181,7 +177,6 @@ namespace lap
 						const auto *tt = iterator.getRow(t, perm[i]);
 						int j_min;
 						SC min_cost, min_cost2, min_cost_real;
-#pragma omp barrier
 						auto cost = [&tt, &v, &iterator, &t](int j) -> SC { return (SC)tt[j] - v[j + iterator.ws.part[t].first]; };
 						getMinimalCost(j_min, min_cost, min_cost2, min_cost_real, cost, mod_v + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 						merge_cost[(t << 3)] = min_cost;
@@ -234,6 +229,7 @@ namespace lap
 							lower_bound += min_cost_real + v[j_min];
 							picked[i] = j_min;
 						}
+#pragma omp barrier
 					}
 				}
 
@@ -299,16 +295,9 @@ namespace lap
 #endif
 			}
 
-			if ((double)greedy_gap <= 1e-6 * (double)initial_gap)
-			{
-				upper = SC(0);
-			}
-			else
-			{
-				upper = greedy_gap / (SC)(8 * dim2);
-			}
-
-			lower = upper / (SC)(dim2 * dim2);
+			upper = greedy_gap / (SC)(16 * dim2);
+			lower = initial_gap / (SC)(dim2 * dim2);
+			if (upper < lower) upper = lower = SC(0);
 
 			lapFree(mod_v);
 			lapFree(perm);

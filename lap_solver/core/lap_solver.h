@@ -282,27 +282,14 @@ namespace lap
 	}
 
 	template <class SC, typename COST>
-	void updateEstimatedV(SC* v, SC *min_v, COST &cost, bool first, bool second, SC min_cost_l, SC max_cost_l, int count)
+	void updateEstimatedV(SC* v, COST &cost, bool first, SC min_cost_l, SC max_cost_l, int count)
 	{
 		if (first)
 		{
 			for (int j = 0; j < count; j++)
 			{
 				SC tmp = cost(j) - min_cost_l;
-				min_v[j] = tmp;
-			}
-		}
-		else if (second)
-		{
-			for (int j = 0; j < count; j++)
-			{
-				SC tmp = cost(j) - min_cost_l;
-				if (tmp < min_v[j])
-				{
-					v[j] = min_v[j];
-					min_v[j] = tmp;
-				}
-				else v[j] = tmp;
+				v[j] = tmp;
 			}
 		}
 		else
@@ -310,12 +297,7 @@ namespace lap
 			for (int j = 0; j < count; j++)
 			{
 				SC tmp = cost(j) - min_cost_l;
-				if (tmp < min_v[j])
-				{
-					v[j] = min_v[j];
-					min_v[j] = tmp;
-				}
-				else v[j] = std::min(v[j], tmp);
+				v[j] = std::min(tmp, v[j]);
 			}
 		}
 	}
@@ -407,7 +389,7 @@ namespace lap
 			auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
 			getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked, dim2);
 			picked[j_min] = 1;
-			updateEstimatedV(v, mod_v, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, dim2);
+			updateEstimatedV(v, cost, (i == 0), min_cost_l, max_cost_l, dim2);
 			lower_bound += min_cost_l;
 			upper_bound += (SC)tt[i];
 			greedy_bound += picked_cost_l;
@@ -534,17 +516,9 @@ namespace lap
 #endif
 		}
 
-		if ((double)greedy_gap <= 1e-6 * (double)initial_gap)
-		{
-			upper = SC(0);
-		}
-		else
-		{
-			upper = greedy_gap / (SC)(8 * dim2);
-		}
-
-
-		lower = upper / (SC)(dim2 * dim2);
+		upper = greedy_gap / (SC)(16 * dim2);
+		lower = initial_gap / (SC)(dim2 * dim2);
+		if (upper < lower) upper = lower = SC(0);
 
 		lapFree(mod_v);
 		lapFree(perm);
@@ -635,10 +609,11 @@ namespace lap
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon;
 #endif
-				double v_d = (double)total_d / (double)dim2;
-				double v_eps = (double)total_eps / (double)dim2;
+				//double v_d = (double)total_d / (double)dim2;
+				//double v_eps = (double)total_eps / (double)dim2;
 				//if (((epsilon * 4 * dim2 > total_eps) && (total_d > total_eps)) || (total_d > SC(16) * total_eps))
-				if ((v_d > 0.0) && (v_eps * v_eps / v_d < (double)epsilon))
+				//if (((v_d > 0.0) && ((v_eps * v_eps / v_d < (double)epsilon))) || (total_eps < SC(2 *dim2) * epsilon))
+				if (total_d > total_eps)
 				{
 					epsilon = SC(0);
 				}
