@@ -2751,7 +2751,7 @@ namespace lap
 			}
 
 			upper = greedy_gap / (SC)(16) / SC(dim2);
-			lower = initial_gap / (SC)(dim2) / SC(dim2);
+			lower = initial_gap / (SC)(16) / (SC)(dim2) / SC(dim2);
 			if (upper < lower) upper = lower = SC(0);
 
 #ifdef LAP_CUDA_OPENMP
@@ -2969,6 +2969,7 @@ namespace lap
 			SC epsilon = epsilon_upper;
 
 			bool first = true;
+			bool second = false;
 			bool clamp = true;
 
 			SC total_d = SC(0);
@@ -3022,7 +3023,7 @@ namespace lap
 					memcpy(v_list.back(), v, sizeof(SC) * dim2);
 				}
 #endif
-				getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, dim2);
+				getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, second, dim2);
 				//if ((!first) && (allow_continue)) clamp = false;
 				total_d = SC(0);
 				total_eps = SC(0);
@@ -4107,6 +4108,7 @@ namespace lap
 					}
 				}
 #endif
+				second = first;
 				first = false;
 
 #ifndef LAP_QUIET

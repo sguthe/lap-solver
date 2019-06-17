@@ -535,7 +535,7 @@ namespace lap
 		}
 
 		upper = greedy_gap / (SC)(16) / SC(dim2);
-		lower = initial_gap / (SC)(dim2) / SC(dim2);
+		lower = initial_gap / (SC)(16) / (SC)(dim2) / SC(dim2);
 		if (upper < lower) upper = lower = SC(0);
 
 		lapFree(mod_v);
@@ -616,7 +616,7 @@ namespace lap
 	}
 
 	template <class SC>
-	void getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, int dim2)
+	void getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool second, int dim2)
 	{
 		total_eps = total_d - total_eps;
 		total_d = -total_d;
@@ -631,7 +631,7 @@ namespace lap
 				//double v_eps = (double)total_eps / (double)dim2;
 				//if (((epsilon * 4 * dim2 > total_eps) && (total_d > total_eps)) || (total_d > SC(16) * total_eps))
 				//if (((v_d > 0.0) && ((v_eps * v_eps / v_d < (double)epsilon))) || (total_eps < SC(2 *dim2) * epsilon))
-				if (total_d > total_eps)
+				if ((!second) && (total_d > total_eps))
 				{
 					epsilon = SC(0);
 				}
@@ -740,6 +740,7 @@ namespace lap
 		epsilon = epsilon_upper;
 
 		bool first = true;
+		bool second = false;
 		bool clamp = true;
 
 		SC total_d = SC(0);
@@ -756,7 +757,7 @@ namespace lap
 				memcpy(v_list.back(), v, sizeof(SC) * dim2);
 			}
 #endif
-			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, dim2);
+			getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, second, dim2);
 
 			total_d = SC(0);
 			total_eps = SC(0);
@@ -1058,6 +1059,7 @@ namespace lap
 				}
 			}
 #endif
+			second = first;
 			first = false;
 #ifndef LAP_QUIET
 			lapInfo << "  rows evaluated: " << total_rows;
