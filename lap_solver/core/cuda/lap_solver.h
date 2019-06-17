@@ -1089,28 +1089,47 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__global__ void updateEstimatedVFirst_kernel(SC *v, TC *tt, int *picked, SC min_cost, int jmin, int size)
+		__global__ void updateEstimatedVFirst_kernel(SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			if (j >= size) return;
 
-			v[j] = (SC)tt[j] - min_cost;
+			min_v[j] = (SC)tt[j] - min_cost;
 			if (jmin == j) picked[j] = 1;
 		}
 
 		template <class SC, class TC>
-		__global__ void updateEstimatedV_kernel(SC *v, TC *tt, int *picked, SC min_cost, int jmin, int size)
+		__global__ void updateEstimatedVSecond_kernel(SC *v, SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			if (j >= size) return;
 
 			SC tmp = (SC)tt[j] - min_cost;
-			if (tmp < v[j])
+			if (tmp < min_v[j])
 			{
-				v[j] = tmp;
+				v[j] = min_v[j];
+				min_v[j] = tmp;
 			}
+			else v[j] = tmp;
+			if (jmin == j) picked[j] = 1;
+		}
+
+		template <class SC, class TC>
+		__global__ void updateEstimatedV_kernel(SC *v, SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			SC tmp = (SC)tt[j] - min_cost;
+			if (tmp < min_v[j])
+			{
+				v[j] = min_v[j];
+				min_v[j] = tmp;
+			}
+			else if (tmp < v[j]) v[j] = tmp;
 			if (jmin == j) picked[j] = 1;
 		}
 
@@ -1937,8 +1956,9 @@ namespace lap
 					SC min_cost = host_struct_private[0].min;
 					int jmin = host_struct_private[0].jmin;
 
-					if (i == 0) updateEstimatedVFirst_kernel<<<grid_size, block_size, 0, stream>>>(v_private[0], tt, picked_private[0], min_cost, jmin, dim2);
-					else updateEstimatedV_kernel<<<grid_size, block_size, 0, stream>>>(v_private[0], tt, picked_private[0], min_cost, jmin, dim2);
+					if (i == 0) updateEstimatedVFirst_kernel<<<grid_size, block_size, 0, stream>>>(mod_v_private[0], tt, picked_private[0], min_cost, jmin, dim2);
+					else if (i == 1) updateEstimatedVSecond_kernel<<<grid_size, block_size, 0, stream>>>(v_private[0], mod_v_private[0], tt, picked_private[0], min_cost, jmin, dim2);
+					else updateEstimatedV_kernel<<<grid_size, block_size, 0, stream>>>(v_private[0], mod_v_private[0], tt, picked_private[0], min_cost, jmin, dim2);
 
 					lower_bound += min_cost;
 					upper_bound += host_struct_private[0].max;
@@ -1990,8 +2010,9 @@ namespace lap
 							max_cost = std::max(max_cost, host_struct_private[tx].max);
 						}
 
-						if (i == 0) updateEstimatedVFirst_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], tt, picked_private[t], min_cost, jmin - iterator.ws.part[t].first, num_items);
-						else updateEstimatedV_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], tt, picked_private[t], min_cost, jmin - iterator.ws.part[t].first, num_items);
+						if (i == 0) updateEstimatedVFirst_kernel<<<grid_size, block_size, 0, stream>>>(mod_v_private[t], tt, picked_private[t], min_cost, jmin - iterator.ws.part[t].first, num_items);
+						else if (i == 1) updateEstimatedVSecond_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], mod_v_private[t], tt, picked_private[t], min_cost, jmin - iterator.ws.part[t].first, num_items);
+						else updateEstimatedV_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], mod_v_private[t], tt, picked_private[t], min_cost, jmin - iterator.ws.part[t].first, num_items);
 
 						if (t == 0)
 						{
@@ -2055,8 +2076,9 @@ namespace lap
 						block_size.x = 256;
 						grid_size.x = (num_items + block_size.x - 1) / block_size.x;
 
-						if (i == 0) updateEstimatedVFirst_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], tt, picked_private[t], min_cost, jmin - iterator.ws.part[t].first, num_items);
-						else updateEstimatedV_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], tt, picked_private[t], min_cost, jmin - iterator.ws.part[t].first, num_items);
+						if (i == 0) updateEstimatedVFirst_kernel<<<grid_size, block_size, 0, stream>>>(mod_v_private[t], tt, picked_private[t], min_cost, jmin - iterator.ws.part[t].first, num_items);
+						else if (i == 1) updateEstimatedVSecond_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], mod_v_private[t], tt, picked_private[t], min_cost, jmin - iterator.ws.part[t].first, num_items);
+						else updateEstimatedV_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], mod_v_private[t], tt, picked_private[t], min_cost, jmin - iterator.ws.part[t].first, num_items);
 					}
 
 					lower_bound += min_cost;
@@ -2322,8 +2344,6 @@ namespace lap
 						std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[0] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[0])), 1u));
 					int min_count = grid_size_min.x * (block_size.x >> 5);
 
-					//cudaMemcpyAsync(mod_v_private[0], mod_v, dim2 * sizeof(SC), cudaMemcpyHostToDevice, stream);
-
 					for (int i = 0; i < dim; i++)
 					{
 						auto *tt = iterator.getRow(0, perm[i]);
@@ -2357,7 +2377,6 @@ namespace lap
 						mod_v[jmin] = SC(0);
 						capacity[jmin] = std::max(SC(0), -gap);
 						picked[i] = jmin;
-						//cudaMemcpyAsync(mod_v_private[0], mod_v, dim2 * sizeof(SC), cudaMemcpyHostToDevice, stream);
 					}
 				}
 				else
@@ -2375,8 +2394,6 @@ namespace lap
 						grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[t] *
 							std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[t])), 1u));
 						int min_count = grid_size_min.x * (block_size.x >> 5);
-
-						//cudaMemcpyAsync(mod_v_private[t], &(mod_v[iterator.ws.part[t].first]), num_items * sizeof(SC), cudaMemcpyHostToDevice, stream);
 
 						for (int i = 0; i < dim; i++)
 						{
@@ -2413,7 +2430,6 @@ namespace lap
 								lower_bound += min_cost_real + v_jmin;
 							}
 							SC gap = (i == 0) ? SC(0) : (min_cost - min_cost2);
-//							bool req_upload = false;
 							if (gap > SC(0))
 							{
 								getModCost_kernel<<<grid_size, block_size, 0, stream>>>(&(mod_cost[iterator.ws.part[t].first]), tt, v_private[t], &(mod_v[iterator.ws.part[t].first]), min_cost, num_items);
@@ -2425,13 +2441,10 @@ namespace lap
 									auto cost = [&mod_cost](int j) -> SC { return mod_cost[j]; };
 									updateModV(mod_v, cost, i, picked, update, capacity);
 								}
-//								req_upload = true;
 							}
 							mod_v[jmin] = SC(0);
 							capacity[jmin] = std::max(SC(0), -gap);
 							picked[i] = jmin;
-//							if ((jmin <= iterator.ws.part[t].first) && (jmin < iterator.ws.part[t].second)) req_upload = true;
-							//if (req_upload) cudaMemcpyAsync(mod_v_private[t], &(mod_v[iterator.ws.part[t].first]), num_items * sizeof(SC), cudaMemcpyHostToDevice, stream);
 						}
 					}
 #else
@@ -2441,7 +2454,6 @@ namespace lap
 						int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 						cudaStream_t stream = iterator.ws.stream[t];
 
-						//cudaMemcpyAsync(mod_v_private[t], &(mod_v[iterator.ws.part[t].first]), num_items * sizeof(SC), cudaMemcpyHostToDevice, stream);
 					}
 					for (int i = 0; i < dim; i++)
 					{
@@ -2489,7 +2501,6 @@ namespace lap
 						lower_bound += min_cost_real + v_jmin;
 						SC gap = (i == 0) ? SC(0) : (min_cost - min_cost2);
 
-//						bool req_upload = false;
 						if (gap > SC(0))
 						{
 							for (int t = 0; t < devices; t++)
@@ -2511,7 +2522,6 @@ namespace lap
 							auto cost = [&mod_cost](int j) -> SC { return mod_cost[j]; };
 							updateModV(mod_v, cost, i, picked, update, capacity);
 
-//							req_upload = true;
 						}
 						mod_v[jmin] = SC(0);
 						capacity[jmin] = std::max(SC(0), -gap);

@@ -66,7 +66,7 @@ namespace lap
 							j_min = merge_idx[(ii << 3)];
 						}
 					}
-					updateEstimatedV(v + iterator.ws.part[t].first, cost, (i == 0), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
+					updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					if (t == 0)
 					{
 						picked[j_min] = 1;
