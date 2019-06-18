@@ -534,7 +534,7 @@ namespace lap
 #endif
 		}
 
-		upper = greedy_gap / (SC)(16) / SC(dim2);
+		upper = std::min(greedy_gap / SC(4), std::max(greedy_gap / SC(10), initial_gap)) / SC(dim2);
 		lower = initial_gap / (SC)(16) / (SC)(dim2) / SC(dim2);
 		if (upper < lower) upper = lower = SC(0);
 
@@ -627,10 +627,6 @@ namespace lap
 #ifdef LAP_DEBUG
 				lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon;
 #endif
-				//double v_d = (double)total_d / (double)dim2;
-				//double v_eps = (double)total_eps / (double)dim2;
-				//if (((epsilon * 4 * dim2 > total_eps) && (total_d > total_eps)) || (total_d > SC(16) * total_eps))
-				//if (((v_d > 0.0) && ((v_eps * v_eps / v_d < (double)epsilon))) || (total_eps < SC(2 *dim2) * epsilon))
 				if ((!second) && (total_d > total_eps))
 				{
 					epsilon = SC(0);

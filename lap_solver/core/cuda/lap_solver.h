@@ -2750,7 +2750,7 @@ namespace lap
 #endif
 			}
 
-			upper = greedy_gap / (SC)(16) / SC(dim2);
+			upper = std::min(greedy_gap / SC(4), std::max(greedy_gap / SC(10), initial_gap)) / SC(dim2);
 			lower = initial_gap / (SC)(16) / (SC)(dim2) / SC(dim2);
 			if (upper < lower) upper = lower = SC(0);
 
