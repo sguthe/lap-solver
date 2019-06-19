@@ -247,13 +247,6 @@ namespace lap
 			int colsol;
 		};
 
-		class reset_struct
-		{
-		public:
-			int i;
-			int j;
-		};
-
 		template <class SC, class TC>
 		__global__ void getMinMaxBest_kernel(SC *o_min_cost, SC *o_max_cost, SC *o_picked_cost, int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int size, int dim2)
 		{
@@ -1677,69 +1670,6 @@ namespace lap
 			}
 		}
 
-		__global__ void resetRowColumnAssignment_kernel(int *pred, int *colsol, int *rowsol, int endofpath, int f)
-		{
-			int j = endofpath;
-			int i;
-			do
-			{
-				i = pred[j];
-				colsol[j] = i;
-				int j1 = rowsol[i];
-				rowsol[i] = j;
-				j = j1;
-			} while (i != f);
-		}
-
-		__device__ void resetRowColumnAssignment_single(int *pred, int *colsol, int *rowsol, int start, int end, int &i, int &j, int f)
-		{
-			do
-			{
-				i = pred[j - start];
-				colsol[j - start] = i;
-				int j1 = rowsol[i];
-				rowsol[i] = j;
-				j = j1;
-			} while ((i != f) && ((j < start) || (j >= end)));
-		}
-
-		__global__ void resetRowColumnAssignmentExperimental_kernel(int **p_pred, int **p_colsol, int *rowsol, int *p_start, int *p_end, int devices, int endofpath, int f)
-		{
-			int j = endofpath;
-			int i;
-			int start, end;
-			int *pred, *colsol;
-			do
-			{
-				for (int d = 0; d < devices; d++)
-				{
-					start = p_start[d];
-					end = p_start[d];
-					if ((j >= start) && (j < end))
-					{
-						pred = p_pred[d];
-						colsol = p_colsol[d];
-						break;
-					}
-				}
-				resetRowColumnAssignment_single(pred, colsol, rowsol, start, end, i, j, f);
-			} while (i != f);
-		}
-
-		__global__ void resetRowColumnAssignment_kernel(int *pred, int *colsol, int *rowsol, int start, int end, int endofpath, int f)
-		{
-			int j = endofpath;
-			int i;
-			do
-			{
-				i = pred[j - start];
-				colsol[j - start] = i;
-				int j1 = rowsol[i];
-				rowsol[i] = j;
-				j = j1;
-			} while (i != f);
-		}
-
 		template <class SC>
 		__global__ void markedSkippedColumns_kernel(char *colactive, SC min_n, int jmin, int *colsol, SC *d, int dim, int size)
 		{
@@ -2882,8 +2812,6 @@ namespace lap
 
 			// used for copying
 			min_struct<SC> *host_min_private;
-			reset_struct *host_reset;
-			cudaMallocHost(&host_reset, 2 * sizeof(reset_struct));
 #ifdef LAP_DEBUG
 			cudaMallocHost(&v, dim2 * sizeof(SC));
 #endif
@@ -2900,7 +2828,6 @@ namespace lap
 			SC **d_private;
 			int *pred_private;
 			int *colsol_private;
-			int *rowsol_private;
 			SC **v_private;
 			SC **total_eps_private;
 			SC **total_d_private;
@@ -2938,7 +2865,6 @@ namespace lap
 				cudaMalloc(&(total_eps_private[t]), sizeof(SC) * size);
 				if (t == 0)
 				{
-					cudaMalloc(&rowsol_private, sizeof(int) * dim2);
 					cudaMallocHost(&colsol_private, sizeof(int) * dim2);
 					cudaMallocHost(&pred_private, sizeof(int) * dim2);
 				}
@@ -3037,6 +2963,8 @@ namespace lap
 #endif
 				// this is to ensure termination of the while statement
 				if (epsilon == SC(0)) epsilon = SC(-1.0);
+				memset(rowsol, -1, dim2 * sizeof(int));
+				memset(colsol_private, -1, dim2 * sizeof(int));
 
 #ifdef LAP_CUDA_OPENMP
 				if (devices == 1)
@@ -3047,8 +2975,6 @@ namespace lap
 					cudaStream_t stream = iterator.ws.stream[t];
 					cudaMemsetAsync(total_d_private[t], 0, sizeof(SC) * size, stream);
 					cudaMemsetAsync(total_eps_private[t], 0, sizeof(SC) * size, stream);
-					cudaMemsetAsync(rowsol_private, -1, dim2 * sizeof(int), stream);
-					cudaMemsetAsync(colsol_private, -1, dim2 * sizeof(int), stream);
 				}
 				else
 				{
@@ -3060,8 +2986,6 @@ namespace lap
 						cudaStream_t stream = iterator.ws.stream[t];
 						cudaMemsetAsync(total_d_private[t], 0, sizeof(SC) * size, stream);
 						cudaMemsetAsync(total_eps_private[t], 0, sizeof(SC) * size, stream);
-						if (t == 0) cudaMemsetAsync(rowsol_private, -1, dim2 * sizeof(int), stream);
-						if (t == 0) cudaMemsetAsync(colsol_private, -1, dim2 * sizeof(int), stream);
 					}
 				}
 #else
@@ -3073,8 +2997,6 @@ namespace lap
 					cudaStream_t stream = iterator.ws.stream[t];
 					cudaMemsetAsync(total_d_private[t], 0, sizeof(SC) * size, stream);
 					cudaMemsetAsync(total_eps_private[t], 0, sizeof(SC) * size, stream);
-					if (t == 0) cudaMemsetAsync(rowsol_private, -1, dim2 * sizeof(int), stream);
-					if (t == 0) cudaMemsetAsync(colsol_private, -1, dim2 * sizeof(int), stream);
 				}
 #endif
 
@@ -3274,7 +3196,8 @@ namespace lap
 							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
 						}
 						// reset row and column assignments along the alternating path.
-						resetRowColumnAssignment_kernel<<<1, 1, 0, stream>>>(pred_private, colsol_private, rowsol_private, endofpath, f);
+						checkCudaErrors(cudaStreamSynchronize(stream));
+						resetRowColumnAssignment(endofpath, f, pred_private, rowsol, colsol_private);
 #ifndef LAP_QUIET
 						{
 							int level;
@@ -3541,11 +3464,9 @@ namespace lap
 								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
 							}
 							// reset row and column assignments along the alternating path.
-							if (t == 0)
-							{
-								resetRowColumnAssignment_kernel<<<1, 1, 0, stream>>>(pred_private, colsol_private, rowsol_private, endofpath, f);
-								checkCudaErrors(cudaStreamSynchronize(stream));
-							}
+							checkCudaErrors(cudaStreamSynchronize(stream));
+#pragma omp barrier
+							if (t == 0) resetRowColumnAssignment(endofpath, f, pred_private, rowsol, colsol_private);
 #pragma omp barrier
 #ifndef LAP_QUIET
 							if (t == 0)
@@ -3912,13 +3833,8 @@ namespace lap
 							}
 						}
 						// reset row and column assignments along the alternating path.
-						{
-							int t = 0;
-							cudaSetDevice(iterator.ws.device[t]);
-							cudaStream_t stream = iterator.ws.stream[t];
-							resetRowColumnAssignment_kernel<<<1, 1, 0, stream>>>(pred_private, colsol_private, rowsol_private, endofpath, f);
-							checkCudaErrors(cudaStreamSynchronize(stream));
-						}
+						for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
+						resetRowColumnAssignment(endofpath, f, pred_private, rowsol, colsol_private);
 #ifndef LAP_QUIET
 						{
 							int level;
@@ -4115,14 +4031,12 @@ namespace lap
 				cudaFree(total_eps_private[t]);
 				if (t == 0)
 				{
-					cudaFree(rowsol_private);
 					cudaFreeHost(colsol_private);
 					cudaFreeHost(pred_private);
 				}
 			}
 
 			// free reserved memory.
-			cudaFreeHost(host_reset);
 #ifdef LAP_DEBUG
 			cudaFreeHost(v);
 #endif
