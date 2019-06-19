@@ -2750,7 +2750,8 @@ namespace lap
 #endif
 			}
 
-			upper = (SC)((double)greedy_gap * sqrt((double)greedy_gap / (double)initial_gap) / (double)dim2);
+			if (greedy_gap < SC(0)) upper = SC(0);
+			else upper = (SC)((double)greedy_gap * sqrt((double)greedy_gap / (double)initial_gap) / (double)dim2);
 			lower = initial_gap / (SC)(16) / (SC)(dim2) / SC(dim2);
 			if (upper < lower) upper = lower = SC(0);
 
