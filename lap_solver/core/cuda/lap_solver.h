@@ -2139,7 +2139,7 @@ namespace lap
 					for (int i = dim - 1; i >= 0; --i)
 					{
 						auto *tt = iterator.getRow(t, i);
-
+#pragma omp barrier
 						getMinSecondBest_kernel<<<grid_size_min, block_size, 0, stream>>>(min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt, v_private[t], picked_private[t], std::numeric_limits<SC>::max(), i - iterator.ws.part[t].first, num_items, dim2);
 						if (min_count <= 32) getMinSecondBestSmall_kernel<<<1, 32, 0, stream>>>(&(host_struct_private[t]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], v_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 						else if (min_count <= 256) getMinSecondBestMedium_kernel<<<1, 256, 0, stream>>>(&(host_struct_private[t]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], v_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
