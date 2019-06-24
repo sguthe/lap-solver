@@ -2825,9 +2825,11 @@ namespace lap
 			int **jmin_private;
 			int **csol_private;
 			char **colactive_private;
+			int **pred_private;
 			SC **d_private;
-			int *pred_private;
-			int *colsol_private;
+			int *pred;
+			int *colsol;
+			int **colsol_private;
 			SC **v_private;
 			SC **total_eps_private;
 			SC **total_d_private;
@@ -2836,10 +2838,14 @@ namespace lap
 			lapAlloc(jmin_private, devices, __FILE__, __LINE__);
 			lapAlloc(csol_private, devices, __FILE__, __LINE__);
 			lapAlloc(colactive_private, devices, __FILE__, __LINE__);
+			lapAlloc(pred_private, devices, __FILE__, __LINE__);
 			lapAlloc(d_private, devices, __FILE__, __LINE__);
+			lapAlloc(colsol_private, devices, __FILE__, __LINE__);
 			lapAlloc(v_private, devices, __FILE__, __LINE__);
 			lapAlloc(total_d_private, devices, __FILE__, __LINE__);
 			lapAlloc(total_eps_private, devices, __FILE__, __LINE__);
+			cudaMallocHost(&colsol, sizeof(int) * dim2);
+			cudaMallocHost(&pred, sizeof(int) * dim2);
 
 			for (int t = 0; t < devices; t++)
 			{
@@ -2863,11 +2869,8 @@ namespace lap
 				cudaMalloc(&(v_private[t]), sizeof(SC) * size);
 				cudaMalloc(&(total_d_private[t]), sizeof(SC) * size);
 				cudaMalloc(&(total_eps_private[t]), sizeof(SC) * size);
-				if (t == 0)
-				{
-					cudaMallocHost(&colsol_private, sizeof(int) * dim2);
-					cudaMallocHost(&pred_private, sizeof(int) * dim2);
-				}
+				cudaMalloc(&(colsol_private[t]), sizeof(int) * size);
+				cudaMalloc(&(pred_private[t]), sizeof(int) * size);
 				if (!use_epsilon) cudaMemsetAsync(v_private[t], 0, sizeof(SC) * size, stream);
 			}
 
@@ -2963,8 +2966,7 @@ namespace lap
 #endif
 				// this is to ensure termination of the while statement
 				if (epsilon == SC(0)) epsilon = SC(-1.0);
-				memset(rowsol, -1, dim2 * sizeof(int));
-				memset(colsol_private, -1, dim2 * sizeof(int));
+				memset(colsol, -1, dim2 * sizeof(int));
 
 #ifdef LAP_CUDA_OPENMP
 				if (devices == 1)
@@ -2975,6 +2977,7 @@ namespace lap
 					cudaStream_t stream = iterator.ws.stream[t];
 					cudaMemsetAsync(total_d_private[t], 0, sizeof(SC) * size, stream);
 					cudaMemsetAsync(total_eps_private[t], 0, sizeof(SC) * size, stream);
+					cudaMemsetAsync(colsol_private[t], -1, size * sizeof(int), stream);
 				}
 				else
 				{
@@ -2986,6 +2989,7 @@ namespace lap
 						cudaStream_t stream = iterator.ws.stream[t];
 						cudaMemsetAsync(total_d_private[t], 0, sizeof(SC) * size, stream);
 						cudaMemsetAsync(total_eps_private[t], 0, sizeof(SC) * size, stream);
+						cudaMemsetAsync(colsol_private[t], -1, size * sizeof(int), stream);
 					}
 				}
 #else
@@ -2997,6 +3001,7 @@ namespace lap
 					cudaStream_t stream = iterator.ws.stream[t];
 					cudaMemsetAsync(total_d_private[t], 0, sizeof(SC) * size, stream);
 					cudaMemsetAsync(total_eps_private[t], 0, sizeof(SC) * size, stream);
+					cudaMemsetAsync(colsol_private[t], -1, size * sizeof(int), stream);
 				}
 #endif
 
@@ -3036,9 +3041,9 @@ namespace lap
 					{
 						// start search and find minimum value
 						if (f < dim)
-							initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], colsol_private + start, pred_private + start, f, std::numeric_limits<SC>::max(), size, dim2);
+							initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 						else
-							initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private + start, pred_private + start, f, std::numeric_limits<SC>::max(), size, dim2);
+							initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 						// min is now set so we need to find the correspoding minima for free and taken columns
 						int min_count = grid_size_min.x * (block_size.x >> 5);
 						if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
@@ -3087,11 +3092,11 @@ namespace lap
 							{
 								if (colactive_tmp[j] != 0)
 								{
-									if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_private[j] < 0) && (colsol_old_tmp >= 0)))
+									if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol[j] < 0) && (colsol_old_tmp >= 0)))
 									{
 										min_tmp = d_tmp[j];
 										jmin_tmp = j;
-										colsol_old_tmp = colsol_private[j];
+										colsol_old_tmp = colsol[j];
 									}
 								}
 							}
@@ -3102,7 +3107,7 @@ namespace lap
 						}
 #endif
 
-						if (f >= dim) markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private + start, d_private[t], dim, size);
+						if (f >= dim) markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
 						else setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 
 						while (!unassignedfound)
@@ -3113,12 +3118,12 @@ namespace lap
 								// get row
 								auto tt = iterator.getRow(t, i);
 								// continue search
-								continueSearchJMinMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private + start, pred_private + start, i, jmin, min, std::numeric_limits<SC>::max(), size, dim2);
+								continueSearchJMinMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], i, jmin, min, std::numeric_limits<SC>::max(), size, dim2);
 							}
 							else
 							{
 								// continue search
-								continueSearchJMinMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private + start, pred_private + start, i, jmin, min, std::numeric_limits<SC>::max(), size, dim2);
+								continueSearchJMinMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, jmin, min, std::numeric_limits<SC>::max(), size, dim2);
 							}
 							// min is now set so we need to find the correspoding minima for free and taken columns
 							if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
@@ -3166,11 +3171,11 @@ namespace lap
 								{
 									if (colactive_tmp[j] != 0)
 									{
-										if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_private[j] < 0) && (colsol_old_tmp >= 0)))
+										if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol[j] < 0) && (colsol_old_tmp >= 0)))
 										{
 											min_tmp = d_tmp[j];
 											jmin_tmp = j;
-											colsol_old_tmp = colsol_private[j];
+											colsol_old_tmp = colsol[j];
 										}
 									}
 								}
@@ -3181,7 +3186,7 @@ namespace lap
 							}
 #endif
 
-							if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private + start, d_private[t], dim, size);
+							if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
 							else setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 						}
 
@@ -3196,8 +3201,10 @@ namespace lap
 							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
 						}
 						// reset row and column assignments along the alternating path.
+						cudaMemcpyAsync(pred, pred_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
 						checkCudaErrors(cudaStreamSynchronize(stream));
-						resetRowColumnAssignment(endofpath, f, pred_private, rowsol, colsol_private);
+						resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
+						cudaMemcpyAsync(colsol_private[t], colsol, dim2 * sizeof(int), cudaMemcpyHostToDevice, stream);
 #ifndef LAP_QUIET
 						{
 							int level;
@@ -3218,7 +3225,7 @@ namespace lap
 #endif
 					}
 
-					if (dim2 != dim_limit) updateUnassignedColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colsol_private + start, v_private[t], total_eps_private[t], epsilon, size);
+					if (dim2 != dim_limit) updateUnassignedColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colsol_private[t], v_private[t], total_eps_private[t], epsilon, size);
 
 					// download updated v
 					cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
@@ -3250,9 +3257,9 @@ namespace lap
 						{
 							// start search and find minimum value
 							if (f < dim)
-								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], colsol_private + start, pred_private + start, f, std::numeric_limits<SC>::max(), size, dim2);
+								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 							else
-								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private + start, pred_private + start, f, std::numeric_limits<SC>::max(), size, dim2);
+								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 							// min is now set so we need to find the correspoding minima for free and taken columns
 							int min_count = grid_size_min.x * (block_size.x >> 5);
 							if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
@@ -3317,11 +3324,11 @@ namespace lap
 									{
 										if (colactive_tmp[j] != 0)
 										{
-											if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_private[j] < 0) && (colsol_old_tmp >= 0)))
+											if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol[j] < 0) && (colsol_old_tmp >= 0)))
 											{
 												min_tmp = d_tmp[j];
 												jmin_tmp = j;
-												colsol_old_tmp = colsol_private[j];
+												colsol_old_tmp = colsol[j];
 											}
 										}
 									}
@@ -3333,7 +3340,7 @@ namespace lap
 							}
 #endif
 							// mark last column scanned
-							if (f >= dim) markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private + start, d_private[t], dim, size);
+							if (f >= dim) markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
 							else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 
 							while (!unassignedfound)
@@ -3355,7 +3362,7 @@ namespace lap
 									// propagate h2
 #pragma omp barrier
 									// continue search
-									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private + start, pred_private + start, i, (SC)tt_jmin[0], v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], i, (SC)tt_jmin[0], v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
 								}
 								else
 								{
@@ -3368,7 +3375,7 @@ namespace lap
 									// propagate h2
 #pragma omp barrier
 									// continue search
-									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private + start, pred_private + start, i, v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
 								}
 								// min is now set so we need to find the correspoding minima for free and taken columns
 								int min_count = grid_size_min.x * (block_size.x >> 5);
@@ -3433,11 +3440,11 @@ namespace lap
 										{
 											if (colactive_tmp[j] != 0)
 											{
-												if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_private[j] < 0) && (colsol_old_tmp >= 0)))
+												if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol[j] < 0) && (colsol_old_tmp >= 0)))
 												{
 													min_tmp = d_tmp[j];
 													jmin_tmp = j;
-													colsol_old_tmp = colsol_private[j];
+													colsol_old_tmp = colsol[j];
 												}
 											}
 										}
@@ -3449,7 +3456,7 @@ namespace lap
 								}
 #endif
 								// mark last column scanned
-								if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private + start, d_private[t], dim, size);
+								if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
 								else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 							}
 
@@ -3464,10 +3471,12 @@ namespace lap
 								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
 							}
 							// reset row and column assignments along the alternating path.
+							cudaMemcpyAsync(pred + start, pred_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
 							checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
-							if (t == 0) resetRowColumnAssignment(endofpath, f, pred_private, rowsol, colsol_private);
+							if (t == 0) resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 #pragma omp barrier
+							cudaMemcpyAsync(colsol_private[t], colsol + start, dim2 * sizeof(int), cudaMemcpyHostToDevice, stream);
 #ifndef LAP_QUIET
 							if (t == 0)
 							{
@@ -3489,7 +3498,7 @@ namespace lap
 #endif
 						}
 
-						if (dim2 != dim_limit) updateUnassignedColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colsol_private + start, v_private[t], total_eps_private[t], epsilon, size);
+						if (dim2 != dim_limit) updateUnassignedColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colsol_private[t], v_private[t], total_eps_private[t], epsilon, size);
 
 						// download updated v
 						cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
@@ -3516,9 +3525,9 @@ namespace lap
 								std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[t])), 1u));
 							// start search and find minimum value
 							if (f < dim)
-								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], colsol_private + start, pred_private + start, f, std::numeric_limits<SC>::max(), size, dim2);
+								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], iterator.getRow(t, f), colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 							else
-								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private + start, pred_private + start, f, std::numeric_limits<SC>::max(), size, dim2);
+								initializeSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), size, dim2);
 							// min is now set so we need to find the correspoding minima for free and taken columns
 							int min_count = grid_size_min.x * (block_size.x >> 5);
 							if (min_count <= 32) findMinSmall_kernel<<<1, 32, 0, stream>>>(&(host_min_private[t]), min_private[t], jmin_private[t], csol_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
@@ -3576,7 +3585,7 @@ namespace lap
 								dim3 block_size, grid_size;
 								block_size.x = 256;
 								grid_size.x = (size + block_size.x - 1) / block_size.x;
-								markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private + start, d_private[t], dim, size);
+								markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
 							}
 						}
 						else 
@@ -3608,11 +3617,11 @@ namespace lap
 							{
 								if (colactive_tmp[j] != 0)
 								{
-									if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_private[j] < 0) && (colsol_old_tmp >= 0)))
+									if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol[j] < 0) && (colsol_old_tmp >= 0)))
 									{
 										min_tmp = d_tmp[j];
 										jmin_tmp = j;
-										colsol_old_tmp = colsol_private[j];
+										colsol_old_tmp = colsol[j];
 									}
 								}
 							}
@@ -3663,7 +3672,7 @@ namespace lap
 									grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[t] *
 										std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[t])), 1u));
 									// continue search
-									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private + start, pred_private + start, i, (SC)tt_jmin[0], v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, (SC)tt_jmin[0], v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
 								}
 							}
 							else
@@ -3689,7 +3698,7 @@ namespace lap
 									grid_size_min.x = std::min(grid_size.x, (unsigned int)iterator.ws.sm_count[t] *
 										std::max(std::min((unsigned int)(iterator.ws.threads_per_sm[t] / block_size.x), grid_size.x / (8u * (unsigned int)iterator.ws.sm_count[t])), 1u));
 									// continue search
-									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private + start, pred_private + start, i, v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
+									continueSearchMin_kernel<<<grid_size_min, block_size, 0, stream>>>(min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin[0], min, std::numeric_limits<SC>::max(), size, dim2);
 								}
 							}
 							for (int t = 0; t < devices; t++)
@@ -3763,7 +3772,7 @@ namespace lap
 									dim3 block_size, grid_size;
 									block_size.x = 256;
 									grid_size.x = (size + block_size.x - 1) / block_size.x;
-									markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private + start, d_private[t], dim, size);
+									markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
 								}
 							}
 							else 
@@ -3794,11 +3803,11 @@ namespace lap
 								{
 									if (colactive_tmp[j] != 0)
 									{
-										if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol_private[j] < 0) && (colsol_old_tmp >= 0)))
+										if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol[j] < 0) && (colsol_old_tmp >= 0)))
 										{
 											min_tmp = d_tmp[j];
 											jmin_tmp = j;
-											colsol_old_tmp = colsol_private[j];
+											colsol_old_tmp = colsol[j];
 										}
 									}
 								}
@@ -3831,10 +3840,20 @@ namespace lap
 							{
 								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
 							}
+							cudaMemcpyAsync(pred + start, pred_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
 						}
 						// reset row and column assignments along the alternating path.
 						for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
-						resetRowColumnAssignment(endofpath, f, pred_private, rowsol, colsol_private);
+						resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
+						for (int t = 0; t < devices; t++)
+						{
+							cudaSetDevice(iterator.ws.device[t]);
+							int start = iterator.ws.part[t].first;
+							int end = iterator.ws.part[t].second;
+							int size = end - start;
+							cudaStream_t stream = iterator.ws.stream[t];
+							cudaMemcpyAsync(colsol_private[t], colsol + start, dim2 * sizeof(int), cudaMemcpyHostToDevice, stream);
+						}
 #ifndef LAP_QUIET
 						{
 							int level;
@@ -3866,7 +3885,7 @@ namespace lap
 						dim3 block_size, grid_size;
 						block_size.x = 256;
 						grid_size.x = (size + block_size.x - 1) / block_size.x;
-						if (dim2 != dim_limit) updateUnassignedColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colsol_private + start, v_private[t], total_eps_private[t], epsilon, size);
+						if (dim2 != dim_limit) updateUnassignedColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colsol_private[t], v_private[t], total_eps_private[t], epsilon, size);
 						cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
 						cudaMemcpyAsync(&(h_total_eps[start]), total_eps_private[t], sizeof(SC) * size, cudaMemcpyDeviceToHost, stream);
 #ifdef LAP_DEBUG
@@ -4015,7 +4034,7 @@ namespace lap
 			lapFree(scancount);
 #endif
 
-			for (int j = 0; j < dim2; j++) rowsol[colsol_private[j]] = j;
+			for (int j = 0; j < dim2; j++) rowsol[colsol[j]] = j;
 
 			// free CUDA memory
 			for (int t = 0; t < devices; t++)
@@ -4029,17 +4048,16 @@ namespace lap
 				cudaFree(v_private[t]);
 				cudaFree(total_d_private[t]);
 				cudaFree(total_eps_private[t]);
-				if (t == 0)
-				{
-					cudaFreeHost(colsol_private);
-					cudaFreeHost(pred_private);
-				}
+				cudaFree(pred_private[t]);
+				cudaFree(colsol_private[t]);
 			}
 
 			// free reserved memory.
 #ifdef LAP_DEBUG
 			cudaFreeHost(v);
 #endif
+			cudaFreeHost(colsol);
+			cudaFreeHost(pred);
 			cudaFreeHost(h_total_d);
 			cudaFreeHost(h_total_eps);
 			cudaFreeHost(tt_jmin);
@@ -4049,7 +4067,9 @@ namespace lap
 			lapFree(csol_private);
 			cudaFreeHost(host_min_private);
 			lapFree(colactive_private);
+			lapFree(pred_private);
 			lapFree(d_private);
+			lapFree(colsol_private);
 			lapFree(v_private);
 			lapFree(total_d_private);
 			lapFree(total_eps_private);
