@@ -3471,12 +3471,12 @@ namespace lap
 								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
 							}
 							// reset row and column assignments along the alternating path.
-							cudaMemcpyAsync(pred + start, pred_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
+							cudaMemcpyAsync(pred + start, pred_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
 							checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 							if (t == 0) resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 #pragma omp barrier
-							cudaMemcpyAsync(colsol_private[t], colsol + start, dim2 * sizeof(int), cudaMemcpyHostToDevice, stream);
+							cudaMemcpyAsync(colsol_private[t], colsol + start, size * sizeof(int), cudaMemcpyHostToDevice, stream);
 #ifndef LAP_QUIET
 							if (t == 0)
 							{
@@ -3840,7 +3840,7 @@ namespace lap
 							{
 								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
 							}
-							cudaMemcpyAsync(pred + start, pred_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
+							cudaMemcpyAsync(pred + start, pred_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
 						}
 						// reset row and column assignments along the alternating path.
 						for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
@@ -3852,7 +3852,7 @@ namespace lap
 							int end = iterator.ws.part[t].second;
 							int size = end - start;
 							cudaStream_t stream = iterator.ws.stream[t];
-							cudaMemcpyAsync(colsol_private[t], colsol + start, dim2 * sizeof(int), cudaMemcpyHostToDevice, stream);
+							cudaMemcpyAsync(colsol_private[t], colsol + start, size * sizeof(int), cudaMemcpyHostToDevice, stream);
 						}
 #ifndef LAP_QUIET
 						{
