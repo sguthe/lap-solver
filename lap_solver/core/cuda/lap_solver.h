@@ -2681,10 +2681,7 @@ namespace lap
 #endif
 			}
 
-			if (greedy_gap < SC(0)) upper = SC(0);
-			else upper = (SC)((double)greedy_gap * sqrt((double)greedy_gap / (double)initial_gap) / (double)dim2);
-			lower = initial_gap / (SC)(16) / (SC)(dim2) / SC(dim2);
-			if (upper < lower) upper = lower = SC(0);
+			getUpperLower(upper, lower, greedy_gap, initial_gap, dim2);
 
 #ifdef LAP_CUDA_OPENMP
 			if (devices == 1)
@@ -2899,7 +2896,7 @@ namespace lap
 
 			bool first = true;
 			bool second = false;
-			bool clamp = true;
+			bool clamp = false;
 
 			SC total_d = SC(0);
 			SC total_eps = SC(0);
