@@ -519,6 +519,8 @@ namespace lap
 
 		if (initial_gap < SC(4) * greedy_gap)
 		{
+			SC old_upper_bound = upper_bound;
+			SC old_lower_bound = lower_bound;
 			upper_bound = SC(0);
 			lower_bound = SC(0);
 			for (int i = dim - 1; i >= 0; --i)
@@ -536,6 +538,8 @@ namespace lap
 				upper_bound += min_cost;
 				lower_bound += min_cost_real + v[picked[i]];
 			}
+			upper_bound = std::min(upper_bound, old_upper_bound);
+			lower_bound = std::max(lower_bound, old_lower_bound);
 			greedy_gap = upper_bound - lower_bound;
 
 #ifdef LAP_DEBUG
@@ -1087,9 +1091,10 @@ namespace lap
 #endif
 
 #ifdef LAP_ROWS_SCANNED
+		lapInfo << "row\tscanned\tlength" << std::endl;
 		for (int f = 0; f < dim2; f++)
 		{
-			lapInfo << "row: " << f << " scanned: " << scancount[f] << " length: " << pathlength[f] << std::endl;
+			lapInfo << f << "\t" << scancount[f] << "\t" << pathlength[f] << std::endl;
 		}
 
 		lapFree(scancount);

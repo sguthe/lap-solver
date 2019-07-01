@@ -2557,6 +2557,8 @@ namespace lap
 
 			if (initial_gap < SC(4) * greedy_gap)
 			{
+				SC old_upper_bound = upper_bound;
+				SC old_lower_bound = lower_bound;
 				upper_bound = SC(0);
 				lower_bound = SC(0);
 				if (devices == 1)
@@ -2677,6 +2679,8 @@ namespace lap
 					}
 #endif
 				}
+				upper_bound = std::min(upper_bound, old_upper_bound);
+				lower_bound = std::max(lower_bound, old_lower_bound);
 				greedy_gap = upper_bound - lower_bound;
 
 #ifdef LAP_DEBUG
@@ -2891,8 +2895,11 @@ namespace lap
 
 #ifdef LAP_ROWS_SCANNED
 			unsigned long long *scancount;
+			unsigned long long *pathlength;
 			lapAlloc(scancount, dim2, __FILE__, __LINE__);
+			lapAlloc(pathlength, dim2, __FILE__, __LINE__);
 			memset(scancount, 0, dim2 * sizeof(unsigned long long));
+			memset(pathlength, 0, dim2 * sizeof(unsigned long long));
 #endif
 
 			SC epsilon = epsilon_upper;
@@ -3203,6 +3210,18 @@ namespace lap
 						// reset row and column assignments along the alternating path.
 						cudaMemcpyAsync(pred, pred_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
 						checkCudaErrors(cudaStreamSynchronize(stream));
+#ifdef LAP_ROWS_SCANNED
+						{
+							int i;
+							int eop = endofpath;
+							do
+							{
+								i = pred[eop];
+								eop = rowsol[i];
+								if (i != f) pathlength[f]++;
+							} while (i != f);
+						}
+#endif
 						resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 						cudaMemcpyAsync(colsol_private[t], colsol, dim2 * sizeof(int), cudaMemcpyHostToDevice, stream);
 #ifndef LAP_QUIET
@@ -3474,6 +3493,18 @@ namespace lap
 							cudaMemcpyAsync(pred + start, pred_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
 							checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
+#ifdef LAP_ROWS_SCANNED
+							if (t == 0) {
+								int i;
+								int eop = endofpath;
+								do
+								{
+									i = pred[eop];
+									eop = rowsol[i];
+									if (i != f) pathlength[f]++;
+								} while (i != f);
+							}
+#endif
 							if (t == 0) resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 #pragma omp barrier
 							cudaMemcpyAsync(colsol_private[t], colsol + start, size * sizeof(int), cudaMemcpyHostToDevice, stream);
@@ -3844,6 +3875,18 @@ namespace lap
 						}
 						// reset row and column assignments along the alternating path.
 						for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
+#ifdef LAP_ROWS_SCANNED
+						{
+							int i;
+							int eop = endofpath;
+							do
+							{
+								i = pred[eop];
+								eop = rowsol[i];
+								if (i != f) pathlength[f]++;
+							} while (i != f);
+						}
+#endif
 						resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 						for (int t = 0; t < devices; t++)
 						{
@@ -4026,9 +4069,10 @@ namespace lap
 #endif
 
 #ifdef LAP_ROWS_SCANNED
+			lapInfo << "row\tscanned\tlength" << std::endl;
 			for (int f = 0; f < dim2; f++)
 			{
-				lapInfo << "row: " << f << " scanned: " << scancount[f] << std::endl;
+				lapInfo << f << "\t" << scancount[f] << "\t" << pathlength[f] << std::endl;
 			}
 
 			lapFree(scancount);
