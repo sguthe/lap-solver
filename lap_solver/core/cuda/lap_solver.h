@@ -2635,7 +2635,6 @@ namespace lap
 							{
 								// need to use all picked v for the lower bound as well
 								upper_bound += picked_cost;
-								std::cout << "min_cost_real = " << min_cost_real << " v_picked = " << v_picked << std::endl;
 								lower_bound += min_cost_real + v_picked;
 							}
 						}
