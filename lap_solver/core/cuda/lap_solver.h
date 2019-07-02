@@ -1730,13 +1730,13 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__global__ void getModCost_kernel(SC *mod_cost, TC *tt, SC *v, SC *mod_v, SC min_cost, int size)
+		__global__ void getModCost_kernel(SC *mod_cost, TC *tt, SC *v, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			if (j >= size) return;
 
-			mod_cost[j] = min_cost - ((SC)tt[j] + mod_v[j] - v[j]);
+			mod_cost[j] = (SC)tt[j] - v[j];
 		}
 
 		template <class SC, class MS>
@@ -2301,11 +2301,11 @@ namespace lap
 						SC gap = (i == 0) ? SC(0) : (min_cost - min_cost2);
 						if (gap > SC(0))
 						{
-							getModCost_kernel<<<grid_size, block_size, 0, stream>>>(mod_cost, tt, v_private[0], mod_v, min_cost, num_items);
+							getModCost_kernel<<<grid_size, block_size, 0, stream>>>(mod_cost, tt, v_private[0], num_items);
 
 							checkCudaErrors(cudaStreamSynchronize(stream));
 
-							auto cost = [&mod_cost](int j) -> SC { return mod_cost[j]; };
+							auto cost = [&min_cost, &mod_cost, &mod_v](int j) -> SC { return min_cost - (mod_cost[j] + mod_v[j]); };
 							updateModV(mod_v, cost, i, picked, update, capacity);
 						}
 						mod_v[jmin] = SC(0);
@@ -2366,13 +2366,13 @@ namespace lap
 							SC gap = (i == 0) ? SC(0) : (min_cost - min_cost2);
 							if (gap > SC(0))
 							{
-								getModCost_kernel<<<grid_size, block_size, 0, stream>>>(&(mod_cost[iterator.ws.part[t].first]), tt, v_private[t], &(mod_v[iterator.ws.part[t].first]), min_cost, num_items);
+								getModCost_kernel<<<grid_size, block_size, 0, stream>>>(&(mod_cost[iterator.ws.part[t].first]), tt, v_private[t], num_items);
 
 								checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 								if (t == 0)
 								{
-									auto cost = [&mod_cost](int j) -> SC { return mod_cost[j]; };
+									auto cost = [&min_cost, &mod_cost, &mod_v](int j) -> SC { return min_cost - (mod_cost[j] + mod_v[j]); };
 									updateModV(mod_v, cost, i, picked, update, capacity);
 								}
 							}
@@ -2448,12 +2448,12 @@ namespace lap
 
 								auto *tt = iterator.getRow(t, i);
 
-								getModCost_kernel<<<grid_size, block_size, 0, stream>>>(&(mod_cost[iterator.ws.part[t].first]), tt, v_private[t], &(mod_v[iterator.ws.part[t].first]), min_cost, num_items);
+								getModCost_kernel<<<grid_size, block_size, 0, stream>>>(&(mod_cost[iterator.ws.part[t].first]), tt, v_private[t], num_items);
 							}
 
 							for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 
-							auto cost = [&mod_cost](int j) -> SC { return mod_cost[j]; };
+							auto cost = [&min_cost, &mod_cost, &mod_v](int j) -> SC { return min_cost - (mod_cost[j] + mod_v[j]); };
 							updateModV(mod_v, cost, i, picked, update, capacity);
 
 						}
@@ -2477,10 +2477,8 @@ namespace lap
 					min_mod = std::min(min_mod, mod_v[j]);
 				}
 
-				if ((max_mod - min_mod != 0) && (initial_gap < SC(4) * greedy_gap))
+				if (max_mod - min_mod != 0)
 				{
-					//for (int j = 0; j < dim2; j++) v[j] = v[j] - mod_v[j];
-					//normalizeV(v, dim2);
 					if (devices == 1)
 					{
 						cudaSetDevice(iterator.ws.device[0]);
@@ -2491,7 +2489,7 @@ namespace lap
 						dim3 block_size, grid_size;
 						block_size.x = 256;
 						grid_size.x = (size + block_size.x - 1) / block_size.x;
-						subtract_kernel<<<grid_size, block_size, 0, stream>>>(v_private[0], mod_v_private[0], dim2);
+						subtract_kernel<<<grid_size, block_size, 0, stream>>>(v_private[0], mod_v, dim2);
 						findMaximum(v_private[0], &(host_struct_private[0]), stream, dim2);
 						subtractMaximum_kernel<<<grid_size, block_size, 0, stream>>>(v_private[0], &(host_struct_private[0]), dim2);
 					}
@@ -2509,7 +2507,7 @@ namespace lap
 							dim3 block_size, grid_size;
 							block_size.x = 256;
 							grid_size.x = (size + block_size.x - 1) / block_size.x;
-							subtract_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], mod_v_private[t], dim2);
+							subtract_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], mod_v + start, dim2);
 							findMaximum(v_private[t], &(host_struct_private[t]), stream, size);
 							checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
@@ -2527,7 +2525,7 @@ namespace lap
 							dim3 block_size, grid_size;
 							block_size.x = 256;
 							grid_size.x = (size + block_size.x - 1) / block_size.x;
-							subtract_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], mod_v_private[t], dim2);
+							subtract_kernel<<<grid_size, block_size, 0, stream>>>(v_private[t], mod_v + start, dim2);
 						}
 						for (int t = 0; t < devices; t++)
 						{
@@ -2553,10 +2551,7 @@ namespace lap
 #endif
 					}
 				}
-			}
 
-			if (initial_gap < SC(4) * greedy_gap)
-			{
 				SC old_upper_bound = upper_bound;
 				SC old_lower_bound = lower_bound;
 				upper_bound = SC(0);

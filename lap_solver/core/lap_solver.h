@@ -509,16 +509,12 @@ namespace lap
 				min_mod = std::min(min_mod, mod_v[j]);
 			}
 
-			if ((max_mod - min_mod != 0) && (initial_gap < SC(4) * greedy_gap))
+			if (max_mod - min_mod != 0)
 			{
 				for (int j = 0; j < dim2; j++) v[j] = v[j] - mod_v[j];
 				normalizeV(v, dim2);
 			}
 
-		}
-
-		if (initial_gap < SC(4) * greedy_gap)
-		{
 			SC old_upper_bound = upper_bound;
 			SC old_lower_bound = lower_bound;
 			upper_bound = SC(0);
