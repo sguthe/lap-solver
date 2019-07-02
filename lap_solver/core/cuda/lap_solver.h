@@ -417,7 +417,7 @@ namespace lap
 			SC v_picked_cost = max;
 			int v_jmin = dim2;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min_cost = min_cost[j];
 				SC c_max_cost = max_cost[j];
@@ -460,7 +460,7 @@ namespace lap
 			SC v_picked_cost = max;
 			int v_jmin = dim2;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min_cost = min_cost[j];
 				SC c_max_cost = max_cost[j];
@@ -574,7 +574,7 @@ namespace lap
 			SC v_picked_cost = max;
 			int v_jmin = dim2;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min_cost = min_cost[j];
 				SC c_second_cost = second_cost[j];
@@ -632,7 +632,7 @@ namespace lap
 			SC v_picked_cost = max;
 			int v_jmin = dim2;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min_cost = min_cost[j];
 				SC c_second_cost = second_cost[j];
@@ -780,7 +780,7 @@ namespace lap
 			SC v_min_cost_real = max;
 			int v_jmin = dim2;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min_cost = min_cost[j];
 				SC c_min_cost2 = min_cost2[j];
@@ -831,7 +831,7 @@ namespace lap
 			SC v_min_cost_real = max;
 			int v_jmin = dim2;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min_cost = min_cost[j];
 				SC c_min_cost2 = min_cost2[j];
@@ -899,7 +899,7 @@ namespace lap
 			SC v_min_cost_real = max;
 			int v_jmin = dim2;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min_cost = min_cost[j];
 				SC c_min_cost2 = min_cost2[j];
@@ -960,7 +960,7 @@ namespace lap
 			SC v_picked_cost = max;
 			SC v_min_v = max;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min_cost = min_cost[j];
 				SC c_picked_cost = picked_cost[j];
@@ -995,7 +995,7 @@ namespace lap
 			SC v_picked_cost = max;
 			SC v_min_v = max;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min_cost = min_cost[j];
 				SC c_picked_cost = picked_cost[j];
@@ -1045,7 +1045,7 @@ namespace lap
 			SC v_picked_cost = max;
 			SC v_min_v = max;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min_cost = min_cost[j];
 				SC c_picked_cost = picked_cost[j];
@@ -1394,7 +1394,7 @@ namespace lap
 
 			SC v_max = min;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_max = max[j];
 				if (c_max > v_max) v_max = c_max;
@@ -1414,7 +1414,7 @@ namespace lap
 
 			SC v_max = min;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_max = max[j];
 				if (c_max > v_max) v_max = c_max;
@@ -1463,7 +1463,7 @@ namespace lap
 			int v_jmin = dim2;
 			int v_colsol = 0;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min = min[j];
 				int c_jmin = jmin[j];
@@ -1508,7 +1508,7 @@ namespace lap
 			int v_jmin = dim2;
 			int v_colsol = 0;
 
-			if (j < size)
+			while (j < size)
 			{
 				SC c_min = min[j];
 				int c_jmin = jmin[j];
@@ -2611,9 +2611,10 @@ namespace lap
 
 						for (int i = dim - 1; i >= 0; --i)
 						{
+#pragma omp barrier
 							auto *tt = iterator.getRow(t, perm[i]);
 
-							getFinalCost_kernel<<<grid_size_min, block_size, 0, stream>>>(min_cost_private[t], picked_cost_private[t], max_cost_private[t], tt, v_private[t], std::numeric_limits<SC>::max(), picked[i], num_items, dim2);
+							getFinalCost_kernel<<<grid_size_min, block_size, 0, stream>>>(min_cost_private[t], picked_cost_private[t], max_cost_private[t], tt, v_private[t], std::numeric_limits<SC>::max(), picked[i] - iterator.ws.part[t].first, num_items, dim2);
 							if (min_count <= 32) getFinalCostSmall_kernel<<<1, 32, 0, stream>>>(&(host_struct_private[t]), min_cost_private[t], picked_cost_private[t], max_cost_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							else if (min_count <= 256) getFinalCostMedium_kernel<<<1, 256, 0, stream>>>(&(host_struct_private[t]), min_cost_private[t], picked_cost_private[t], max_cost_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							else getFinalCostLarge_kernel<<<1, 1024, 0, stream>>>(&(host_struct_private[t]), min_cost_private[t], picked_cost_private[t], max_cost_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
@@ -2634,6 +2635,7 @@ namespace lap
 							{
 								// need to use all picked v for the lower bound as well
 								upper_bound += picked_cost;
+								std::cout << "min_cost_real = " << min_cost_real << " v_picked = " << v_picked << std::endl;
 								lower_bound += min_cost_real + v_picked;
 							}
 						}
@@ -2655,7 +2657,7 @@ namespace lap
 
 							auto *tt = iterator.getRow(t, perm[i]);
 
-							getFinalCost_kernel<<<grid_size_min, block_size, 0, stream>>>(min_cost_private[t], picked_cost_private[t], max_cost_private[t], tt, v_private[t], std::numeric_limits<SC>::max(), picked[i], num_items, dim2);
+							getFinalCost_kernel<<<grid_size_min, block_size, 0, stream>>>(min_cost_private[t], picked_cost_private[t], max_cost_private[t], tt, v_private[t], std::numeric_limits<SC>::max(), picked[i] - iterator.ws.part[t].first, num_items, dim2);
 							if (min_count <= 32) getFinalCostSmall_kernel<<<1, 32, 0, stream>>>(&(host_struct_private[t]), min_cost_private[t], picked_cost_private[t], max_cost_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							else if (min_count <= 256) getFinalCostMedium_kernel<<<1, 256, 0, stream>>>(&(host_struct_private[t]), min_cost_private[t], picked_cost_private[t], max_cost_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
 							else getFinalCostLarge_kernel<<<1, 1024, 0, stream>>>(&(host_struct_private[t]), min_cost_private[t], picked_cost_private[t], max_cost_private[t], std::numeric_limits<SC>::max(), min_count, dim2);
