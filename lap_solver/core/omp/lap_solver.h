@@ -161,8 +161,6 @@ namespace lap
 				// sort permutation by keys
 				std::sort(perm, perm + dim, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
 
-				SC greedy_gap;
-
 				lower_bound = SC(0);
 				upper_bound = SC(0);
 				// greedy search
