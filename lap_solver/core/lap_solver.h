@@ -354,15 +354,9 @@ namespace lap
 		}
 	}
 
-	template <class SC, typename COST>
-	void updateModV(SC *mod_v, COST &cost, int i, int *picked, SC *update, SC *capacity)
+	template <class SC>
+	void updateModV(SC *mod_v, int i, int *picked, SC *update, SC *capacity)
 	{
-		for (int ii = 0; ii < i; ii++)
-		{
-			int j = picked[ii];
-			SC cost_l = cost(j);
-			update[j] = std::max(SC(0), cost_l);
-		}
 		if (i > 0)
 		{
 			SC up = update[picked[i - 1]];
@@ -488,8 +482,12 @@ namespace lap
 				SC gap = (i == 0) ? SC(0) : (min_cost - min_cost2);
 				if (gap > SC(0))
 				{
-					auto cost = [&min_cost, &tt, &mod_v, &v](int j) -> SC { return min_cost - ((SC)tt[j] + mod_v[j] - v[j]); };
-					updateModV(mod_v, cost, i, picked, update, capacity);
+					for (int ii = 0; ii < i; ii++)
+					{
+						int j = picked[ii];
+						update[j] = std::max(SC(0), min_cost - ((SC)tt[j] + mod_v[j] - v[j]));
+					}
+					updateModV(mod_v, i, picked, update, capacity);
 				}
 				mod_v[j_min] = SC(0);
 				capacity[j_min] = std::max(SC(0), -gap);

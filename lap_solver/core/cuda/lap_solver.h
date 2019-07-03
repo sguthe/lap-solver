@@ -1730,13 +1730,15 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__global__ void getModCost_kernel(SC *mod_cost, TC *tt, SC *v, int size)
+		__global__ void getModUpdate_kernel(SC *update, TC *tt, SC *v, SC min_cost, SC *mod_v, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			if (j >= size) return;
 
-			mod_cost[j] = (SC)tt[j] - v[j];
+			SC up = min_cost - ((SC)tt[j] + mod_v[j] - v[j]);
+			if (up < SC(0)) up = SC(0);
+			update[j] = up;
 		}
 
 		template <class SC, class MS>
@@ -1763,7 +1765,6 @@ namespace lap
 		std::pair<SC, SC> estimateEpsilon(int dim, int dim2, I& iterator, SC **v_private)
 		{
 			SC *mod_v;
-			SC *mod_cost;
 			SC **mod_v_private;
 			SC **min_cost_private;
 			SC **max_cost_private;
@@ -1783,7 +1784,6 @@ namespace lap
 #endif
 
 			cudaMallocHost(&mod_v, dim2 * sizeof(SC));
-			cudaMallocHost(&mod_cost, dim2 * sizeof(SC));
 			lapAlloc(mod_v_private, devices, __FILE__, __LINE__);
 			lapAlloc(min_cost_private, devices, __FILE__, __LINE__);
 			lapAlloc(max_cost_private, devices, __FILE__, __LINE__);
@@ -1791,7 +1791,7 @@ namespace lap
 			lapAlloc(jmin_private, devices, __FILE__, __LINE__);
 			lapAlloc(perm, dim, __FILE__, __LINE__);
 			lapAlloc(picked_private, devices, __FILE__, __LINE__);
-			lapAlloc(update, dim2, __FILE__, __LINE__);
+			cudaMallocHost(&update, dim2 * sizeof(SC));
 			lapAlloc(capacity, dim2, __FILE__, __LINE__);
 			lapAlloc(picked, dim2, __FILE__, __LINE__);
 			cudaMallocHost(&host_struct_private, devices * sizeof(estimateEpsilon_struct<SC>));
@@ -2301,12 +2301,11 @@ namespace lap
 						SC gap = (i == 0) ? SC(0) : (min_cost - min_cost2);
 						if (gap > SC(0))
 						{
-							getModCost_kernel<<<grid_size, block_size, 0, stream>>>(mod_cost, tt, v_private[0], num_items);
+							getModUpdate_kernel<<<grid_size, block_size, 0, stream>>>(update, tt, v_private[0], min_cost, mod_v, num_items);
 
 							checkCudaErrors(cudaStreamSynchronize(stream));
 
-							auto cost = [&min_cost, &mod_cost, &mod_v](int j) -> SC { return min_cost - (mod_cost[j] + mod_v[j]); };
-							updateModV(mod_v, cost, i, picked, update, capacity);
+							updateModV(mod_v, i, picked, update, capacity);
 						}
 						mod_v[jmin] = SC(0);
 						capacity[jmin] = std::max(SC(0), -gap);
@@ -2366,14 +2365,13 @@ namespace lap
 							SC gap = (i == 0) ? SC(0) : (min_cost - min_cost2);
 							if (gap > SC(0))
 							{
-								getModCost_kernel<<<grid_size, block_size, 0, stream>>>(&(mod_cost[iterator.ws.part[t].first]), tt, v_private[t], num_items);
+								getModUpdate_kernel<<<grid_size, block_size, 0, stream>>>(&(update[iterator.ws.part[t].first]), tt, v_private[t], min_cost, &(mod_v[iterator.ws.part[t].first]), num_items);
 
 								checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 								if (t == 0)
 								{
-									auto cost = [&min_cost, &mod_cost, &mod_v](int j) -> SC { return min_cost - (mod_cost[j] + mod_v[j]); };
-									updateModV(mod_v, cost, i, picked, update, capacity);
+									updateModV(mod_v, i, picked, update, capacity);
 								}
 							}
 							mod_v[jmin] = SC(0);
@@ -2448,13 +2446,12 @@ namespace lap
 
 								auto *tt = iterator.getRow(t, i);
 
-								getModCost_kernel<<<grid_size, block_size, 0, stream>>>(&(mod_cost[iterator.ws.part[t].first]), tt, v_private[t], num_items);
+								getModUpdate_kernel<<<grid_size, block_size, 0, stream>>>(&(update[iterator.ws.part[t].first]), tt, v_private[t], min_cost, &(mod_v[iterator.ws.part[t].first]), num_items);
 							}
 
 							for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 
-							auto cost = [&min_cost, &mod_cost, &mod_v](int j) -> SC { return min_cost - (mod_cost[j] + mod_v[j]); };
-							updateModV(mod_v, cost, i, picked, update, capacity);
+							updateModV(mod_v, i, picked, update, capacity);
 
 						}
 						mod_v[jmin] = SC(0);
@@ -2724,7 +2721,6 @@ namespace lap
 			}
 #endif
 			cudaFreeHost(mod_v);
-			cudaFreeHost(mod_cost);
 			lapFree(mod_v_private);
 			lapFree(min_cost_private);
 			lapFree(max_cost_private);
@@ -2732,7 +2728,7 @@ namespace lap
 			lapFree(jmin_private);
 			lapFree(perm);
 			lapFree(picked_private);
-			lapFree(update);
+			cudaFreeHost(update);
 			lapFree(capacity);
 			lapFree(picked);
 			cudaFreeHost(host_struct_private);

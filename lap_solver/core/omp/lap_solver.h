@@ -204,18 +204,9 @@ namespace lap
 								if (mod_v[j] >= SC(0)) update[j] = std::max(SC(0), min_cost - ((SC)tt[j - iterator.ws.part[t].first] + mod_v[j] - v[j]));
 							}
 #pragma omp barrier
-							if ((t == threads - 1) && (i > 0))
+							if (t == threads - 1)
 							{
-								SC up = update[picked[i - 1]];
-								mod_v[picked[i - 1]] += up;
-								for (int ii = i - 2; ii >= 0; --ii)
-								{
-									int j = picked[ii];
-									SC up_new = std::max(up - capacity[j], update[j]);
-									mod_v[j] += up_new;
-									capacity[j] += up_new - up;
-									up = up_new;
-								}
+								updateModV(mod_v, i, picked, update, capacity);
 							}
 						}
 						if (t == 0)
