@@ -329,11 +329,10 @@ namespace lap
 	}
 
 	template <class SC, typename COST>
-	void getMinimalCost(int &j_min, SC &min_cost, SC &min_cost2, SC &min_cost_real, COST &cost, SC *mod_v, int count)
+	void getMinimalCost(int &j_min, SC &min_cost, SC &min_cost_real, COST &cost, SC *mod_v, int count)
 	{
 		j_min = std::numeric_limits<int>::max();
 		min_cost = std::numeric_limits<SC>::max();
-		min_cost2 = std::numeric_limits<SC>::max();
 		min_cost_real = std::numeric_limits<SC>::max();
 		for (int j = 0; j < count; j++)
 		{
@@ -346,29 +345,7 @@ namespace lap
 					j_min = j;
 				}
 			}
-			else
-			{
-				min_cost2 = std::min(min_cost2, cost_l + mod_v[j]);
-			}
 			min_cost_real = std::min(min_cost_real, cost_l);
-		}
-	}
-
-	template <class SC>
-	void updateModV(SC *mod_v, int i, int *picked, SC *update, SC *capacity)
-	{
-		if (i > 0)
-		{
-			SC up = update[picked[i - 1]];
-			mod_v[picked[i - 1]] += up;
-			for (int ii = i - 2; ii >= 0; --ii)
-			{
-				int j = picked[ii];
-				SC up_new = std::max(up - capacity[j], update[j]);
-				mod_v[j] += up_new;
-				capacity[j] += up_new - up;
-				up = up_new;
-			}
 		}
 	}
 
@@ -387,14 +364,10 @@ namespace lap
 		SC *mod_v;
 		int *perm;
 		int *picked;
-		SC *update;
-		SC *capacity;
 
 		lapAlloc(mod_v, dim2, __FILE__, __LINE__);
 		lapAlloc(perm, dim, __FILE__, __LINE__);
 		lapAlloc(picked, dim2, __FILE__, __LINE__);
-		lapAlloc(update, dim2, __FILE__, __LINE__);
-		lapAlloc(capacity, dim2, __FILE__, __LINE__);
 
 		SC lower_bound = SC(0);
 		SC greedy_bound = SC(0);
@@ -473,24 +446,13 @@ namespace lap
 				// greedy order
 				const auto *tt = iterator.getRow(perm[i]);
 				int j_min;
-				SC min_cost, min_cost2, min_cost_real;
+				SC min_cost, min_cost_real;
 				auto cost = [&tt, &v](int j) -> SC { return (SC)tt[j] - v[j]; };
-				getMinimalCost(j_min, min_cost, min_cost2, min_cost_real, cost, mod_v, dim2);
+				getMinimalCost(j_min, min_cost, min_cost_real, cost, mod_v, dim2);
 				upper_bound += min_cost + v[j_min];
 				// need to use the same v values in total
 				lower_bound += min_cost_real + v[j_min];
-				SC gap = (i == 0) ? SC(0) : (min_cost - min_cost2);
-				if (gap > SC(0))
-				{
-					for (int ii = 0; ii < i; ii++)
-					{
-						int j = picked[ii];
-						update[j] = std::max(SC(0), min_cost - ((SC)tt[j] + mod_v[j] - v[j]));
-					}
-					updateModV(mod_v, i, picked, update, capacity);
-				}
 				mod_v[j_min] = SC(0);
-				capacity[j_min] = std::max(SC(0), -gap);
 				picked[i] = j_min;
 			}
 			greedy_gap = upper_bound - lower_bound;
@@ -499,25 +461,30 @@ namespace lap
 			lapDebug << "  upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap << std::endl;
 #endif
 
-			SC max_mod = mod_v[0];
-			SC min_mod = mod_v[0];
-			for (int j = 1; j < dim2; j++)
+			// update v in reverse order
+			for (int i = dim - 1; i >= 0; --i)
 			{
-				max_mod = std::max(max_mod, mod_v[j]);
-				min_mod = std::min(min_mod, mod_v[j]);
+				const auto *tt = iterator.getRow(perm[i]);
+				SC min_cost = (SC)tt[picked[i]] - v[picked[i]];
+				mod_v[picked[i]] = SC(-1);
+				for (int j = 0; j < dim2; j++)
+				{
+					if (mod_v[j] >= SC(0))
+					{
+						SC cost_l = (SC)tt[j] - v[j];
+						if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+					}
+				}
 			}
 
-			if (max_mod - min_mod != 0)
-			{
-				for (int j = 0; j < dim2; j++) v[j] = v[j] - mod_v[j];
-				normalizeV(v, dim2);
-			}
+			normalizeV(v, dim2);
 
 			SC old_upper_bound = upper_bound;
 			SC old_lower_bound = lower_bound;
 			upper_bound = SC(0);
 			lower_bound = SC(0);
-			for (int i = dim - 1; i >= 0; --i)
+			//for (int i = dim - 1; i >= 0; --i)
+			for (int i = 0; i < dim; i++)
 			{
 				// reverse greedy order
 				const auto *tt = iterator.getRow(perm[i]);
@@ -546,8 +513,6 @@ namespace lap
 		lapFree(mod_v);
 		lapFree(perm);
 		lapFree(picked);
-		lapFree(update);
-		lapFree(capacity);
 
 		return std::pair<SC, SC>((SC)upper, (SC)lower);
 	}
