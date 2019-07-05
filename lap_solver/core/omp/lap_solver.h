@@ -210,7 +210,6 @@ namespace lap
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
-					int threads = omp_get_num_threads();
 					// update v in reverse order
 					for (int i = dim - 1; i >= 0; --i)
 					{
