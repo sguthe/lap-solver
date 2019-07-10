@@ -1312,13 +1312,16 @@ namespace lap
 #pragma unroll 8
 			while (j < size)
 			{
-				SC h = d[j];
-				//SC v2 = (SC)tt[j] - v[j] - h2;
-				SC v2 = ((SC)tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
-				bool is_active = (colactive[j] != 0);
-				bool is_smaller = (v2 < h);
-				if (is_active)
+				if (j == jmin) colactive[jmin] = 0;
+				else if (colactive[j] != 0)
 				{
+					SC h = d[j];
+					//SC v2 = (SC)tt[j] - v[j] - h2;
+					SC v2 = ((SC)tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
+					//bool is_active = (colactive[j] != 0);
+					bool is_smaller = (v2 < h);
+					//if (is_active)
+					//{
 					if (is_smaller)
 					{
 						pred[j] = i;
@@ -1359,13 +1362,16 @@ namespace lap
 #pragma unroll 8
 			while (j < size)
 			{
-				SC h = d[j];
-				//SC v2 = -v[j] - h2;
-				SC v2 = -(v[j] - v_jmin) + min;
-				bool is_active = (colactive[j] != 0);
-				bool is_smaller = (v2 < h);
-				if (is_active)
+				if (j == jmin) colactive[jmin] = 0;
+				else if (colactive[j] != 0)
 				{
+					SC h = d[j];
+					//SC v2 = -v[j] - h2;
+					SC v2 = -(v[j] - v_jmin) + min;
+					//bool is_active = (colactive[j] != 0);
+					bool is_smaller = (v2 < h);
+					//if (is_active)
+					//{
 					if (is_smaller)
 					{
 						pred[j] = i;
@@ -1621,6 +1627,21 @@ namespace lap
 		}
 
 		template <class SC>
+		__global__ void setColInactive_kernel(char *colactive, int jmin, SC *v_jmin, SC *v_in)
+		{
+			*v_jmin = *v_in;
+			colactive[jmin] = 0;
+		}
+
+		template <class TC, class TC2, class SC>
+		__global__ void setColInactive_kernel(char *colactive, int jmin, TC *tt_jmin, TC2 *tt_in, SC *v_jmin, SC *v_in)
+		{
+			*tt_jmin = *tt_in;
+			*v_jmin = *v_in;
+			colactive[jmin] = 0;
+		}
+
+		template <class SC>
 		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -1654,6 +1675,54 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
+
+			if (colactive[j] == 0)
+			{
+				SC dlt = min - d[j];
+				total_d[j] -= dlt;
+				dlt += eps;
+				v[j] -= dlt;
+				total_eps[j] -= dlt;
+			}
+		}
+
+		template <class SC>
+		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, int size, int *colsol, int csol)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+			if (j >= size) return;
+			if (j == 0) *colsol = csol;
+
+			if (colactive[j] == 0)
+			{
+				SC dlt = min - d[j];
+				v[j] -= dlt;
+			}
+		}
+
+		template <class SC>
+		__global__ void updateColumnPricesClamp_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, SC eps, int size, int *colsol, int csol)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+			if (j >= size) return;
+			if (j == 0) *colsol = csol;
+
+			if (colactive[j] == 0)
+			{
+				SC dlt = min - d[j];
+				total_d[j] -= dlt;
+				if (eps > dlt) dlt = eps;
+				v[j] -= dlt;
+				total_eps[j] -= dlt;
+			}
+		}
+
+		template <class SC>
+		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, SC eps, int size, int *colsol, int csol)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+			if (j >= size) return;
+			if (j == 0) *colsol = csol;
 
 			if (colactive[j] == 0)
 			{
@@ -3041,7 +3110,9 @@ namespace lap
 #endif
 
 						if (f >= dim) markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
-						else setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
+						//else setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
+
+						bool fast = unassignedfound;
 
 						while (!unassignedfound)
 						{
@@ -3120,36 +3191,53 @@ namespace lap
 #endif
 
 							if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
-							else setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
+							//else setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 						}
 
-						// update column prices. can increase or decrease
-						if (epsilon > SC(0))
+						if (fast)
 						{
-							if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
-							else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+							colsol[endofpath] = f;
+							rowsol[f] = endofpath;
+							if (epsilon > SC(0))
+							{
+								if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size, &(colsol_private[t][endofpath]), colsol[endofpath]);
+								else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size, &(colsol_private[t][endofpath]), colsol[endofpath]);
+							}
+							else
+							{
+								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size, &(colsol_private[t][endofpath]), colsol[endofpath]);
+							}
 						}
 						else
 						{
-							updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
-						}
-						// reset row and column assignments along the alternating path.
-						cudaMemcpyAsync(pred, pred_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
-						checkCudaErrors(cudaStreamSynchronize(stream));
-#ifdef LAP_ROWS_SCANNED
-						{
-							int i;
-							int eop = endofpath;
-							do
+							// update column prices. can increase or decrease
+							if (epsilon > SC(0))
 							{
-								i = pred[eop];
-								eop = rowsol[i];
-								if (i != f) pathlength[f]++;
-							} while (i != f);
-						}
+								if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+								else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+							}
+							else
+							{
+								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
+							}
+							// reset row and column assignments along the alternating path.
+							cudaMemcpyAsync(pred, pred_private[t], dim2 * sizeof(int), cudaMemcpyDeviceToHost, stream);
+							checkCudaErrors(cudaStreamSynchronize(stream));
+#ifdef LAP_ROWS_SCANNED
+							{
+								int i;
+								int eop = endofpath;
+								do
+								{
+									i = pred[eop];
+									eop = rowsol[i];
+									if (i != f) pathlength[f]++;
+								} while (i != f);
+							}
 #endif
-						resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
-						cudaMemcpyAsync(colsol_private[t], colsol, dim2 * sizeof(int), cudaMemcpyHostToDevice, stream);
+							resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
+							cudaMemcpyAsync(colsol_private[t], colsol, dim2 * sizeof(int), cudaMemcpyHostToDevice, stream);
+						}
 #ifndef LAP_QUIET
 						{
 							int level;
@@ -3286,7 +3374,9 @@ namespace lap
 #endif
 							// mark last column scanned
 							if (f >= dim) markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
-							else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
+							//else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
+
+							bool fast = unassignedfound;
 
 							while (!unassignedfound)
 							{
@@ -3299,8 +3389,9 @@ namespace lap
 									// single device
 									if ((jmin >= start) && (jmin < end))
 									{
-										cudaMemcpyAsync(tt_jmin, &(tt[jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
-										cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
+										setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start, tt_jmin, &(tt[jmin - start]), v_jmin, &(v_private[t][jmin - start]));
+										//cudaMemcpyAsync(tt_jmin, &(tt[jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
+										//cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 										checkCudaErrors(cudaStreamSynchronize(stream));
 										//h2 = tt_jmin[0] - v_jmin[0] - min;
 									}
@@ -3313,7 +3404,8 @@ namespace lap
 								{
 									if ((jmin >= start) && (jmin < end))
 									{
-										cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
+										setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start, v_jmin, &(v_private[t][jmin - start]));
+										//cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 										checkCudaErrors(cudaStreamSynchronize(stream));
 										//h2 = -v_jmin[0] - min;
 									}
@@ -3402,38 +3494,70 @@ namespace lap
 #endif
 								// mark last column scanned
 								if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
-								else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
+								//else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 							}
 
 							// update column prices. can increase or decrease
-							if (epsilon > SC(0))
+							if (fast)
 							{
-								if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
-								else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+								if ((endofpath >= start) && (endofpath < end))
+								{
+									colsol[endofpath] = f;
+									rowsol[f] = endofpath;
+									if (epsilon > SC(0))
+									{
+										if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size, &(colsol_private[t][endofpath - start]), colsol[endofpath]);
+										else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size, &(colsol_private[t][endofpath - start]), colsol[endofpath]);
+									}
+									else
+									{
+										updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size, &(colsol_private[t][endofpath - start]), colsol[endofpath]);
+									}
+								}
+								else
+								{
+									if (epsilon > SC(0))
+									{
+										if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+										else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+									}
+									else
+									{
+										updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
+									}
+								}
 							}
 							else
 							{
-								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
-							}
-							// reset row and column assignments along the alternating path.
-							cudaMemcpyAsync(pred + start, pred_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
-							checkCudaErrors(cudaStreamSynchronize(stream));
+								if (epsilon > SC(0))
+								{
+									if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+									else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+								}
+								else
+								{
+									updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
+								}
+								// reset row and column assignments along the alternating path.
+								cudaMemcpyAsync(pred + start, pred_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
+								checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 #ifdef LAP_ROWS_SCANNED
-							if (t == 0) {
-								int i;
-								int eop = endofpath;
-								do
-								{
-									i = pred[eop];
-									eop = rowsol[i];
-									if (i != f) pathlength[f]++;
-								} while (i != f);
-							}
+								if (t == 0) {
+									int i;
+									int eop = endofpath;
+									do
+									{
+										i = pred[eop];
+										eop = rowsol[i];
+										if (i != f) pathlength[f]++;
+									} while (i != f);
+								}
 #endif
-							if (t == 0) resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
+								if (t == 0) resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 #pragma omp barrier
-							cudaMemcpyAsync(colsol_private[t], colsol + start, size * sizeof(int), cudaMemcpyHostToDevice, stream);
+								cudaMemcpyAsync(colsol_private[t], colsol + start, size * sizeof(int), cudaMemcpyHostToDevice, stream);
+							}
 #ifndef LAP_QUIET
 							if (t == 0)
 							{
@@ -3545,6 +3669,7 @@ namespace lap
 								markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
 							}
 						}
+#if 0
 						else 
 						{
 							int t = iterator.ws.find(jmin);
@@ -3553,6 +3678,7 @@ namespace lap
 							cudaStream_t stream = iterator.ws.stream[t];
 							setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 						}
+#endif
 
 #ifdef LAP_CUDA_COMPARE_CPU
 						{
@@ -3588,6 +3714,7 @@ namespace lap
 							}
 						}
 #endif
+						bool fast = unassignedfound;
 						while (!unassignedfound)
 						{
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
@@ -3610,8 +3737,9 @@ namespace lap
 //									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									if ((jmin >= start) && (jmin < end))
 									{
-										cudaMemcpyAsync(tt_jmin, &(tt[t][jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
-										cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
+										setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start, tt_jmin, &(tt[jmin - start]), v_jmin, &(v_private[t][jmin - start]));
+										//cudaMemcpyAsync(tt_jmin, &(tt[t][jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
+										//cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 									}
 								}
 								// single device
@@ -3639,7 +3767,8 @@ namespace lap
 									cudaSetDevice(iterator.ws.device[t]);
 									int start = iterator.ws.part[t].first;
 									cudaStream_t stream = iterator.ws.stream[t];
-									cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
+									setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start, v_jmin, &(v_private[t][jmin - start]));
+									//cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 									checkCudaErrors(cudaStreamSynchronize(stream));
 								}
 								for (int t = 0; t < devices; t++)
@@ -3732,6 +3861,7 @@ namespace lap
 									markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
 								}
 							}
+#if 0
 							else 
 							{
 								int t = iterator.ws.find(jmin);
@@ -3740,6 +3870,7 @@ namespace lap
 								cudaStream_t stream = iterator.ws.stream[t];
 								setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 							}
+#endif
 #ifdef LAP_CUDA_COMPARE_CPU
 							{
 								for (int t = 0; t < devices; t++)
@@ -3777,51 +3908,93 @@ namespace lap
 						}
 
 						// update column prices. can increase or decrease
-						// need to copy pred from GPUs here
-						for (int t = 0; t < devices; t++)
+						if (fast)
 						{
-							cudaSetDevice(iterator.ws.device[t]);
-							int start = iterator.ws.part[t].first;
-							int end = iterator.ws.part[t].second;
-							int size = end - start;
-							cudaStream_t stream = iterator.ws.stream[t];
-							dim3 block_size, grid_size;
-							block_size.x = 256;
-							grid_size.x = (size + block_size.x - 1) / block_size.x;
-							if (epsilon > SC(0))
+							colsol[endofpath] = f;
+							rowsol[f] = endofpath;
+							for (int t = 0; t < devices; t++)
 							{
-								if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
-								else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+								cudaSetDevice(iterator.ws.device[t]);
+								int start = iterator.ws.part[t].first;
+								int end = iterator.ws.part[t].second;
+								int size = end - start;
+								cudaStream_t stream = iterator.ws.stream[t];
+								dim3 block_size, grid_size;
+								block_size.x = 256;
+								grid_size.x = (size + block_size.x - 1) / block_size.x;
+								if ((endofpath >= start) && (endofpath < end))
+								{
+									if (epsilon > SC(0))
+									{
+										if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size, &(colsol_private[t][endofpath - start]), colsol[endofpath]);
+										else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size, &(colsol_private[t][endofpath - start]), colsol[endofpath]);
+									}
+									else
+									{
+										updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size, &(colsol_private[t][endofpath - start]), colsol[endofpath]);
+									}
+								}
+								else
+								{
+									if (epsilon > SC(0))
+									{
+										if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+										else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+									}
+									else
+									{
+										updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
+									}
+								}
 							}
-							else
-							{
-								updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
-							}
-							cudaMemcpyAsync(pred + start, pred_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
 						}
-						// reset row and column assignments along the alternating path.
-						for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
+						else
+						{
+							for (int t = 0; t < devices; t++)
+							{
+								cudaSetDevice(iterator.ws.device[t]);
+								int start = iterator.ws.part[t].first;
+								int end = iterator.ws.part[t].second;
+								int size = end - start;
+								cudaStream_t stream = iterator.ws.stream[t];
+								dim3 block_size, grid_size;
+								block_size.x = 256;
+								grid_size.x = (size + block_size.x - 1) / block_size.x;
+								if (epsilon > SC(0))
+								{
+									if (clamp) updateColumnPricesClamp_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+									else updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, size);
+								}
+								else
+								{
+									updateColumnPrices_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], size);
+								}
+								cudaMemcpyAsync(pred + start, pred_private[t], size * sizeof(int), cudaMemcpyDeviceToHost, stream);
+							}
+							// reset row and column assignments along the alternating path.
+							for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 #ifdef LAP_ROWS_SCANNED
-						{
-							int i;
-							int eop = endofpath;
-							do
 							{
-								i = pred[eop];
-								eop = rowsol[i];
-								if (i != f) pathlength[f]++;
-							} while (i != f);
-						}
+								int i;
+								int eop = endofpath;
+								do
+								{
+									i = pred[eop];
+									eop = rowsol[i];
+									if (i != f) pathlength[f]++;
+								} while (i != f);
+							}
 #endif
-						resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
-						for (int t = 0; t < devices; t++)
-						{
-							cudaSetDevice(iterator.ws.device[t]);
-							int start = iterator.ws.part[t].first;
-							int end = iterator.ws.part[t].second;
-							int size = end - start;
-							cudaStream_t stream = iterator.ws.stream[t];
-							cudaMemcpyAsync(colsol_private[t], colsol + start, size * sizeof(int), cudaMemcpyHostToDevice, stream);
+							resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
+							for (int t = 0; t < devices; t++)
+							{
+								cudaSetDevice(iterator.ws.device[t]);
+								int start = iterator.ws.part[t].first;
+								int end = iterator.ws.part[t].second;
+								int size = end - start;
+								cudaStream_t stream = iterator.ws.stream[t];
+								cudaMemcpyAsync(colsol_private[t], colsol + start, size * sizeof(int), cudaMemcpyHostToDevice, stream);
+							}
 						}
 #ifndef LAP_QUIET
 						{
