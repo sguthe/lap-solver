@@ -262,7 +262,6 @@ namespace lap
 			{
 				SC t_cost = (SC)tt[j];
 				if (t_cost < t_min_cost) t_min_cost = t_cost;
-				//if (t_cost > t_max_cost) t_max_cost = t_cost;
 				if (i == j) t_max_cost = t_cost;
 				if ((t_cost < t_picked_cost) && (picked[j] == 0))
 				{
@@ -1181,7 +1180,6 @@ namespace lap
 			while (j < size)
 			{
 				SC h = d[j];
-				//SC v2 = (SC)tt[j] - v[j] - h2;
 				SC v2 = ((SC)tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
 				bool is_active = (colactive[j] != 0);
 				bool is_smaller = (v2 < h);
@@ -1265,7 +1263,6 @@ namespace lap
 			while (j < size)
 			{
 				SC h = d[j];
-				//SC v2 = -v[j] - h2;
 				SC v2 = -(v[j] - v_jmin) + min;
 				bool is_active = (colactive[j] != 0);
 				bool is_smaller = (v2 < h);
@@ -1304,7 +1301,6 @@ namespace lap
 
 			SC t_min = max;
 			int t_jmin = dim2;
-			//SC h2 = (SC)tt[jmin] - v[jmin] - min;
 			SC tt_jmin = (SC)tt[jmin];
 			SC v_jmin = v[jmin];
 			int t_colsol = 0;
@@ -1316,12 +1312,8 @@ namespace lap
 				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
-					//SC v2 = (SC)tt[j] - v[j] - h2;
 					SC v2 = ((SC)tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
-					//bool is_active = (colactive[j] != 0);
 					bool is_smaller = (v2 < h);
-					//if (is_active)
-					//{
 					if (is_smaller)
 					{
 						pred[j] = i;
@@ -1355,7 +1347,6 @@ namespace lap
 
 			SC t_min = max;
 			int t_jmin = dim2;
-			//SC h2 = -v[jmin] - min;
 			SC v_jmin = v[jmin];
 			int t_colsol = 0;
 
@@ -1366,12 +1357,8 @@ namespace lap
 				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
-					//SC v2 = -v[j] - h2;
 					SC v2 = -(v[j] - v_jmin) + min;
-					//bool is_active = (colactive[j] != 0);
 					bool is_smaller = (v2 < h);
-					//if (is_active)
-					//{
 					if (is_smaller)
 					{
 						pred[j] = i;
@@ -2955,7 +2942,6 @@ namespace lap
 				}
 #endif
 				getNextEpsilon(epsilon, epsilon_lower, total_d, total_eps, first, second, dim2);
-				//if ((!first) && (allow_continue)) clamp = false;
 				total_d = SC(0);
 				total_eps = SC(0);
 #ifndef LAP_QUIET
@@ -3020,7 +3006,6 @@ namespace lap
 				displayProgress(start_time, elapsed, 0, dim2, " rows");
 #endif
 				long long count = 0ll;
-				//SC h2(0);
 
 				int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
 
@@ -3110,7 +3095,6 @@ namespace lap
 #endif
 
 						if (f >= dim) markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
-						//else setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 
 						bool fast = unassignedfound;
 
@@ -3191,7 +3175,6 @@ namespace lap
 #endif
 
 							if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
-							//else setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 						}
 
 						if (fast)
@@ -3374,7 +3357,6 @@ namespace lap
 #endif
 							// mark last column scanned
 							if (f >= dim) markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
-							//else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 
 							bool fast = unassignedfound;
 
@@ -3390,10 +3372,7 @@ namespace lap
 									if ((jmin >= start) && (jmin < end))
 									{
 										setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start, tt_jmin, &(tt[jmin - start]), v_jmin, &(v_private[t][jmin - start]));
-										//cudaMemcpyAsync(tt_jmin, &(tt[jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
-										//cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 										checkCudaErrors(cudaStreamSynchronize(stream));
-										//h2 = tt_jmin[0] - v_jmin[0] - min;
 									}
 									// propagate h2
 #pragma omp barrier
@@ -3405,9 +3384,7 @@ namespace lap
 									if ((jmin >= start) && (jmin < end))
 									{
 										setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start, v_jmin, &(v_private[t][jmin - start]));
-										//cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 										checkCudaErrors(cudaStreamSynchronize(stream));
-										//h2 = -v_jmin[0] - min;
 									}
 									// propagate h2
 #pragma omp barrier
@@ -3494,7 +3471,6 @@ namespace lap
 #endif
 								// mark last column scanned
 								if (i >= dim) markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
-								//else if ((jmin >= start) && (jmin < end)) setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
 							}
 
 							// update column prices. can increase or decrease
@@ -3669,16 +3645,6 @@ namespace lap
 								markedSkippedColumns_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], dim, size);
 							}
 						}
-#if 0
-						else 
-						{
-							int t = iterator.ws.find(jmin);
-							cudaSetDevice(iterator.ws.device[t]);
-							int start = iterator.ws.part[t].first;
-							cudaStream_t stream = iterator.ws.stream[t];
-							setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
-						}
-#endif
 
 #ifdef LAP_CUDA_COMPARE_CPU
 						{
@@ -3734,12 +3700,9 @@ namespace lap
 									// get row
 									tt[t] = iterator.getRow(t, i);
 									// initialize Search
-//									initializeMin_kernel<<<1, 1, 0, stream>>>(min_private[t], std::numeric_limits<SC>::max(), dim2);
 									if ((jmin >= start) && (jmin < end))
 									{
 										setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start, tt_jmin, &(tt[jmin - start]), v_jmin, &(v_private[t][jmin - start]));
-										//cudaMemcpyAsync(tt_jmin, &(tt[t][jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
-										//cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 									}
 								}
 								// single device
@@ -3768,7 +3731,6 @@ namespace lap
 									int start = iterator.ws.part[t].first;
 									cudaStream_t stream = iterator.ws.stream[t];
 									setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start, v_jmin, &(v_private[t][jmin - start]));
-									//cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
 									checkCudaErrors(cudaStreamSynchronize(stream));
 								}
 								for (int t = 0; t < devices; t++)
@@ -3861,16 +3823,7 @@ namespace lap
 									markedSkippedColumnsUpdate_kernel<<<grid_size, block_size, 0, stream>>>(colactive_private[t], min_n, jmin - start, colsol_private[t], d_private[t], dim, size);
 								}
 							}
-#if 0
-							else 
-							{
-								int t = iterator.ws.find(jmin);
-								cudaSetDevice(iterator.ws.device[t]);
-								int start = iterator.ws.part[t].first;
-								cudaStream_t stream = iterator.ws.stream[t];
-								setColInactive_kernel<<<1, 1, 0, stream>>>(colactive_private[t], jmin - start);
-							}
-#endif
+
 #ifdef LAP_CUDA_COMPARE_CPU
 							{
 								for (int t = 0; t < devices; t++)

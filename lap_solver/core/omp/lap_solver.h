@@ -114,10 +114,6 @@ namespace lap
 #pragma omp barrier
 					if (t == 0)
 					{
-						//min_cost_l = merge_cost[0];
-						//second_cost_l = merge_cost[1];
-						//picked_cost_l = merge_cost[2];
-						//j_min = merge_idx[0];
 						for (int ii = 1; ii < threads; ii++)
 						{
 							if (merge_cost[(ii << 3)] < min_cost_l)
@@ -256,7 +252,7 @@ namespace lap
 						for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
 						{
 							SC cost_l = (SC)tt[j - iterator.ws.part[t].first] - v[j];
-							min_cost_real = std::min(min_cost_real, cost_l);// +v[j]);
+							min_cost_real = std::min(min_cost_real, cost_l);
 						}
 #pragma omp barrier
 						merge_cost[t << 3] = min_cost_real;
@@ -429,7 +425,6 @@ namespace lap
 #endif
 				jmin = dim2;
 				min = std::numeric_limits<SC>::max();
-				//SC h2_global;
 				SC tt_jmin_global;
 				int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
 
@@ -542,24 +537,20 @@ namespace lap
 						{
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
 							int i = colsol[jmin];
-							//updateDistance(i, dim, dim2, iterator, min, jmin, min_n, jmin_n, colactive, pred, colsol, d, v);
 							jmin_local = dim2;
 							min_local = std::numeric_limits<SC>::max();
 							if (i < dim)
 							{
-								//SC h2;
 								SC tt_jmin;
 								SC v_jmin = v[jmin];
 								auto tt = iterator.getRow(t, i);
 								if ((jmin >= start) && (jmin < end))
 								{
-									//h2_global = h2 = tt[jmin - start] - v[jmin] - min;
 									tt_jmin_global = tt_jmin = (SC)tt[jmin - start];
 								}
 #pragma omp barrier
 								if ((jmin < start) || (jmin >= end))
 								{
-									//h2 = h2_global;
 									tt_jmin = tt_jmin_global;
 								}
 								for (int j = start; j < end; j++)
@@ -567,7 +558,6 @@ namespace lap
 									int j_local = j - start;
 									if (colactive[j] != 0)
 									{
-										//SC v2 = tt[j_local] - v[j] - h2;
 										SC v2 = (tt[j_local] - tt_jmin) - (v[j] - v_jmin) + min;
 										SC h = d[j];
 										if (v2 < h)
@@ -593,7 +583,6 @@ namespace lap
 							else
 							{
 								SC v_jmin = v[jmin];
-								//SC h2 = -v[jmin] - min;
 								for (int j = start; j < end; j++)
 								{
 									if (colactive[j] != 0)

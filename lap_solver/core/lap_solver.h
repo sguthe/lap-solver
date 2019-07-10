@@ -483,7 +483,6 @@ namespace lap
 			SC old_lower_bound = lower_bound;
 			upper_bound = SC(0);
 			lower_bound = SC(0);
-			//for (int i = dim - 1; i >= 0; --i)
 			for (int i = 0; i < dim; i++)
 			{
 				// reverse greedy order
@@ -493,7 +492,7 @@ namespace lap
 				for (int j = 0; j < dim2; j++)
 				{
 					SC cost_l = (SC)tt[j] - v[j];
-					min_cost_real = std::min(min_cost_real, cost_l);// +v[j]);
+					min_cost_real = std::min(min_cost_real, cost_l);
 				}
 				// need to use all picked v for the lower bound as well
 				upper_bound += min_cost;
@@ -851,14 +850,12 @@ namespace lap
 					if (i < dim)
 					{
 						auto tt = iterator.getRow(i);
-						//SC h2 = tt[jmin] - v[jmin] - min;
 						SC tt_jmin = (SC)tt[jmin];
 						SC v_jmin = v[jmin];
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
 							{
-								//SC v2 = tt[j] - v[j] - h2;
 								SC v2 = (tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
 								SC h = d[j];
 								if (v2 < h)
@@ -883,13 +880,11 @@ namespace lap
 					}
 					else
 					{
-						//SC h2 = -v[jmin] - min;
 						SC v_jmin = v[jmin];
 						for (int j = 0; j < dim2; j++)
 						{
 							if (colactive[j] != 0)
 							{
-								//SC v2 = -v[j] - h2;
 								SC v2 = -(v[j] - v_jmin) + min;
 								SC h = d[j];
 								if (v2 < h)

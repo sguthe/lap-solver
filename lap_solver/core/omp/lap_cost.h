@@ -80,7 +80,6 @@ namespace lap
 						stride[t] = ws.part[t].second - ws.part[t].first;
 						lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
 						// first touch
-						//memset(cc[t], 0, (long long)(stride[t]) * (long long)x_size * sizeof(TC));
 						cc[t][0] = TC(0);
 						for (int x = 0; x < x_size; x++)
 						{
@@ -101,7 +100,6 @@ namespace lap
 					stride[t] = ws.part[t].second - ws.part[t].first;
 					lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
 					// first touch
-					//memset(cc[t], 0, (long long)(stride[t]) * (long long)x_size * sizeof(TC));
 					cc[t][0] = TC(0);
 				}
 			}
