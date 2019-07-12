@@ -144,10 +144,16 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	lap::SimpleCostFunction<TC, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu);
 	lap::TableCost<TC> costMatrix(N1, N2, cpuCostFunction);
 
+	TC *buffer;
+	cudaMallocHost(&buffer, N2 * sizeof(TC));
+
 	// cost function (copy data from table)
-	auto get_cost_row = [&costMatrix](TC *d_row, int t, cudaStream_t stream, int x, int start, int end)
+	auto get_cost_row = [&costMatrix, &buffer](TC *d_row, int t, cudaStream_t stream, int x, int start, int end)
 	{
-		cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
+		std::memcpy(buffer + start, costMatrix.getRow(x) + start, (end - start) * sizeof(TC));
+		//cudaMemcpyAsync(d_row, buffer + start, (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
+		//cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
+		lap::cuda::memCpyKernel(d_row, buffer + start, end - start, stream);
 	};
 
 	// cost function
@@ -163,6 +169,8 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	lap::displayTime(start_time, "setup complete", std::cout);
 
 	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol, epsilon);
+
+	cudaFreeHost(buffer);
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costMatrix, rowsol);

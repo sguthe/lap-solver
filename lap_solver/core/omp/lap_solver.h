@@ -379,7 +379,6 @@ namespace lap
 
 			bool first = true;
 			bool second = false;
-			bool clamp = false;
 
 			SC total_d = SC(0);
 			SC total_eps = SC(0);
@@ -666,8 +665,7 @@ namespace lap
 							// update column prices. can increase or decrease
 							if (epsilon > SC(0))
 							{
-								if (clamp) updateColumnPricesClamp(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
-								else updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
+								updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
 							}
 							else
 							{
