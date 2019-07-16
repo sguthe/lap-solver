@@ -1,7 +1,5 @@
 #pragma once
 
-#define NO_MIN_LOOP
-
 // collection of all CUDA kernel required for the solver
 
 namespace lap
@@ -123,137 +121,6 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__global__ void getMinMaxBest_kernel(SC *o_min_cost, SC *o_max_cost, SC *o_picked_cost, int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int size, int dim2)
-		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
-
-			SC t_min_cost = max;
-			SC t_max_cost = min;
-			SC t_picked_cost = max;
-			int t_jmin = dim2;
-
-#ifdef NO_MIN_LOOP
-			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
-			{
-				SC t_cost = (SC)tt[j];
-				if (t_cost < t_min_cost) t_min_cost = t_cost;
-				if (i == j) t_max_cost = t_cost;
-				if ((t_cost < t_picked_cost) && (picked[j] == 0))
-				{
-					t_jmin = j;
-					t_picked_cost = t_cost;
-				}
-			}
-
-			minWarpIndex(t_picked_cost, t_jmin);
-			minWarp(t_min_cost);
-			maxWarp(t_max_cost);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min_cost[i] = t_min_cost;
-				o_max_cost[i] = t_max_cost;
-				o_picked_cost[i] = t_picked_cost;
-				o_jmin[i] = t_jmin;
-			}
-		}
-
-		template <class SC, class TC>
-		__global__ void getMinSecondBest_kernel(SC *o_min_cost, SC *o_max_cost, SC *o_picked_cost, int *o_jmin, TC *tt, SC *v, int *picked, SC max, int i, int size, int dim2)
-		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
-
-			SC t_min_cost = max;
-			SC t_second_cost = max;
-			SC t_picked_cost = max;
-			int t_jmin = dim2;
-
-#ifdef NO_MIN_LOOP
-			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
-			{
-				SC t_cost = (SC)tt[j] - v[j];
-				if (t_cost < t_min_cost)
-				{
-					t_second_cost = t_min_cost;
-					t_min_cost = t_cost;
-				}
-				else if (t_cost < t_second_cost) t_second_cost = t_cost;
-				if ((t_cost < t_picked_cost) && (picked[j] == 0))
-				{
-					t_jmin = j;
-					t_picked_cost = t_cost;
-				}
-			}
-
-			minWarpIndex(t_picked_cost, t_jmin);
-			SC old_min_cost = t_min_cost;
-			minWarp(t_min_cost);
-			if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-			minWarp(t_second_cost);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min_cost[i] = t_min_cost;
-				o_max_cost[i] = t_second_cost;
-				o_picked_cost[i] = t_picked_cost;
-				o_jmin[i] = t_jmin;
-			}
-		}
-
-		template <class SC, class TC>
-		__global__ void getMinimalCost_kernel(SC *o_min_cost, int *o_jmin, SC *o_min_cost_real, TC *tt, SC *v, int *taken, SC max, int i, int size, int dim2)
-		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
-
-			SC t_min_cost_real = max;
-			SC t_min_cost = max;
-			int t_jmin = dim2;
-
-#ifdef NO_MIN_LOOP
-			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x) 
-#endif
-			{
-				SC t_cost = (SC)tt[j] - v[j];
-				if (taken[j] == 0)
-				{
-					if (t_cost < t_min_cost)
-					{
-						t_min_cost = t_cost;
-						t_jmin = j;
-					}
-				}
-				if (t_cost < t_min_cost_real) t_min_cost_real = t_cost;
-			}
-
-			minWarpIndex(t_min_cost, t_jmin);
-			minWarp(t_min_cost_real);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min_cost[i] = t_min_cost;
-				o_jmin[i] = t_jmin;
-				o_min_cost_real[i] = t_min_cost_real;
-			}
-		}
-
-		template <class SC, class TC>
 		__global__ void updateVSingle_kernel(TC *tt, SC *v, int *taken, int picked, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -290,42 +157,176 @@ namespace lap
 			}
 		}
 
-		template <class SC, class TC>
-		__global__ void getFinalCost_kernel(SC *o_min_cost, SC *o_picked_cost, SC *o_picked_v, TC *tt, SC *v, SC max, int j_picked, int size, int dim2)
+		__device__ __forceinline__ bool semaphoreWarp(unsigned int *semaphore)
 		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
+			int sem;
+			if (threadIdx.x == 0) sem = atomicInc(semaphore, gridDim.x - 1);
+			sem = __shfl_sync(0xffffffff, sem, 0, 32);
+			return (sem == gridDim.x - 1);
+		}
 
-			SC t_min_cost = max;
-			SC t_picked_cost = max;
-			SC t_picked_v = max;
-
-#ifdef NO_MIN_LOOP
-			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
+		__device__ __forceinline__ bool semaphoreBlock(unsigned int *semaphore)
+		{
+			__shared__ int b_active;
+			__syncthreads();
+			if (threadIdx.x == 0)
 			{
-				SC t_cost = (SC)tt[j] - v[j];
+				int sem = atomicInc(semaphore, gridDim.x - 1);
+				if (sem == gridDim.x - 1) b_active = 1;
+				else b_active = 0;
+			}
+			__syncthreads();
+			return (b_active != 0);
+		}
+
+		template <class SC, class TC>
+		__device__ __forceinline__ void getMinMaxBestRead(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, int i, int j, TC *tt, int *picked, SC min, SC max, int size, int dim2)
+		{
+			t_min_cost = max;
+			t_max_cost = min;
+			t_picked_cost = max;
+			t_jmin = dim2;
+
+			if (j < size)
+			{
+				SC t_cost = (SC)tt[j];
 				if (t_cost < t_min_cost) t_min_cost = t_cost;
-				if (j == j_picked)
+				if (i == j) t_max_cost = t_cost;
+				if ((t_cost < t_picked_cost) && (picked[j] == 0))
 				{
-					t_picked_cost = (SC)tt[j];
-					t_picked_v = v[j];
+					t_jmin = j;
+					t_picked_cost = t_cost;
 				}
 			}
+		}
 
+		template <class SC>
+		__device__ __forceinline__ void getMinMaxBestCombineSmall(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin)
+		{
+			minWarpIndex(t_picked_cost, t_jmin);
 			minWarp(t_min_cost);
-			minWarp(t_picked_cost);
-			minWarp(t_picked_v);
+			maxWarp(t_max_cost);
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinMaxBestCombineTiny(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin)
+		{
+			minWarpIndex8(t_picked_cost, t_jmin);
+			minWarp8(t_min_cost);
+			maxWarp8(t_max_cost);
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinMaxBestWriteShared(SC *b_min_cost, SC *b_max_cost, SC *b_picked_cost, int *b_jmin, SC t_min_cost, SC t_max_cost, SC t_picked_cost, int t_jmin)
+		{
+			int bidx = threadIdx.x >> 5;
+			b_min_cost[bidx] = t_min_cost;
+			b_max_cost[bidx] = t_max_cost;
+			b_picked_cost[bidx] = t_picked_cost;
+			b_jmin[bidx] = t_jmin;
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinMaxBestReadShared(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, SC *b_min_cost, SC *b_max_cost, SC *b_picked_cost, int *b_jmin)
+		{
+			t_min_cost = b_min_cost[threadIdx.x];
+			t_max_cost = b_max_cost[threadIdx.x];
+			t_picked_cost = b_picked_cost[threadIdx.x];
+			t_jmin = b_jmin[threadIdx.x];
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinMaxBestCombineMedium(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, SC *b_min_cost, SC *b_max_cost, SC *b_picked_cost, int *b_jmin)
+		{
+			getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min_cost[i] = t_min_cost;
-				o_picked_cost[i] = t_picked_cost;
-				o_picked_v[i] = t_picked_v;
+				getMinMaxBestWriteShared(b_min_cost, b_max_cost, b_picked_cost, b_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+			}
+			__syncthreads();
+			if (threadIdx.x < 8)
+			{
+				getMinMaxBestReadShared(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinMaxBestCombineTiny(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinMaxBestCombineLarge(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, SC *b_min_cost, SC *b_max_cost, SC *b_picked_cost, int *b_jmin)
+		{
+			getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+			if ((threadIdx.x & 0x1f) == 0)
+			{
+				getMinMaxBestWriteShared(b_min_cost, b_max_cost, b_picked_cost, b_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+			}
+			__syncthreads();
+			if (threadIdx.x < 32)
+			{
+				getMinMaxBestReadShared(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinMaxBestWriteTemp(volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC t_min_cost, SC t_max_cost, SC t_picked_cost, int t_jmin)
+		{
+			if (threadIdx.x == 0)
+			{
+				o_min_cost[blockIdx.x] = t_min_cost;
+				o_max_cost[blockIdx.x] = t_max_cost;
+				o_picked_cost[blockIdx.x] = t_picked_cost;
+				o_jmin[blockIdx.x] = t_jmin;
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinMaxBestReadTemp(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin)
+		{
+			if (threadIdx.x < gridDim.x)
+			{
+				t_min_cost = o_min_cost[threadIdx.x];
+				t_max_cost = o_max_cost[threadIdx.x];
+				t_picked_cost = o_picked_cost[threadIdx.x];
+				t_jmin = o_jmin[threadIdx.x];
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinMaxBestReadTempLarge(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin)
+		{
+			if (threadIdx.x < gridDim.x)
+			{
+				t_min_cost = o_min_cost[threadIdx.x];
+				t_max_cost = o_max_cost[threadIdx.x];
+				t_picked_cost = o_picked_cost[threadIdx.x];
+				t_jmin = o_jmin[threadIdx.x];
+				// read additional values
+				for (int i = threadIdx.x + blockDim.x; i < gridDim.x; i += blockDim.x)
+				{
+					SC c_min_cost = o_min_cost[i];
+					SC c_max_cost = o_max_cost[i];
+					SC c_picked_cost = o_picked_cost[i];
+					int c_jmin = o_jmin[i];
+					if (c_min_cost < t_min_cost) t_min_cost = c_min_cost;
+					if (c_max_cost > t_max_cost) t_max_cost = c_max_cost;
+					if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_jmin < t_jmin)))
+					{
+						t_jmin = c_jmin;
+						t_picked_cost = c_picked_cost;
+					}
+				}
+			}
+		}
+
+		template <class MS, class SC>
+		__device__ __forceinline__ void getMinMaxBestWrite(MS *s, SC t_min_cost, SC t_max_cost, SC t_picked_cost, int t_jmin)
+		{
+			if (threadIdx.x == 0)
+			{
+				s->min = t_min_cost;
+				s->max = t_max_cost;
+				s->picked = t_picked_cost;
+				s->jmin = t_jmin;
 			}
 		}
 
@@ -335,56 +336,18 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			SC t_min_cost = max;
-			SC t_max_cost = min;
-			SC t_picked_cost = max;
-			int t_jmin = dim2;
+			SC t_min_cost, t_max_cost, t_picked_cost;
+			int t_jmin;
 
-			if (j < size)
-			{
-				SC t_cost = (SC)tt[j];
-				if (t_cost < t_min_cost) t_min_cost = t_cost;
-				if (i == j) t_max_cost = t_cost;
-				if ((t_cost < t_picked_cost) && (picked[j] == 0))
-				{
-					t_jmin = j;
-					t_picked_cost = t_cost;
-				}
-			}
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, tt, picked, min, max, size, dim2);
+			getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
-			minWarpIndex(t_picked_cost, t_jmin);
-			minWarp(t_min_cost);
-			maxWarp(t_max_cost);
-			if (threadIdx.x == 0)
+			if (semaphoreWarp(semaphore))
 			{
-				o_min_cost[blockIdx.x] = t_min_cost;
-				o_max_cost[blockIdx.x] = t_max_cost;
-				o_picked_cost[blockIdx.x] = t_picked_cost;
-				o_jmin[blockIdx.x] = t_jmin;
-			}
-
-			int sem;
-			if (threadIdx.x == 0) sem = atomicInc(semaphore, gridDim.x - 1);
-			sem = __shfl_sync(0xffffffff, sem, 0, 32);
-			if (sem == gridDim.x - 1)
-			{
-				if (threadIdx.x < gridDim.x)
-				{
-					t_min_cost = o_min_cost[threadIdx.x];
-					t_max_cost = o_max_cost[threadIdx.x];
-					t_picked_cost = o_picked_cost[threadIdx.x];
-					t_jmin = o_jmin[threadIdx.x];
-				}
-				minWarpIndex(t_picked_cost, t_jmin);
-				minWarp(t_min_cost);
-				maxWarp(t_max_cost);
-				if (threadIdx.x == 0)
-				{
-					s->min = t_min_cost;
-					s->max = t_max_cost;
-					s->picked = t_picked_cost;
-					s->jmin = t_jmin;
-				}
+				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin);
+				getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 			}
 		}
 
@@ -394,104 +357,21 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			__shared__ SC b_min_cost[8];
-			__shared__ SC b_max_cost[8];
-			__shared__ SC b_picked_cost[8];
+			__shared__ SC b_min_cost[8], b_max_cost[8], b_picked_cost[8];
 			__shared__ int b_jmin[8];
-			__shared__ int b_active;
 
-			SC t_min_cost = max;
-			SC t_max_cost = min;
-			SC t_picked_cost = max;
-			int t_jmin = dim2;
+			SC t_min_cost, t_max_cost, t_picked_cost;
+			int t_jmin;
 
-			if (j < size)
-			{
-				SC t_cost = (SC)tt[j];
-				if (t_cost < t_min_cost) t_min_cost = t_cost;
-				if (i == j) t_max_cost = t_cost;
-				if ((t_cost < t_picked_cost) && (picked[j] == 0))
-				{
-					t_jmin = j;
-					t_picked_cost = t_cost;
-				}
-			}
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, tt, picked, min, max, size, dim2);
+			getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
-			minWarpIndex(t_picked_cost, t_jmin);
-			minWarp(t_min_cost);
-			maxWarp(t_max_cost);
-			if ((threadIdx.x & 0x1f) == 0)
+			if (semaphoreBlock(semaphore))
 			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = t_min_cost;
-				b_max_cost[bidx] = t_max_cost;
-				b_picked_cost[bidx] = t_picked_cost;
-				b_jmin[bidx] = t_jmin;
-			}
-			__syncthreads();
-			if (threadIdx.x < 8)
-			{
-				t_min_cost = b_min_cost[threadIdx.x];
-				t_max_cost = b_max_cost[threadIdx.x];
-				t_picked_cost = b_picked_cost[threadIdx.x];
-				t_jmin = b_jmin[threadIdx.x];
-				minWarpIndex8(t_picked_cost, t_jmin);
-				minWarp8(t_min_cost);
-				maxWarp8(t_max_cost);
-			}
-			if (threadIdx.x == 0)
-			{
-				o_min_cost[blockIdx.x] = t_min_cost;
-				o_max_cost[blockIdx.x] = t_max_cost;
-				o_picked_cost[blockIdx.x] = t_picked_cost;
-				o_jmin[blockIdx.x] = t_jmin;
-			}
-			__syncthreads();
-			if (threadIdx.x == 0)
-			{
-				int sem = atomicInc(semaphore, gridDim.x - 1);
-				if (sem == gridDim.x - 1) b_active = 1;
-				else b_active = 0;
-			}
-			__syncthreads();
-			if (b_active != 0)
-			{
-				if (threadIdx.x < gridDim.x)
-				{
-					t_min_cost = o_min_cost[threadIdx.x];
-					t_max_cost = o_max_cost[threadIdx.x];
-					t_picked_cost = o_picked_cost[threadIdx.x];
-					t_jmin = o_jmin[threadIdx.x];
-				}
-				minWarpIndex(t_picked_cost, t_jmin);
-				minWarp(t_min_cost);
-				maxWarp(t_max_cost);
-				if ((threadIdx.x & 0x1f) == 0)
-				{
-					int bidx = threadIdx.x >> 5;
-					b_min_cost[bidx] = t_min_cost;
-					b_max_cost[bidx] = t_max_cost;
-					b_picked_cost[bidx] = t_picked_cost;
-					b_jmin[bidx] = t_jmin;
-				}
-				__syncthreads();
-				if (threadIdx.x < 8)
-				{
-					t_min_cost = b_min_cost[threadIdx.x];
-					t_max_cost = b_max_cost[threadIdx.x];
-					t_picked_cost = b_picked_cost[threadIdx.x];
-					t_jmin = b_jmin[threadIdx.x];
-					minWarpIndex8(t_picked_cost, t_jmin);
-					minWarp8(t_min_cost);
-					maxWarp8(t_max_cost);
-				}
-				if (threadIdx.x == 0)
-				{
-					s->min = t_min_cost;
-					s->max = t_max_cost;
-					s->picked = t_picked_cost;
-					s->jmin = t_jmin;
-				}
+				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin);
+				getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 			}
 		}
 
@@ -501,277 +381,209 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			__shared__ SC b_min_cost[32];
-			__shared__ SC b_max_cost[32];
-			__shared__ SC b_picked_cost[32];
+			__shared__ SC b_min_cost[32], b_max_cost[32], b_picked_cost[32];
 			__shared__ int b_jmin[32];
-			__shared__ int b_active;
 
-			SC t_min_cost = max;
-			SC t_max_cost = min;
-			SC t_picked_cost = max;
-			int t_jmin = dim2;
+			SC t_min_cost, t_max_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, tt, picked, min, max, size, dim2);
+			getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinMaxBestReadTempLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin);
+				getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+			}
+		}
+
+		template <class SC, class TC>
+		__device__ __forceinline__ void getMinSecondBestRead(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin, int i, int j, TC *tt, SC *v, int *picked, int last_picked, SC max, int size, int dim2)
+		{
+			t_min_cost = max;
+			t_second_cost = max;
+			t_picked_cost = max;
+			t_jmin = dim2;
 
 			if (j < size)
 			{
-				SC t_cost = (SC)tt[j];
-				if (t_cost < t_min_cost) t_min_cost = t_cost;
-				if (i == j) t_max_cost = t_cost;
+				if (j == last_picked) picked[j] = 1;
+
+				SC t_cost = (SC)tt[j] - v[j];
+				if (t_cost < t_min_cost)
+				{
+					t_second_cost = t_min_cost;
+					t_min_cost = t_cost;
+				}
+				else if (t_cost < t_second_cost) t_second_cost = t_cost;
 				if ((t_cost < t_picked_cost) && (picked[j] == 0))
 				{
 					t_jmin = j;
 					t_picked_cost = t_cost;
 				}
 			}
+		}
 
+		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestCombineSmall(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin)
+		{
 			minWarpIndex(t_picked_cost, t_jmin);
+			SC old_min_cost = t_min_cost;
 			minWarp(t_min_cost);
-			maxWarp(t_max_cost);
+			if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
+			minWarp(t_second_cost);
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestCombineTiny(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin)
+		{
+			minWarpIndex8(t_picked_cost, t_jmin);
+			SC old_min_cost = t_min_cost;
+			minWarp8(t_min_cost);
+			if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
+			minWarp8(t_second_cost);
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestWriteShared(SC *b_min_cost, SC *b_max_cost, SC *b_picked_cost, int *b_jmin, SC t_min_cost, SC t_second_cost, SC t_picked_cost, int t_jmin)
+		{
+			int bidx = threadIdx.x >> 5;
+			b_min_cost[bidx] = t_min_cost;
+			b_max_cost[bidx] = t_second_cost;
+			b_picked_cost[bidx] = t_picked_cost;
+			b_jmin[bidx] = t_jmin;
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestReadShared(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin, SC *b_min_cost, SC *b_max_cost, SC *b_picked_cost, int *b_jmin)
+		{
+			t_min_cost = b_min_cost[threadIdx.x];
+			t_second_cost = b_max_cost[threadIdx.x];
+			t_picked_cost = b_picked_cost[threadIdx.x];
+			t_jmin = b_jmin[threadIdx.x];
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestCombineMedium(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin, SC *b_min_cost, SC *b_max_cost, SC *b_picked_cost, int *b_jmin)
+		{
+			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = t_min_cost;
-				b_max_cost[bidx] = t_max_cost;
-				b_picked_cost[bidx] = t_picked_cost;
-				b_jmin[bidx] = t_jmin;
+				getMinSecondBestWriteShared(b_min_cost, b_max_cost, b_picked_cost, b_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+			}
+			__syncthreads();
+			if (threadIdx.x < 8)
+			{
+				getMinSecondBestReadShared(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestCombineTiny(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestCombineLarge(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin, SC *b_min_cost, SC *b_max_cost, SC *b_picked_cost, int *b_jmin)
+		{
+			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+			if ((threadIdx.x & 0x1f) == 0)
+			{
+				getMinSecondBestWriteShared(b_min_cost, b_max_cost, b_picked_cost, b_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
 			}
 			__syncthreads();
 			if (threadIdx.x < 32)
 			{
-				t_min_cost = b_min_cost[threadIdx.x];
-				t_max_cost = b_max_cost[threadIdx.x];
-				t_picked_cost = b_picked_cost[threadIdx.x];
-				t_jmin = b_jmin[threadIdx.x];
-				minWarpIndex(t_picked_cost, t_jmin);
-				minWarp(t_min_cost);
-				maxWarp(t_max_cost);
+				getMinSecondBestReadShared(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
 			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestWriteTemp(volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC t_min_cost, SC t_second_cost, SC t_picked_cost, int t_jmin)
+		{
 			if (threadIdx.x == 0)
 			{
 				o_min_cost[blockIdx.x] = t_min_cost;
-				o_max_cost[blockIdx.x] = t_max_cost;
+				o_max_cost[blockIdx.x] = t_second_cost;
 				o_picked_cost[blockIdx.x] = t_picked_cost;
 				o_jmin[blockIdx.x] = t_jmin;
 			}
-			__syncthreads();
-			if (threadIdx.x == 0)
-			{
-				int sem = atomicInc(semaphore, gridDim.x - 1);
-				if (sem == gridDim.x - 1) b_active = 1;
-				else b_active = 0;
-			}
-			__syncthreads();
-			if (b_active != 0)
-			{
-				if (threadIdx.x < gridDim.x)
-				{
-					t_min_cost = o_min_cost[threadIdx.x];
-					t_max_cost = o_max_cost[threadIdx.x];
-					t_picked_cost = o_picked_cost[threadIdx.x];
-					t_jmin = o_jmin[threadIdx.x];
-					// read additional values
-					for (int i = threadIdx.x + blockDim.x; i < gridDim.x; i += blockDim.x)
-					{
-						SC c_min_cost = o_min_cost[i];
-						SC c_max_cost = o_max_cost[i];
-						SC c_picked_cost = o_picked_cost[i];
-						int c_jmin = o_jmin[i];
-						if (c_min_cost < t_min_cost) t_min_cost = c_min_cost;
-						if (c_max_cost > t_max_cost) t_max_cost = c_max_cost;
-						if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_jmin < t_jmin)))
-						{
-							t_jmin = c_jmin;
-							t_picked_cost = c_picked_cost;
-						}
+		}
 
+		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestReadTemp(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC max, int dim2)
+		{
+			if (threadIdx.x < gridDim.x)
+			{
+				t_min_cost = o_min_cost[threadIdx.x];
+				t_second_cost = o_max_cost[threadIdx.x];
+				t_picked_cost = o_picked_cost[threadIdx.x];
+				t_jmin = o_jmin[threadIdx.x];
+			}
+			else
+			{
+				t_min_cost = max;
+				t_second_cost = max;
+				t_picked_cost = max;
+				t_jmin = dim2;
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestReadTempLarge(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC max, int dim2)
+		{
+			if (threadIdx.x < gridDim.x)
+			{
+				t_min_cost = o_min_cost[threadIdx.x];
+				t_second_cost = o_max_cost[threadIdx.x];
+				t_picked_cost = o_picked_cost[threadIdx.x];
+				t_jmin = o_jmin[threadIdx.x];
+				// read additional values
+				for (int i = threadIdx.x + blockDim.x; i < gridDim.x; i += blockDim.x)
+				{
+					SC c_min_cost = o_min_cost[i];
+					SC c_second_cost = o_max_cost[i];
+					SC c_picked_cost = o_picked_cost[i];
+					int c_jmin = o_jmin[i];
+					if (c_min_cost < t_min_cost)
+					{
+						if (t_min_cost < c_second_cost) t_second_cost = t_min_cost;
+						else t_second_cost = c_second_cost;
+						t_min_cost = c_min_cost;
+					}
+					else if (c_min_cost < t_second_cost) t_second_cost = c_min_cost;
+					if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_jmin < t_jmin)))
+					{
+						t_jmin = c_jmin;
+						t_picked_cost = c_picked_cost;
 					}
 				}
-				minWarpIndex(t_picked_cost, t_jmin);
-				minWarp(t_min_cost);
-				maxWarp(t_max_cost);
-				if ((threadIdx.x & 0x1f) == 0)
-				{
-					int bidx = threadIdx.x >> 5;
-					b_min_cost[bidx] = t_min_cost;
-					b_max_cost[bidx] = t_max_cost;
-					b_picked_cost[bidx] = t_picked_cost;
-					b_jmin[bidx] = t_jmin;
-				}
-				__syncthreads();
-				if (threadIdx.x < 32)
-				{
-					t_min_cost = b_min_cost[threadIdx.x];
-					t_max_cost = b_max_cost[threadIdx.x];
-					t_picked_cost = b_picked_cost[threadIdx.x];
-					t_jmin = b_jmin[threadIdx.x];
-					minWarpIndex(t_picked_cost, t_jmin);
-					minWarp(t_min_cost);
-					maxWarp(t_max_cost);
-				}
-				if (threadIdx.x == 0)
-				{
-					s->min = t_min_cost;
-					s->max = t_max_cost;
-					s->picked = t_picked_cost;
-					s->jmin = t_jmin;
-				}
+			}
+			else
+			{
+				t_min_cost = max;
+				t_second_cost = max;
+				t_picked_cost = max;
+				t_jmin = dim2;
 			}
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinMaxBestSmall_kernel(MS *s, SC *min_cost, SC *max_cost, SC *picked_cost, int *jmin, SC min, SC max, int size, int dim2)
+		__device__ __forceinline__ void getMinSecondBestWrite(MS *s, SC t_min_cost, SC t_second_cost, SC t_picked_cost, int t_jmin, SC *v, SC max, int dim2)
 		{
-			int j = threadIdx.x;
-
-			SC v_min_cost = max;
-			SC v_max_cost = min;
-			SC v_picked_cost = max;
-			int v_jmin = dim2;
-
-			while (j < size)
-			{
-				SC c_min_cost = min_cost[j];
-				SC c_max_cost = max_cost[j];
-				SC c_picked_cost = picked_cost[j];
-				int c_jmin = jmin[j];
-				if (c_min_cost < v_min_cost) v_min_cost = c_min_cost;
-				if (c_max_cost > v_max_cost) v_max_cost = c_max_cost;
-				if ((c_picked_cost < v_picked_cost) || ((c_picked_cost == v_picked_cost) && (c_jmin < v_jmin)))
-				{
-					v_picked_cost = c_picked_cost;
-					v_jmin = c_jmin;
-				}
-				j += blockDim.x;
-			}
-			minWarpIndex(v_picked_cost, v_jmin);
-			minWarp(v_min_cost);
-			maxWarp(v_max_cost);
 			if (threadIdx.x == 0)
 			{
-				s->min = v_min_cost;
-				s->max = v_max_cost;
-				s->picked = v_picked_cost;
-				s->jmin = v_jmin;
-			}
-		}
-
-		template <class MS, class SC>
-		__global__ void getMinMaxBestMedium_kernel(MS *s, SC *min_cost, SC *max_cost, SC *picked_cost, int *jmin, SC min, SC max, int size, int dim2)
-		{
-			// 256 threads in 8 warps
-			__shared__ SC b_min_cost[8];
-			__shared__ SC b_max_cost[8];
-			__shared__ SC b_picked_cost[8];
-			__shared__ int b_jmin[8];
-
-			int j = threadIdx.x;
-
-			SC v_min_cost = max;
-			SC v_max_cost = min;
-			SC v_picked_cost = max;
-			int v_jmin = dim2;
-
-			while (j < size)
-			{
-				SC c_min_cost = min_cost[j];
-				SC c_max_cost = max_cost[j];
-				SC c_picked_cost = picked_cost[j];
-				int c_jmin = jmin[j];
-				if (c_min_cost < v_min_cost) v_min_cost = c_min_cost;
-				if (c_max_cost > v_max_cost) v_max_cost = c_max_cost;
-				if ((c_picked_cost < v_picked_cost) || ((c_picked_cost == v_picked_cost) && (c_jmin < v_jmin)))
+				s->min = t_min_cost;
+				s->max = t_second_cost;
+				s->picked = t_picked_cost;
+				s->jmin = t_jmin;
+				if (t_jmin < dim2)
 				{
-					v_picked_cost = c_picked_cost;
-					v_jmin = c_jmin;
+					s->v_jmin = v[t_jmin];
 				}
-				j += blockDim.x;
-			}
-			minWarpIndex(v_picked_cost, v_jmin);
-			minWarp(v_min_cost);
-			maxWarp(v_max_cost);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = v_min_cost;
-				b_max_cost[bidx] = v_max_cost;
-				b_picked_cost[bidx] = v_picked_cost;
-				b_jmin[bidx] = v_jmin;
-			}
-			__syncthreads();
-			if (threadIdx.x >= 8) return;
-			v_min_cost = b_min_cost[threadIdx.x];
-			v_max_cost = b_max_cost[threadIdx.x];
-			v_picked_cost = b_picked_cost[threadIdx.x];
-			v_jmin = b_jmin[threadIdx.x];
-			minWarpIndex8(v_picked_cost, v_jmin);
-			minWarp8(v_min_cost);
-			maxWarp8(v_max_cost);
-			if (threadIdx.x == 0)
-			{
-				s->min = v_min_cost;
-				s->max = v_max_cost;
-				s->picked = v_picked_cost;
-				s->jmin = v_jmin;
-			}
-		}
-
-		template <class MS, class SC>
-		__global__ void getMinMaxBestLarge_kernel(MS *s, SC *min_cost, SC *max_cost, SC *picked_cost, int *jmin, SC min, SC max, int size, int dim2)
-		{
-			// 1024 threads in 32 warps
-			__shared__ SC b_min_cost[32];
-			__shared__ SC b_max_cost[32];
-			__shared__ SC b_picked_cost[32];
-			__shared__ int b_jmin[32];
-
-			int j = threadIdx.x;
-
-			SC v_min_cost = max;
-			SC v_max_cost = min;
-			SC v_picked_cost = max;
-			int v_jmin = dim2;
-
-			while (j < size)
-			{
-				SC c_min_cost = min_cost[j];
-				SC c_max_cost = max_cost[j];
-				SC c_picked_cost = picked_cost[j];
-				int c_jmin = jmin[j];
-				if (c_min_cost < v_min_cost) v_min_cost = c_min_cost;
-				if (c_max_cost > v_max_cost) v_max_cost = c_max_cost;
-				if ((c_picked_cost < v_picked_cost) || ((c_picked_cost == v_picked_cost) && (c_jmin < v_jmin)))
+				else
 				{
-					v_picked_cost = c_picked_cost;
-					v_jmin = c_jmin;
+					s->v_jmin = max;
 				}
-				j += blockDim.x;
-			}
-			minWarpIndex(v_picked_cost, v_jmin);
-			minWarp(v_min_cost);
-			maxWarp(v_max_cost);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = v_min_cost;
-				b_max_cost[bidx] = v_max_cost;
-				b_picked_cost[bidx] = v_picked_cost;
-				b_jmin[bidx] = v_jmin;
-			}
-			__syncthreads();
-			if (threadIdx.x >= 32) return;
-			v_min_cost = b_min_cost[threadIdx.x];
-			v_max_cost = b_max_cost[threadIdx.x];
-			v_picked_cost = b_picked_cost[threadIdx.x];
-			v_jmin = b_jmin[threadIdx.x];
-			minWarpIndex(v_picked_cost, v_jmin);
-			minWarp(v_min_cost);
-			maxWarp(v_max_cost);
-			if (threadIdx.x == 0)
-			{
-				s->min = v_min_cost;
-				s->max = v_max_cost;
-				s->picked = v_picked_cost;
-				s->jmin = v_jmin;
 			}
 		}
 
@@ -780,80 +592,18 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			SC t_min_cost = max;
-			SC t_second_cost = max;
-			SC t_picked_cost = max;
-			int t_jmin = dim2;
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
 
-			if (j < size)
-			{
-				if (j == last_picked) picked[j] = 1;
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
 
-				SC t_cost = (SC)tt[j] - v[j];
-				if (t_cost < t_min_cost)
-				{
-					t_second_cost = t_min_cost;
-					t_min_cost = t_cost;
-				}
-				else if (t_cost < t_second_cost) t_second_cost = t_cost;
-				if ((t_cost < t_picked_cost) && (picked[j] == 0))
-				{
-					t_jmin = j;
-					t_picked_cost = t_cost;
-				}
-			}
-
-			minWarpIndex(t_picked_cost, t_jmin);
-			SC old_min_cost = t_min_cost;
-			minWarp(t_min_cost);
-			if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-			minWarp(t_second_cost);
-			if (threadIdx.x == 0)
+			if (semaphoreWarp(semaphore))
 			{
-				o_min_cost[blockIdx.x] = t_min_cost;
-				o_max_cost[blockIdx.x] = t_second_cost;
-				o_picked_cost[blockIdx.x] = t_picked_cost;
-				o_jmin[blockIdx.x] = t_jmin;
-			}
-			int sem;
-			if (threadIdx.x == 0) sem = atomicInc(semaphore, gridDim.x - 1);
-			sem = __shfl_sync(0xffffffff, sem, 0, 32);
-			if (sem == gridDim.x - 1)
-			{
-				if (threadIdx.x < gridDim.x)
-				{
-					t_min_cost = o_min_cost[threadIdx.x];
-					t_second_cost = o_max_cost[threadIdx.x];
-					t_picked_cost = o_picked_cost[threadIdx.x];
-					t_jmin = o_jmin[threadIdx.x];
-				}
-				else
-				{
-					t_min_cost = max;
-					t_second_cost = max;
-					t_picked_cost = max;
-					t_jmin = dim2;
-				}
-				minWarpIndex(t_picked_cost, t_jmin);
-				SC old_min_cost = t_min_cost;
-				minWarp(t_min_cost);
-				if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-				minWarp(t_second_cost);
-				if (threadIdx.x == 0)
-				{
-					s->min = t_min_cost;
-					s->max = t_second_cost;
-					s->picked = t_picked_cost;
-					s->jmin = t_jmin;
-					if (t_jmin < dim2)
-					{
-						s->v_jmin = v[t_jmin];
-					}
-					else
-					{
-						s->v_jmin = max;
-					}
-				}
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, v, max, dim2);
 			}
 		}
 
@@ -862,133 +612,21 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			__shared__ SC b_min_cost[8];
-			__shared__ SC b_max_cost[8];
-			__shared__ SC b_picked_cost[8];
+			__shared__ SC b_min_cost[8], b_max_cost[8], b_picked_cost[8];
 			__shared__ int b_jmin[8];
-			__shared__ int b_active;
 
-			SC t_min_cost = max;
-			SC t_second_cost = max;
-			SC t_picked_cost = max;
-			int t_jmin = dim2;
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
 
-			if (j < size)
-			{
-				if (j == last_picked) picked[j] = 1;
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
 
-				SC t_cost = (SC)tt[j] - v[j];
-				if (t_cost < t_min_cost)
-				{
-					t_second_cost = t_min_cost;
-					t_min_cost = t_cost;
-				}
-				else if (t_cost < t_second_cost) t_second_cost = t_cost;
-				if ((t_cost < t_picked_cost) && (picked[j] == 0))
-				{
-					t_jmin = j;
-					t_picked_cost = t_cost;
-				}
-			}
-
-			minWarpIndex(t_picked_cost, t_jmin);
-			SC old_min_cost = t_min_cost;
-			minWarp(t_min_cost);
-			if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-			minWarp(t_second_cost);
-			if ((threadIdx.x & 0x1f) == 0)
+			if (semaphoreBlock(semaphore))
 			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = t_min_cost;
-				b_max_cost[bidx] = t_second_cost;
-				b_picked_cost[bidx] = t_picked_cost;
-				b_jmin[bidx] = t_jmin;
-			}
-			__syncthreads();
-			if (threadIdx.x < 8)
-			{
-				t_min_cost = b_min_cost[threadIdx.x];
-				t_second_cost = b_max_cost[threadIdx.x];
-				t_picked_cost = b_picked_cost[threadIdx.x];
-				t_jmin = b_jmin[threadIdx.x];
-				minWarpIndex8(t_picked_cost, t_jmin);
-				SC old_min_cost = t_min_cost;
-				minWarp8(t_min_cost);
-				if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-				minWarp8(t_second_cost);
-			}
-			if (threadIdx.x == 0)
-			{
-				o_min_cost[blockIdx.x] = t_min_cost;
-				o_max_cost[blockIdx.x] = t_second_cost;
-				o_picked_cost[blockIdx.x] = t_picked_cost;
-				o_jmin[blockIdx.x] = t_jmin;
-			}
-			__syncthreads();
-			if (threadIdx.x == 0)
-			{
-				int sem = atomicInc(semaphore, gridDim.x - 1);
-				if (sem == gridDim.x - 1) b_active = 1;
-				else b_active = 0;
-			}
-			__syncthreads();
-			if (b_active != 0)
-			{
-				if (threadIdx.x < gridDim.x)
-				{
-					t_min_cost = o_min_cost[threadIdx.x];
-					t_second_cost = o_max_cost[threadIdx.x];
-					t_picked_cost = o_picked_cost[threadIdx.x];
-					t_jmin = o_jmin[threadIdx.x];
-				}
-				else
-				{
-					t_min_cost = max;
-					t_second_cost = max;
-					t_picked_cost = max;
-					t_jmin = dim2;
-				}
-				minWarpIndex(t_picked_cost, t_jmin);
-				SC old_min_cost = t_min_cost;
-				minWarp(t_min_cost);
-				if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-				minWarp(t_second_cost);
-				if ((threadIdx.x & 0x1f) == 0)
-				{
-					int bidx = threadIdx.x >> 5;
-					b_min_cost[bidx] = t_min_cost;
-					b_max_cost[bidx] = t_second_cost;
-					b_picked_cost[bidx] = t_picked_cost;
-					b_jmin[bidx] = t_jmin;
-				}
-				__syncthreads();
-				if (threadIdx.x < 8)
-				{
-					t_min_cost = b_min_cost[threadIdx.x];
-					t_second_cost = b_max_cost[threadIdx.x];
-					t_picked_cost = b_picked_cost[threadIdx.x];
-					t_jmin = b_jmin[threadIdx.x];
-					minWarpIndex8(t_picked_cost, t_jmin);
-					SC old_min_cost = t_min_cost;
-					minWarp8(t_min_cost);
-					if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-					minWarp8(t_second_cost);
-				}
-				if (threadIdx.x == 0)
-				{
-					s->min = t_min_cost;
-					s->max = t_second_cost;
-					s->picked = t_picked_cost;
-					s->jmin = t_jmin;
-					if (t_jmin < dim2)
-					{
-						s->v_jmin = v[t_jmin];
-					}
-					else
-					{
-						s->v_jmin = max;
-					}
-				}
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, v, max, dim2);
 			}
 		}
 
@@ -997,180 +635,179 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			__shared__ SC b_min_cost[32];
-			__shared__ SC b_max_cost[32];
-			__shared__ SC b_picked_cost[32];
+			__shared__ SC b_min_cost[32], b_max_cost[32], b_picked_cost[32];
 			__shared__ int b_jmin[32];
-			__shared__ int b_active;
 
-			SC t_min_cost = max;
-			SC t_second_cost = max;
-			SC t_picked_cost = max;
-			int t_jmin = dim2;
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTempLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, v, max, dim2);
+			}
+		}
+
+		template <class SC, class TC>
+		__device__ __forceinline__ void getMinimalCostRead(SC &t_min_cost, int &t_jmin, SC &t_min_cost_real, int j, TC *tt, SC *v, int *taken, int last_taken, SC max, int size, int dim2)
+		{
+			t_min_cost_real = max;
+			t_min_cost = max;
+			t_jmin = dim2;
 
 			if (j < size)
 			{
-				if (j == last_picked) picked[j] = 1;
-
 				SC t_cost = (SC)tt[j] - v[j];
-				if (t_cost < t_min_cost)
+				if (last_taken == j) taken[j] = 1;
+				else if (taken[j] == 0)
 				{
-					t_second_cost = t_min_cost;
-					t_min_cost = t_cost;
+					if (t_cost < t_min_cost)
+					{
+						t_min_cost = t_cost;
+						t_jmin = j;
+					}
 				}
-				else if (t_cost < t_second_cost) t_second_cost = t_cost;
-				if ((t_cost < t_picked_cost) && (picked[j] == 0))
-				{
-					t_jmin = j;
-					t_picked_cost = t_cost;
-				}
+				if (t_cost < t_min_cost_real) t_min_cost_real = t_cost;
 			}
+		}
 
-			minWarpIndex(t_picked_cost, t_jmin);
-			SC old_min_cost = t_min_cost;
-			minWarp(t_min_cost);
-			if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-			minWarp(t_second_cost);
+		template <class SC>
+		__device__ __forceinline__ void getMinimalCostCombineSmall(SC &t_min_cost, int &t_jmin, SC &t_min_cost_real)
+		{
+			minWarpIndex(t_min_cost, t_jmin);
+			minWarp(t_min_cost_real);
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinimalCostCombineTiny(SC &t_min_cost, int &t_jmin, SC &t_min_cost_real)
+		{
+			minWarpIndex8(t_min_cost, t_jmin);
+			minWarp8(t_min_cost_real);
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinimalCostWriteShared(SC *b_min_cost, int *b_jmin, SC *b_min_cost_real, SC t_min_cost, int t_jmin, SC t_min_cost_real)
+		{
+			int bidx = threadIdx.x >> 5;
+			b_min_cost[bidx] = t_min_cost;
+			b_min_cost_real[bidx] = t_min_cost_real;
+			b_jmin[bidx] = t_jmin;
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinimalCostReadShared(SC &t_min_cost, int &t_jmin, SC &t_min_cost_real, SC *b_min_cost, int *b_jmin, SC *b_min_cost_real)
+		{
+			t_min_cost = b_min_cost[threadIdx.x];
+			t_min_cost_real = b_min_cost_real[threadIdx.x];
+			t_jmin = b_jmin[threadIdx.x];
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinimalCostCombineMedium(SC &t_min_cost, int &t_jmin, SC &t_min_cost_real, SC *b_min_cost, int *b_jmin, SC *b_min_cost_real)
+		{
+			getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = t_min_cost;
-				b_max_cost[bidx] = t_second_cost;
-				b_picked_cost[bidx] = t_picked_cost;
-				b_jmin[bidx] = t_jmin;
+				getMinimalCostWriteShared(b_min_cost, b_jmin, b_min_cost_real, t_min_cost, t_jmin, t_min_cost_real);
+			}
+			__syncthreads();
+			if (threadIdx.x < 8)
+			{
+				getMinimalCostReadShared(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
+				getMinimalCostCombineTiny(t_min_cost, t_jmin, t_min_cost_real);
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinimalCostCombineLarge(SC &t_min_cost, int &t_jmin, SC &t_min_cost_real, SC *b_min_cost, int *b_jmin, SC *b_min_cost_real)
+		{
+			getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
+			if ((threadIdx.x & 0x1f) == 0)
+			{
+				getMinimalCostWriteShared(b_min_cost, b_jmin, b_min_cost_real, t_min_cost, t_jmin, t_min_cost_real);
 			}
 			__syncthreads();
 			if (threadIdx.x < 32)
 			{
-				t_min_cost = b_min_cost[threadIdx.x];
-				t_second_cost = b_max_cost[threadIdx.x];
-				t_picked_cost = b_picked_cost[threadIdx.x];
-				t_jmin = b_jmin[threadIdx.x];
-				minWarpIndex(t_picked_cost, t_jmin);
-				SC old_min_cost = t_min_cost;
-				minWarp(t_min_cost);
-				if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-				minWarp(t_second_cost);
+				getMinimalCostReadShared(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
+				getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
 			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinimalCostWriteTemp(volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC t_min_cost, int t_jmin, SC t_min_cost_real)
+		{
 			if (threadIdx.x == 0)
 			{
 				o_min_cost[blockIdx.x] = t_min_cost;
-				o_max_cost[blockIdx.x] = t_second_cost;
-				o_picked_cost[blockIdx.x] = t_picked_cost;
 				o_jmin[blockIdx.x] = t_jmin;
+				o_min_cost_real[blockIdx.x] = t_min_cost_real;
 			}
-			__syncthreads();
-			if (threadIdx.x == 0)
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinimalCostReadTemp(SC &t_min_cost, int &t_jmin, SC &t_min_cost_real, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC max, int dim2)
+		{
+			if (threadIdx.x < gridDim.x)
 			{
-				int sem = atomicInc(semaphore, gridDim.x - 1);
-				if (sem == gridDim.x - 1) b_active = 1;
-				else b_active = 0;
+				t_min_cost = o_min_cost[threadIdx.x];
+				t_jmin = o_jmin[threadIdx.x];
+				t_min_cost_real = o_min_cost_real[threadIdx.x];
 			}
-			__syncthreads();
-			if (b_active != 0)
+			else
 			{
-				if (threadIdx.x < gridDim.x)
+				t_min_cost = max;
+				t_jmin = dim2;
+				t_min_cost_real = max;
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinimalCostReadTempLarge(SC &t_min_cost, int &t_jmin, SC &t_min_cost_real, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC max, int dim2)
+		{
+			if (threadIdx.x < gridDim.x)
+			{
+				t_min_cost = o_min_cost[threadIdx.x];
+				t_jmin = o_jmin[threadIdx.x];
+				t_min_cost_real = o_min_cost_real[threadIdx.x];
+				// read additional values
+				for (int i = threadIdx.x + blockDim.x; i < gridDim.x; i += blockDim.x)
 				{
-					t_min_cost = o_min_cost[threadIdx.x];
-					t_second_cost = o_max_cost[threadIdx.x];
-					t_picked_cost = o_picked_cost[threadIdx.x];
-					t_jmin = o_jmin[threadIdx.x];
-				}
-				else
-				{
-					t_min_cost = max;
-					t_second_cost = max;
-					t_picked_cost = max;
-					t_jmin = dim2;
-				}
-				minWarpIndex(t_picked_cost, t_jmin);
-				SC old_min_cost = t_min_cost;
-				minWarp(t_min_cost);
-				if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-				minWarp(t_second_cost);
-				if ((threadIdx.x & 0x1f) == 0)
-				{
-					int bidx = threadIdx.x >> 5;
-					b_min_cost[bidx] = t_min_cost;
-					b_max_cost[bidx] = t_second_cost;
-					b_picked_cost[bidx] = t_picked_cost;
-					b_jmin[bidx] = t_jmin;
-				}
-				__syncthreads();
-				if (threadIdx.x < 32)
-				{
-					t_min_cost = b_min_cost[threadIdx.x];
-					t_second_cost = b_max_cost[threadIdx.x];
-					t_picked_cost = b_picked_cost[threadIdx.x];
-					t_jmin = b_jmin[threadIdx.x];
-					minWarpIndex(t_picked_cost, t_jmin);
-					SC old_min_cost = t_min_cost;
-					minWarp(t_min_cost);
-					if (t_min_cost < old_min_cost) t_second_cost = old_min_cost;
-					minWarp(t_second_cost);
-				}
-				if (threadIdx.x == 0)
-				{
-					s->min = t_min_cost;
-					s->max = t_second_cost;
-					s->picked = t_picked_cost;
-					s->jmin = t_jmin;
-					if (t_jmin < dim2)
+					SC c_min_cost = o_min_cost[i];
+					int c_jmin = o_jmin[i];
+					SC c_min_cost_real = o_min_cost_real[i];
+					if ((c_min_cost < t_min_cost) || ((c_min_cost == t_min_cost) && (c_jmin < t_jmin)))
 					{
-						s->v_jmin = v[t_jmin];
+						t_jmin = c_jmin;
+						t_min_cost = c_min_cost;
 					}
-					else
-					{
-						s->v_jmin = max;
-					}
+					if (c_min_cost_real < t_min_cost_real) t_min_cost_real = c_min_cost_real;
 				}
+			}
+			else
+			{
+				t_min_cost = max;
+				t_jmin = dim2;
+				t_min_cost_real = max;
 			}
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestSmall_kernel(MS *s, SC *min_cost, SC *second_cost, SC *picked_cost, int *jmin, SC *v, SC max, int size, int dim2)
+		__device__ __forceinline__ void getMinimalCostWrite(MS *s, SC t_min_cost, int t_jmin, SC t_min_cost_real, SC *v, SC max, int dim2)
 		{
-			int j = threadIdx.x;
-
-			SC v_min_cost = max;
-			SC v_second_cost = max;
-			SC v_picked_cost = max;
-			int v_jmin = dim2;
-
-			while (j < size)
-			{
-				SC c_min_cost = min_cost[j];
-				SC c_second_cost = second_cost[j];
-				SC c_picked_cost = picked_cost[j];
-				int c_jmin = jmin[j];
-				if (c_min_cost < v_min_cost)
-				{
-					if (v_min_cost < c_second_cost) v_second_cost = v_min_cost;
-					else v_second_cost = c_second_cost;
-					v_min_cost = c_min_cost;
-				}
-				else if (c_min_cost < v_second_cost) v_second_cost = c_min_cost;
-				if ((c_picked_cost < v_picked_cost) || ((c_picked_cost == v_picked_cost) && (c_jmin < v_jmin)))
-				{
-					v_picked_cost = c_picked_cost;
-					v_jmin = c_jmin;
-				}
-				j += blockDim.x;
-			}
-			minWarpIndex(v_picked_cost, v_jmin);
-			SC old_min_cost = v_min_cost;
-			minWarp(v_min_cost);
-			if (v_min_cost < old_min_cost) v_second_cost = old_min_cost;
-			minWarp(v_second_cost);
 			if (threadIdx.x == 0)
 			{
-				s->min = v_min_cost;
-				s->max = v_second_cost;
-				s->picked = v_picked_cost;
-				s->jmin = v_jmin;
-				if (v_jmin < dim2)
+				s->min = t_min_cost_real;
+				s->picked = t_min_cost;
+				s->jmin = t_jmin;
+				if (t_jmin < dim2)
 				{
-					s->v_jmin = v[v_jmin];
+					s->v_jmin = v[t_jmin];
 				}
 				else
 				{
@@ -1179,445 +816,280 @@ namespace lap
 			}
 		}
 
-		template <class MS, class SC>
-		__global__ void getMinSecondBestMedium_kernel(MS *s, SC *min_cost, SC *second_cost, SC *picked_cost, int *jmin, SC *v, SC max, int size, int dim2)
+		template <class MS, class SC, class TC>
+		__global__ void getMinimalCostSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, int last_picked, SC max, int size, int dim2)
 		{
-			// 256 threads in 8 warps
-			__shared__ SC b_min_cost[8];
-			__shared__ SC b_second_cost[8];
-			__shared__ SC b_picked_cost[8];
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min_cost, t_min_cost_real;
+			int t_jmin;
+
+			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
+			getMinimalCostWriteTemp(o_min_cost, o_jmin, o_min_cost_real, t_min_cost, t_jmin, t_min_cost_real);
+
+			if (semaphoreWarp(semaphore))
+			{
+				getMinimalCostReadTemp(t_min_cost, t_jmin, t_min_cost_real, o_min_cost, o_jmin, o_min_cost_real, max, dim2);
+				getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
+				getMinimalCostWrite(s, t_min_cost, t_jmin, t_min_cost_real, v, max, dim2);
+			}
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void getMinimalCostMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, int last_picked, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[8], b_min_cost_real[8];
 			__shared__ int b_jmin[8];
 
-			int j = threadIdx.x;
+			SC t_min_cost, t_min_cost_real;
+			int t_jmin;
 
-			SC v_min_cost = max;
-			SC v_second_cost = max;
-			SC v_picked_cost = max;
-			int v_jmin = dim2;
+			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinimalCostCombineMedium(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
+			getMinimalCostWriteTemp(o_min_cost, o_jmin, o_min_cost_real, t_min_cost, t_jmin, t_min_cost_real);
 
-			while (j < size)
+			if (semaphoreBlock(semaphore))
 			{
-				SC c_min_cost = min_cost[j];
-				SC c_second_cost = second_cost[j];
-				SC c_picked_cost = picked_cost[j];
-				int c_jmin = jmin[j];
-				if (c_min_cost < v_min_cost)
-				{
-					if (v_min_cost < c_second_cost) v_second_cost = v_min_cost;
-					else v_second_cost = c_second_cost;
-					v_min_cost = c_min_cost;
-				}
-				else if (c_min_cost < v_second_cost) v_second_cost = c_min_cost;
-				if ((c_picked_cost < v_picked_cost) || ((c_picked_cost == v_picked_cost) && (c_jmin < v_jmin)))
-				{
-					v_picked_cost = c_picked_cost;
-					v_jmin = c_jmin;
-				}
-				j += blockDim.x;
-			}
-			minWarpIndex(v_picked_cost, v_jmin);
-			SC old_min_cost = v_min_cost;
-			minWarp(v_min_cost);
-			if (v_min_cost < old_min_cost) v_second_cost = old_min_cost;
-			minWarp(v_second_cost);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = v_min_cost;
-				b_second_cost[bidx] = v_second_cost;
-				b_picked_cost[bidx] = v_picked_cost;
-				b_jmin[bidx] = v_jmin;
-			}
-			__syncthreads();
-			if (threadIdx.x >= 8) return;
-			v_min_cost = b_min_cost[threadIdx.x];
-			v_second_cost = b_second_cost[threadIdx.x];
-			v_picked_cost = b_picked_cost[threadIdx.x];
-			v_jmin = b_jmin[threadIdx.x];
-			minWarpIndex8(v_picked_cost, v_jmin);
-			old_min_cost = v_min_cost;
-			minWarp8(v_min_cost);
-			if (v_min_cost < old_min_cost) v_second_cost = old_min_cost;
-			minWarp8(v_second_cost);
-			if (threadIdx.x == 0)
-			{
-				s->min = v_min_cost;
-				s->max = v_second_cost;
-				s->picked = v_picked_cost;
-				s->jmin = v_jmin;
-				if (v_jmin < dim2)
-				{
-					s->v_jmin = v[v_jmin];
-				}
-				else
-				{
-					s->v_jmin = max;
-				}
+				getMinimalCostReadTemp(t_min_cost, t_jmin, t_min_cost_real, o_min_cost, o_jmin, o_min_cost_real, max, dim2);
+				getMinimalCostCombineMedium(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
+				getMinimalCostWrite(s, t_min_cost, t_jmin, t_min_cost_real, v, max, dim2);
 			}
 		}
 
-		template <class MS, class SC>
-		__global__ void getMinSecondBestLarge_kernel(MS *s, SC *min_cost, SC *second_cost, SC *picked_cost, int *jmin, SC *v, SC max, int size, int dim2)
+		template <class MS, class SC, class TC>
+		__global__ void getMinimalCostLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, int last_picked, SC max, int size, int dim2)
 		{
-			// 1024 threads in 32 warps
-			__shared__ SC b_min_cost[32];
-			__shared__ SC b_second_cost[32];
-			__shared__ SC b_picked_cost[32];
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[32], b_min_cost_real[32];
 			__shared__ int b_jmin[32];
 
-			int j = threadIdx.x;
+			SC t_min_cost, t_min_cost_real;
+			int t_jmin;
 
-			SC v_min_cost = max;
-			SC v_second_cost = max;
-			SC v_picked_cost = max;
-			int v_jmin = dim2;
+			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinimalCostCombineLarge(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
+			getMinimalCostWriteTemp(o_min_cost, o_jmin, o_min_cost_real, t_min_cost, t_jmin, t_min_cost_real);
 
-			while (j < size)
+			if (semaphoreBlock(semaphore))
 			{
-				SC c_min_cost = min_cost[j];
-				SC c_second_cost = second_cost[j];
-				SC c_picked_cost = picked_cost[j];
-				int c_jmin = jmin[j];
-				if (c_min_cost < v_min_cost)
-				{
-					if (v_min_cost < c_second_cost) v_second_cost = v_min_cost;
-					else v_second_cost = c_second_cost;
-					v_min_cost = c_min_cost;
-				}
-				else if (c_min_cost < v_second_cost) v_second_cost = c_min_cost;
-				if ((c_picked_cost < v_picked_cost) || ((c_picked_cost == v_picked_cost) && (c_jmin < v_jmin)))
-				{
-					v_picked_cost = c_picked_cost;
-					v_jmin = c_jmin;
-				}
-				j += blockDim.x;
+				getMinimalCostReadTempLarge(t_min_cost, t_jmin, t_min_cost_real, o_min_cost, o_jmin, o_min_cost_real, max, dim2);
+				getMinimalCostCombineLarge(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
+				getMinimalCostWrite(s, t_min_cost, t_jmin, t_min_cost_real, v, max, dim2);
 			}
-			minWarpIndex(v_picked_cost, v_jmin);
-			SC old_min_cost = v_min_cost;
-			minWarp(v_min_cost);
-			if (v_min_cost < old_min_cost) v_second_cost = old_min_cost;
-			minWarp(v_second_cost);
+		}
+
+		template <class SC, class TC>
+		__device__ __forceinline__ void getFinalCostRead(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v, int j, TC *tt, SC *v, int j_picked, SC max, int size)
+		{
+			t_min_cost = max;
+			t_picked_cost = max;
+			t_picked_v = max;
+
+			if (j < size)
+			{
+				SC t_cost = (SC)tt[j] - v[j];
+				if (t_cost < t_min_cost) t_min_cost = t_cost;
+				if (j == j_picked)
+				{
+					t_picked_cost = (SC)tt[j];
+					t_picked_v = v[j];
+				}
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getFinalCostCombineSmall(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v)
+		{
+			minWarp(t_min_cost);
+			minWarp(t_picked_cost);
+			minWarp(t_picked_v);
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getFinalCostCombineTiny(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v)
+		{
+			minWarp8(t_min_cost);
+			minWarp8(t_picked_cost);
+			minWarp8(t_picked_v);
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getFinalCostWriteShared(SC *b_min_cost, SC *b_picked_cost, SC *b_picked_v, SC t_min_cost, SC t_picked_cost, SC t_picked_v)
+		{
+			int bidx = threadIdx.x >> 5;
+			b_min_cost[bidx] = t_min_cost;
+			b_picked_cost[bidx] = t_picked_cost;
+			b_picked_v[bidx] = t_picked_v;
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getFinalCostReadShared(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v, SC *b_min_cost, SC *b_picked_cost, SC *b_picked_v)
+		{
+			t_min_cost = b_min_cost[threadIdx.x];
+			t_picked_cost = b_picked_cost[threadIdx.x];
+			t_picked_v = b_picked_v[threadIdx.x];
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getFinalCostCombineMedium(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v, SC *b_min_cost, SC *b_picked_cost, SC *b_picked_v)
+		{
+			getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = v_min_cost;
-				b_second_cost[bidx] = v_second_cost;
-				b_picked_cost[bidx] = v_picked_cost;
-				b_jmin[bidx] = v_jmin;
+				getFinalCostWriteShared(b_min_cost, b_picked_cost, b_picked_v, t_min_cost, t_picked_cost, t_picked_v);
 			}
 			__syncthreads();
-			if (threadIdx.x >= 32) return;
-			v_min_cost = b_min_cost[threadIdx.x];
-			v_second_cost = b_second_cost[threadIdx.x];
-			v_picked_cost = b_picked_cost[threadIdx.x];
-			v_jmin = b_jmin[threadIdx.x];
-			minWarpIndex(v_picked_cost, v_jmin);
-			old_min_cost = v_min_cost;
-			minWarp(v_min_cost);
-			if (v_min_cost < old_min_cost) v_second_cost = old_min_cost;
-			minWarp(v_second_cost);
-			if (threadIdx.x == 0)
+			if (threadIdx.x < 8)
 			{
-				s->min = v_min_cost;
-				s->max = v_second_cost;
-				s->picked = v_picked_cost;
-				s->jmin = v_jmin;
-				if (v_jmin < dim2)
-				{
-					s->v_jmin = v[v_jmin];
-				}
-				else
-				{
-					s->v_jmin = max;
-				}
+				getFinalCostReadShared(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
+				getFinalCostCombineTiny(t_min_cost, t_picked_cost, t_picked_v);
 			}
 		}
 
-		template <class MS, class SC>
-		__global__ void getMinimalCostSmall_kernel(MS *s, SC *min_cost, int *jmin, SC *min_cost_real, SC *v, SC max, int size, int dim2)
+		template <class SC>
+		__device__ __forceinline__ void getFinalCostCombineLarge(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v, SC *b_min_cost, SC *b_picked_cost, SC *b_picked_v)
 		{
-			int j = threadIdx.x;
-
-			SC v_min_cost = max;
-			SC v_min_cost_real = max;
-			int v_jmin = dim2;
-
-			while (j < size)
-			{
-				SC c_min_cost = min_cost[j];
-				SC c_min_cost_real = min_cost_real[j];
-				int c_jmin = jmin[j];
-				if ((c_min_cost < v_min_cost) || ((c_min_cost == v_min_cost) && (c_jmin < v_jmin)))
-				{
-					v_min_cost = c_min_cost;
-					v_jmin = c_jmin;
-				}
-				if (c_min_cost_real < v_min_cost_real) v_min_cost_real = c_min_cost_real;
-				j += blockDim.x;
-			}
-			minWarpIndex(v_min_cost, v_jmin);
-			minWarp(v_min_cost_real);
-			if (threadIdx.x == 0)
-			{
-				s->min = v_min_cost_real;
-				s->picked = v_min_cost;
-				s->jmin = v_jmin;
-				if (v_jmin < dim2)
-				{
-					s->v_jmin = v[v_jmin];
-				}
-				else
-				{
-					s->v_jmin = max;
-				}
-			}
-		}
-
-		template <class MS, class SC>
-		__global__ void getMinimalCostMedium_kernel(MS *s, SC *min_cost, int *jmin, SC *min_cost_real, SC *v, SC max, int size, int dim2)
-		{
-			// 256 threads in 8 warps
-			__shared__ SC b_min_cost[8];
-			__shared__ SC b_min_cost_real[8];
-			__shared__ int b_jmin[8];
-
-			int j = threadIdx.x;
-
-			SC v_min_cost = max;
-			SC v_min_cost_real = max;
-			int v_jmin = dim2;
-
-			while (j < size)
-			{
-				SC c_min_cost = min_cost[j];
-				SC c_min_cost_real = min_cost_real[j];
-				int c_jmin = jmin[j];
-				if ((c_min_cost < v_min_cost) || ((c_min_cost == v_min_cost) && (c_jmin < v_jmin)))
-				{
-					v_min_cost = c_min_cost;
-					v_jmin = c_jmin;
-				}
-				if (c_min_cost_real < v_min_cost_real) v_min_cost_real = c_min_cost_real;
-				j += blockDim.x;
-			}
-			minWarpIndex(v_min_cost, v_jmin);
-			minWarp(v_min_cost_real);
+			getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
 			if ((threadIdx.x & 0x1f) == 0)
 			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = v_min_cost;
-				b_min_cost_real[bidx] = v_min_cost_real;
-				b_jmin[bidx] = v_jmin;
+				getFinalCostWriteShared(b_min_cost, b_picked_cost, b_picked_v, t_min_cost, t_picked_cost, t_picked_v);
 			}
 			__syncthreads();
-			if (threadIdx.x >= 8) return;
-			v_min_cost = b_min_cost[threadIdx.x];
-			v_min_cost_real = b_min_cost_real[threadIdx.x];
-			v_jmin = b_jmin[threadIdx.x];
-			minWarpIndex8(v_min_cost, v_jmin);
-			minWarp8(v_min_cost_real);
+			if (threadIdx.x < 32)
+			{
+				getFinalCostReadShared(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
+				getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getFinalCostWriteTemp(volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC t_min_cost, SC t_picked_cost, SC t_picked_v)
+		{
 			if (threadIdx.x == 0)
 			{
-				s->min = v_min_cost_real;
-				s->picked = v_min_cost;
-				s->jmin = v_jmin;
-				if (v_jmin < dim2)
+				o_min_cost[blockIdx.x] = t_min_cost;
+				o_picked_cost[blockIdx.x] = t_picked_cost;
+				o_picked_v[blockIdx.x] = t_picked_v;
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getFinalCostReadTemp(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC max)
+		{
+			if (threadIdx.x < gridDim.x)
+			{
+				t_min_cost = o_min_cost[threadIdx.x];
+				t_picked_cost = o_picked_cost[threadIdx.x];
+				t_picked_v = o_picked_v[threadIdx.x];
+			}
+			else
+			{
+				t_min_cost = max;
+				t_picked_cost = max;
+				t_picked_v = max;
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getFinalCostReadTempLarge(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC max)
+		{
+			if (threadIdx.x < gridDim.x)
+			{
+				t_min_cost = o_min_cost[threadIdx.x];
+				t_picked_cost = o_picked_cost[threadIdx.x];
+				t_picked_v = o_picked_v[threadIdx.x];
+				// read additional values
+				for (int i = threadIdx.x + blockDim.x; i < gridDim.x; i += blockDim.x)
 				{
-					s->v_jmin = v[v_jmin];
+					SC c_min_cost = o_min_cost[i];
+					SC c_picked_cost = o_picked_cost[i];
+					SC c_picked_v = o_picked_v[i];
+					if (c_min_cost < t_min_cost) t_min_cost = c_min_cost;
+					if (c_picked_cost < t_picked_cost) t_picked_cost = c_picked_cost;
+					if (c_picked_v < t_picked_v) t_picked_v = c_picked_v;
 				}
-				else
-				{
-					s->v_jmin = max;
-				}
+			}
+			else
+			{
+				t_min_cost = max;
+				t_picked_cost = max;
+				t_picked_v = max;
 			}
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostLarge_kernel(MS *s, SC *min_cost, int *jmin, SC *min_cost_real, SC *v, SC max, int size, int dim2)
+		__device__ __forceinline__ void getFinalCostWrite(MS *s, SC t_min_cost, SC t_picked_cost, SC t_picked_v)
 		{
-			// 1024 threads in 32 warps
-			__shared__ SC b_min_cost[32];
-			__shared__ SC b_min_cost_real[32];
-			__shared__ int b_jmin[32];
-
-			int j = threadIdx.x;
-
-			SC v_min_cost = max;
-			SC v_min_cost_real = max;
-			int v_jmin = dim2;
-
-			while (j < size)
-			{
-				SC c_min_cost = min_cost[j];
-				SC c_min_cost_real = min_cost_real[j];
-				int c_jmin = jmin[j];
-				if ((c_min_cost < v_min_cost) || ((c_min_cost == v_min_cost) && (c_jmin < v_jmin)))
-				{
-					v_min_cost = c_min_cost;
-					v_jmin = c_jmin;
-				}
-				if (c_min_cost_real < v_min_cost_real) v_min_cost_real = c_min_cost_real;
-				j += blockDim.x;
-			}
-			minWarpIndex(v_min_cost, v_jmin);
-			minWarp(v_min_cost_real);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = v_min_cost;
-				b_min_cost_real[bidx] = v_min_cost_real;
-				b_jmin[bidx] = v_jmin;
-			}
-			__syncthreads();
-			if (threadIdx.x >= 32) return;
-			v_min_cost = b_min_cost[threadIdx.x];
-			v_min_cost_real = b_min_cost_real[threadIdx.x];
-			v_jmin = b_jmin[threadIdx.x];
-			minWarpIndex(v_min_cost, v_jmin);
-			minWarp(v_min_cost_real);
 			if (threadIdx.x == 0)
 			{
-				s->min = v_min_cost_real;
-				s->picked = v_min_cost;
-				s->jmin = v_jmin;
-				if (v_jmin < dim2)
-				{
-					s->v_jmin = v[v_jmin];
-				}
-				else
-				{
-					s->v_jmin = max;
-				}
+				s->min = t_min_cost;
+				s->picked = t_picked_cost;
+				s->v_jmin = t_picked_v;
 			}
 		}
 
-		template <class MS, class SC>
-		__global__ void getFinalCostSmall_kernel(MS *s, SC *min_cost, SC *picked_cost, SC *min_v, SC max, int size, int dim2)
+		template <class MS, class SC, class TC>
+		__global__ void getFinalCostSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, TC *tt, SC *v, SC max, int j_picked, int size)
 		{
-			int j = threadIdx.x;
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			SC v_min_cost = max;
-			SC v_picked_cost = max;
-			SC v_min_v = max;
+			SC t_min_cost, t_picked_cost, t_picked_v;
 
-			while (j < size)
+			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, tt, v, j_picked, max, size);
+			getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
+			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
+
+			if (semaphoreWarp(semaphore))
 			{
-				SC c_min_cost = min_cost[j];
-				SC c_picked_cost = picked_cost[j];
-				SC c_min_v = min_v[j];
-				if (c_min_cost < v_min_cost) v_min_cost = c_min_cost;
-				if (c_picked_cost < v_picked_cost) v_picked_cost = c_picked_cost;
-				if (c_min_v < v_min_v) v_min_v = c_min_v;
-				j += blockDim.x;
-			}
-			minWarp(v_min_cost);
-			minWarp(v_picked_cost);
-			minWarp(v_min_v);
-			if (threadIdx.x == 0)
-			{
-				s->min = v_min_cost;
-				s->picked = v_picked_cost;
-				s->v_jmin = v_min_v;
+				getFinalCostReadTemp(t_min_cost, t_picked_cost, t_picked_v, o_min_cost, o_picked_cost, o_picked_v, max);
+				getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
+				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
 			}
 		}
 
-		template <class MS, class SC>
-		__global__ void getFinalCostMedium_kernel(MS *s, SC *min_cost, SC *picked_cost, SC *min_v, SC max, int size, int dim2)
+		template <class MS, class SC, class TC>
+		__global__ void getFinalCostMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, TC *tt, SC *v, SC max, int j_picked, int size)
 		{
-			// 256 threads in 8 warps
-			__shared__ SC b_min_cost[8];
-			__shared__ SC b_picked_cost[8];
-			__shared__ SC b_min_v[8];
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			int j = threadIdx.x;
+			__shared__ SC b_min_cost[8], b_picked_cost[8], b_picked_v[8];
 
-			SC v_min_cost = max;
-			SC v_picked_cost = max;
-			SC v_min_v = max;
+			SC t_min_cost, t_picked_cost, t_picked_v;
 
-			while (j < size)
+			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, tt, v, j_picked, max, size);
+			getFinalCostCombineMedium(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
+			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
+
+			if (semaphoreBlock(semaphore))
 			{
-				SC c_min_cost = min_cost[j];
-				SC c_picked_cost = picked_cost[j];
-				SC c_min_v = min_v[j];
-				if (c_min_cost < v_min_cost) v_min_cost = c_min_cost;
-				if (c_picked_cost < v_picked_cost) v_picked_cost = c_picked_cost;
-				if (c_min_v < v_min_v) v_min_v = c_min_v;
-				j += blockDim.x;
-			}
-			minWarp(v_min_cost);
-			minWarp(v_picked_cost);
-			minWarp(v_min_v);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = v_min_cost;
-				b_picked_cost[bidx] = v_picked_cost;
-				b_min_v[bidx] = v_min_v;
-			}
-			__syncthreads();
-			if (threadIdx.x >= 8) return;
-			v_min_cost = b_min_cost[threadIdx.x];
-			v_picked_cost = b_picked_cost[threadIdx.x];
-			v_min_v = b_min_v[threadIdx.x];
-			minWarp8(v_min_cost);
-			minWarp8(v_picked_cost);
-			minWarp8(v_min_v);
-			if (threadIdx.x == 0)
-			{
-				s->min = v_min_cost;
-				s->picked = v_picked_cost;
-				s->v_jmin = v_min_v;
+				getFinalCostReadTemp(t_min_cost, t_picked_cost, t_picked_v, o_min_cost, o_picked_cost, o_picked_v, max);
+				getFinalCostCombineMedium(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
+				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
 			}
 		}
 
-		template <class MS, class SC>
-		__global__ void getFinalCostLarge_kernel(MS *s, SC *min_cost, SC *picked_cost, SC *min_v, SC max, int size, int dim2)
+		template <class MS, class SC, class TC>
+		__global__ void getFinalCostLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, TC *tt, SC *v, SC max, int j_picked, int size)
 		{
-			// 1024 threads in 32 warps
-			__shared__ SC b_min_cost[32];
-			__shared__ SC b_picked_cost[32];
-			__shared__ SC b_min_v[32];
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			int j = threadIdx.x;
+			__shared__ SC b_min_cost[8], b_picked_cost[8], b_picked_v[8];
 
-			SC v_min_cost = max;
-			SC v_picked_cost = max;
-			SC v_min_v = max;
+			SC t_min_cost, t_picked_cost, t_picked_v;
 
-			while (j < size)
+			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, tt, v, j_picked, max, size);
+			getFinalCostCombineLarge(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
+			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
+
+			if (semaphoreBlock(semaphore))
 			{
-				SC c_min_cost = min_cost[j];
-				SC c_picked_cost = picked_cost[j];
-				SC c_min_v = min_v[j];
-				if (c_min_cost < v_min_cost) v_min_cost = c_min_cost;
-				if (c_picked_cost < v_picked_cost) v_picked_cost = c_picked_cost;
-				if (c_min_v < v_min_v) v_min_v = c_min_v;
-				j += blockDim.x;
-			}
-			minWarp(v_min_cost);
-			minWarp(v_picked_cost);
-			minWarp(v_min_v);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int bidx = threadIdx.x >> 5;
-				b_min_cost[bidx] = v_min_cost;
-				b_picked_cost[bidx] = v_picked_cost;
-				b_min_v[bidx] = v_min_v;
-			}
-			__syncthreads();
-			if (threadIdx.x >= 32) return;
-			v_min_cost = b_min_cost[threadIdx.x];
-			v_picked_cost = b_picked_cost[threadIdx.x];
-			v_min_v = b_min_v[threadIdx.x];
-			minWarp(v_min_cost);
-			minWarp(v_picked_cost);
-			minWarp(v_min_v);
-			if (threadIdx.x == 0)
-			{
-				s->min = v_min_cost;
-				s->picked = v_picked_cost;
-				s->v_jmin = v_min_v;
+				getFinalCostReadTempLarge(t_min_cost, t_picked_cost, t_picked_v, o_min_cost, o_picked_cost, o_picked_v, max);
+				getFinalCostCombineLarge(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
+				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
 			}
 		}
 
@@ -1667,374 +1139,662 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__global__ void initializeSearchMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		__device__ __forceinline__ void initializeSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *pred, SC *d, int j, int f, TC *tt, SC *v, SC max, int size, int dim2)
 		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
+			t_min = max;
+			t_jmin = dim2;
+			t_colsol = 0;
 
-			SC t_min = max;
-			int t_jmin = dim2;
-			int t_colsol = 0;
-
-#ifdef NO_MIN_LOOP
 			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
 			{
-				SC v0;
 				colactive[j] = 1;
 				pred[j] = f;
-				d[j] = v0 = (SC)tt[j] - v[j];
-				int c_colsol = colsol[j];
-				if ((v0 < t_min) || ((v0 == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
-				{
-					t_min = v0;
-					t_jmin = j;
-					t_colsol = c_colsol;
-				}
-			}
 
-
-			minWarpIndex(t_min, t_jmin, t_colsol);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = t_min;
-				o_jmin[i] = t_jmin;
-				o_colsol[i] = t_colsol;
+				d[j] = t_min = (SC)tt[j] - v[j];
+				t_jmin = j;
+				t_colsol = colsol[j];
 			}
 		}
 
 		template <class SC, class TC>
-		__global__ void initializeSearchMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__device__ __forceinline__ void initializeSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *colsol_in, int *pred, SC *d, int j, int f, TC *tt, SC *v, SC max, int size, int dim2)
 		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
+			t_min = max;
+			t_jmin = dim2;
+			t_colsol = 0;
 
-			SC t_min = max;
-			int t_jmin = dim2;
-			int t_colsol = 0;
-
-#ifdef NO_MIN_LOOP
 			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
 			{
-				SC v0;
 				colactive[j] = 1;
 				pred[j] = f;
-				d[j] = v0 = (SC)tt[j] - v[j];
-				int c_colsol = colsol[j] = colsol_in[j];
-				if ((v0 < t_min) || ((v0 == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
-				{
-					t_min = v0;
-					t_jmin = j;
-					t_colsol = c_colsol;
-				}
+
+				d[j] = t_min = (SC)tt[j] - v[j];
+				t_jmin = j;
+				t_colsol = colsol[j] = colsol_in[j];
 			}
+		}
 
+		template <class SC>
+		__device__ __forceinline__ void initializeSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *pred, SC *d, int j, int f, SC *v, SC max, int size, int dim2)
+		{
+			t_min = max;
+			t_jmin = dim2;
+			t_colsol = 0;
 
-			minWarpIndex(t_min, t_jmin, t_colsol);
-			if ((threadIdx.x & 0x1f) == 0)
+			if (j < size)
 			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = t_min;
-				o_jmin[i] = t_jmin;
-				o_colsol[i] = t_colsol;
+				colactive[j] = 1;
+				pred[j] = f;
+
+				d[j] = t_min = -v[j];
+				t_jmin = j;
+				t_colsol = colsol[j];
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void initializeSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *colsol_in, int *pred, SC *d, int j, int f, SC *v, SC max, int size, int dim2)
+		{
+			t_min = max;
+			t_jmin = dim2;
+			t_colsol = 0;
+
+			if (j < size)
+			{
+				colactive[j] = 1;
+				pred[j] = f;
+
+				d[j] = t_min = -v[j];
+				t_jmin = j;
+				t_colsol = colsol[j] = colsol_in[j];
 			}
 		}
 
 		template <class SC, class TC>
-		__global__ void continueSearchMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, SC tt_jmin, SC v_jmin, SC min, SC max, int size, int dim2)
+		__device__ __forceinline__ void continueSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *pred, SC *d, int j, int i, TC *tt, SC *v, SC min, int jmin, SC tt_jmin, SC v_jmin,SC max, int size, int dim2)
 		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
+			t_min = max;
+			t_jmin = dim2;
+			t_colsol = 0;
 
-			SC t_min = max;
-			int t_jmin = dim2;
-			int t_colsol = 0;
-
-#ifdef NO_MIN_LOOP
 			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
-			{
-				SC h = d[j];
-				SC v2 = ((SC)tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
-				bool is_active = (colactive[j] != 0);
-				bool is_smaller = (v2 < h);
-				if (is_active)
-				{
-					if (is_smaller)
-					{
-						pred[j] = i;
-						d[j] = h = v2;
-					}
-					int c_colsol = colsol[j];
-					if ((h < t_min) || ((h == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
-					{
-						t_min = h;
-						t_jmin = j;
-						t_colsol = c_colsol;
-					}
-				}
-			}
-
-			minWarpIndex(t_min, t_jmin, t_colsol);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = t_min;
-				o_jmin[i] = t_jmin;
-				o_colsol[i] = t_colsol;
-			}
-		}
-
-		template <class SC>
-		__global__ void initializeSearchMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim, int dim2)
-		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
-
-			SC t_min = max;
-			int t_jmin = dim2;
-			int t_colsol = 0;
-
-#ifdef NO_MIN_LOOP
-			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
-			{
-				SC v0;
-				colactive[j] = 1;
-				pred[j] = f;
-				d[j] = v0 = -v[j];
-				int c_colsol = colsol[j];
-				if (c_colsol < dim)
-				{
-					if ((v0 < t_min) || ((v0 == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
-					{
-						t_min = v0;
-						t_jmin = j;
-						t_colsol = c_colsol;
-					}
-				}
-			}
-
-			minWarpIndex(t_min, t_jmin, t_colsol);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = t_min;
-				o_jmin[i] = t_jmin;
-				o_colsol[i] = t_colsol;
-			}
-		}
-
-		template <class SC>
-		__global__ void initializeSearchMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim, int dim2)
-		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
-
-			SC t_min = max;
-			int t_jmin = dim2;
-			int t_colsol = 0;
-
-#ifdef NO_MIN_LOOP
-			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
-			{
-				SC v0;
-				colactive[j] = 1;
-				pred[j] = f;
-				d[j] = v0 = -v[j];
-				int c_colsol = colsol[j] = colsol_in[j];
-				if (c_colsol < dim)
-				{
-					if ((v0 < t_min) || ((v0 == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
-					{
-						t_min = v0;
-						t_jmin = j;
-						t_colsol = c_colsol;
-					}
-				}
-			}
-
-			minWarpIndex(t_min, t_jmin, t_colsol);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = t_min;
-				o_jmin[i] = t_jmin;
-				o_colsol[i] = t_colsol;
-			}
-		}
-
-		template <class SC>
-		__global__ void continueSearchMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC v_jmin, SC min, SC max, int size, int dim2)
-		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
-
-			SC t_min = max;
-			int t_jmin = dim2;
-			int t_colsol = 0;
-
-#ifdef NO_MIN_LOOP
-			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
-			{
-				SC h = d[j];
-				SC v2 = -(v[j] - v_jmin) + min;
-				bool is_active = (colactive[j] != 0);
-				bool is_smaller = (v2 < h);
-				if (is_active)
-				{
-					if (is_smaller)
-					{
-						pred[j] = i;
-						d[j] = h = v2;
-					}
-					int c_colsol = colsol[j];
-					if ((h < t_min) || ((h == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
-					{
-						t_min = h;
-						t_jmin = j;
-						t_colsol = c_colsol;
-					}
-				}
-			}
-
-			minWarpIndex(t_min, t_jmin, t_colsol);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = t_min;
-				o_jmin[i] = t_jmin;
-				o_colsol[i] = t_colsol;
-			}
-		}
-
-		template <class SC, class TC>
-		__global__ void continueSearchJMinMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
-		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
-
-			SC t_min = max;
-			int t_jmin = dim2;
-			SC tt_jmin = (SC)tt[jmin];
-			SC v_jmin = v[jmin];
-			int t_colsol = 0;
-
-#ifdef NO_MIN_LOOP
-			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
 			{
 				if (j == jmin) colactive[jmin] = 0;
 				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
 					SC v2 = ((SC)tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
+
 					bool is_smaller = (v2 < h);
 					if (is_smaller)
 					{
 						pred[j] = i;
 						d[j] = h = v2;
 					}
-					int c_colsol = colsol[j];
-					if ((h < t_min) || ((h == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
-					{
-						t_min = h;
-						t_jmin = j;
-						t_colsol = c_colsol;
-					}
-				}
-			}
 
-			minWarpIndex(t_min, t_jmin, t_colsol);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = t_min;
-				o_jmin[i] = t_jmin;
-				o_colsol[i] = t_colsol;
+					t_min = h;
+					t_jmin = j;
+					t_colsol = colsol[j];
+				}
 			}
 		}
 
 		template <class SC>
-		__global__ void continueSearchJMinMin_kernel(SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
+		__device__ __forceinline__ void continueSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *pred, SC *d, int j, int i, SC *v, SC min, int jmin, SC v_jmin, SC max, int size, int dim2)
 		{
-#ifdef NO_MIN_LOOP
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-#endif
+			t_min = max;
+			t_jmin = dim2;
+			t_colsol = 0;
 
-			SC t_min = max;
-			int t_jmin = dim2;
-			SC v_jmin = v[jmin];
-			int t_colsol = 0;
-
-#ifdef NO_MIN_LOOP
 			if (j < size)
-#else
-#pragma unroll 4
-			for (int j = threadIdx.x + blockIdx.x * blockDim.x; j < size; j += blockDim.x * gridDim.x)
-#endif
 			{
 				if (j == jmin) colactive[jmin] = 0;
 				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
-					SC v2 = -(v[j] - v_jmin) + min;
+					SC v2 = (v[j] - v_jmin) + min;
+
 					bool is_smaller = (v2 < h);
 					if (is_smaller)
 					{
 						pred[j] = i;
 						d[j] = h = v2;
 					}
-					int c_colsol = colsol[j];
-					if ((h < t_min) || ((h == t_min) && (c_colsol < 0) && (t_colsol >= 0)))
+
+					t_min = h;
+					t_jmin = j;
+					t_colsol = colsol[j];
+				}
+			}
+		}
+
+		template <class SC, class TC>
+		__device__ __forceinline__ void continueSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *pred, SC *d, int j, int i, TC *tt, SC *v, SC min, SC tt_jmin, SC v_jmin, SC max, int size, int dim2)
+		{
+			t_min = max;
+			t_jmin = dim2;
+			t_colsol = 0;
+
+			if (j < size)
+			{
+				if (colactive[j] != 0)
+				{
+					SC h = d[j];
+					SC v2 = ((SC)tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
+
+					bool is_smaller = (v2 < h);
+					if (is_smaller)
 					{
-						t_min = h;
-						t_jmin = j;
+						pred[j] = i;
+						d[j] = h = v2;
+					}
+
+					t_min = h;
+					t_jmin = j;
+					t_colsol = colsol[j];
+				}
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void continueSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *pred, SC *d, int j, int i, SC *v, SC min, SC v_jmin, SC max, int size, int dim2)
+		{
+			t_min = max;
+			t_jmin = dim2;
+			t_colsol = 0;
+
+			if (j < size)
+			{
+				if (colactive[j] != 0)
+				{
+					SC h = d[j];
+					SC v2 = (v[j] - v_jmin) + min;
+
+					bool is_smaller = (v2 < h);
+					if (is_smaller)
+					{
+						pred[j] = i;
+						d[j] = h = v2;
+					}
+
+					t_min = h;
+					t_jmin = j;
+					t_colsol = colsol[j];
+				}
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void searchWriteShared(SC *b_min, int *b_jmin, int *b_colsol, SC t_min, int t_jmin, int t_colsol)
+		{
+			int bidx = threadIdx.x >> 5;
+			b_min[bidx] = t_min;
+			b_jmin[bidx] = t_jmin;
+			b_colsol[bidx] = t_colsol;
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void searchReadShared(SC &t_min, int &t_jmin, int &t_colsol, SC *b_min, int *b_jmin, int *b_colsol)
+		{
+			t_min = b_min[threadIdx.x];
+			t_jmin = b_jmin[threadIdx.x];
+			t_colsol = b_colsol[threadIdx.x];
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void searchCombineMedium(SC &t_min, int &t_jmin, int &t_colsol, SC *b_min, int *b_jmin, int *b_colsol)
+		{
+			minWarpIndex(t_min, t_jmin, t_colsol);
+			if ((threadIdx.x & 0x1f) == 0)
+			{
+				searchWriteShared(b_min, b_jmin, b_colsol, t_min, t_jmin, t_colsol);
+			}
+			__syncthreads();
+			if (threadIdx.x < 8)
+			{
+				searchReadShared(t_min, t_jmin, t_colsol, b_min, b_jmin, b_colsol);
+				minWarpIndex8(t_min, t_jmin, t_colsol);
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void searchCombineLarge(SC &t_min, int &t_jmin, int &t_colsol, SC *b_min, int *b_jmin, int *b_colsol)
+		{
+			minWarpIndex(t_min, t_jmin, t_colsol);
+			if ((threadIdx.x & 0x1f) == 0)
+			{
+				searchWriteShared(b_min, b_jmin, b_colsol, t_min, t_jmin, t_colsol);
+			}
+			__syncthreads();
+			if (threadIdx.x < 32)
+			{
+				searchReadShared(t_min, t_jmin, t_colsol, b_min, b_jmin, b_colsol);
+				minWarpIndex(t_min, t_jmin, t_colsol);
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void searchWriteTemp(volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC t_min, int t_jmin, int t_colsol)
+		{
+			if (threadIdx.x == 0)
+			{
+				o_min[blockIdx.x] = t_min;
+				o_jmin[blockIdx.x] = t_jmin;
+				o_colsol[blockIdx.x] = t_colsol;
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void searchReadTemp(SC &t_min, int &t_jmin, int &t_colsol, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC max, int dim2)
+		{
+			if (threadIdx.x < gridDim.x)
+			{
+				t_min = o_min[threadIdx.x];
+				t_jmin = o_jmin[threadIdx.x];
+				t_colsol = o_colsol[threadIdx.x];
+			}
+			else
+			{
+				t_min = max;
+				t_jmin = dim2;
+				t_colsol = 0;
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void searchReadTempLarge(SC &t_min, int &t_jmin, int &t_colsol, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC max, int dim2)
+		{
+			if (threadIdx.x < gridDim.x)
+			{
+				t_min = o_min[threadIdx.x];
+				t_jmin = o_jmin[threadIdx.x];
+				t_colsol = o_colsol[threadIdx.x];
+				// read additional values
+				for (int i = threadIdx.x + blockDim.x; i < gridDim.x; i += blockDim.x)
+				{
+					SC c_min = o_min[threadIdx.x];
+					int c_jmin = o_jmin[threadIdx.x];
+					int c_colsol = o_colsol[threadIdx.x];
+					if ((c_min < t_min) || ((c_min == t_min) && ((c_colsol < t_colsol) || ((c_colsol == t_colsol) && (c_jmin < t_jmin)))))
+					{
+						t_min = c_min;
+						t_jmin = c_jmin;
 						t_colsol = c_colsol;
 					}
 				}
 			}
-
-			minWarpIndex(t_min, t_jmin, t_colsol);
-			if ((threadIdx.x & 0x1f) == 0)
+			else
 			{
-				int i = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
-				o_min[i] = t_min;
-				o_jmin[i] = t_jmin;
-				o_colsol[i] = t_colsol;
+				t_min = max;
+				t_jmin = dim2;
+				t_colsol = 0;
 			}
+		}
+
+		template <class MS, class SC>
+		__device__ __forceinline__ void searchWrite(MS *s, SC t_min, int t_jmin, int t_colsol)
+		{
+			if (threadIdx.x == 0)
+			{
+				s->min = t_min;
+				s->jmin = t_jmin;
+				s->colsol = t_colsol;
+			}
+		}
+
+		template <class MS, class SC>
+		__device__ __forceinline__ void searchSmall(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC &t_min, int &t_jmin, int &t_colsol, SC max, int size, int dim2)
+		{
+			minWarpIndex(t_min, t_jmin, t_colsol);
+			searchWriteTemp(o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol);
+
+			if (semaphoreWarp(semaphore))
+			{
+				searchReadTemp(t_min, t_jmin, t_colsol, o_min, o_jmin, o_colsol, max, dim2);
+				minWarpIndex(t_min, t_jmin, t_colsol);
+				searchWrite(s, t_min, t_jmin, t_colsol);
+			}
+		}
+		
+		template <class MS, class SC>
+		__device__ __forceinline__ void searchMedium(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC &t_min, int &t_jmin, int &t_colsol, SC max, int size, int dim2)
+		{
+			__shared__ SC b_min[8];
+			__shared__ int b_jmin[8], b_colsol[8];
+
+			searchCombineMedium(t_min, t_jmin, t_colsol, b_min, b_jmin, b_colsol);
+			searchWriteTemp(o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol);
+
+			if (semaphoreBlock(semaphore))
+			{
+				searchReadTemp(t_min, t_jmin, t_colsol, o_min, o_jmin, o_colsol, max, dim2);
+				searchCombineMedium(t_min, t_jmin, t_colsol, b_min, b_jmin, b_colsol);
+				searchWrite(s, t_min, t_jmin, t_colsol);
+			}
+		}
+
+		template <class MS, class SC>
+		__device__ __forceinline__ void searchLarge(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC &t_min, int &t_jmin, int &t_colsol, SC max, int size, int dim2)
+		{
+			__shared__ SC b_min[32];
+			__shared__ int b_jmin[32], b_colsol[32];
+
+			searchCombineLarge(t_min, t_jmin, t_colsol, b_min, b_jmin, b_colsol);
+			searchWriteTemp(o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol);
+
+			if (semaphoreBlock(semaphore))
+			{
+				searchReadTempLarge(t_min, t_jmin, t_colsol, o_min, o_jmin, o_colsol, max, dim2);
+				searchCombineLarge(t_min, t_jmin, t_colsol, b_min, b_jmin, b_colsol);
+				searchWrite(s, t_min, t_jmin, t_colsol);
+			}
+		}
+
+		// normal
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, tt, v, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, tt, v, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, tt, v, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		// copy colsol
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, tt, v, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, tt, v, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, tt, v, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		// virtual row
+		template <class MS, class SC>
+		__global__ void initializeSearchMinSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, v, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void initializeSearchMinMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, v, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void initializeSearchMinLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, v, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		// copy colsol, virtual row
+		template <class MS, class SC>
+		__global__ void initializeSearchMinSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, v, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void initializeSearchMinMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, v, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void initializeSearchMinLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, v, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void continueSearchJMinMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC tt_jmin = (SC)tt[jmin];
+			SC v_jmin = v[jmin];
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, jmin, tt_jmin, v_jmin, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void continueSearchJMinMinMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC tt_jmin = (SC)tt[jmin];
+			SC v_jmin = v[jmin];
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, jmin, tt_jmin, v_jmin, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void continueSearchJMinMinLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC tt_jmin = (SC)tt[jmin];
+			SC v_jmin = v[jmin];
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, jmin, tt_jmin, v_jmin, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void continueSearchJMinMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC v_jmin = v[jmin];
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, jmin, v_jmin, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void continueSearchJMinMinMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC v_jmin = v[jmin];
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, jmin, v_jmin, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void continueSearchJMinMinLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC v_jmin = v[jmin];
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, jmin, v_jmin, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void continueSearchMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, SC tt_jmin, SC v_jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void continueSearchMinMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, SC tt_jmin, SC v_jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void continueSearchMinLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, SC tt_jmin, SC v_jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void continueSearchMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC v_jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void continueSearchMinMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC v_jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void continueSearchMinLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC v_jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC>
@@ -2102,162 +1862,6 @@ namespace lap
 			v_max = b_max[threadIdx.x];
 			maxWarp(v_max);
 			if (threadIdx.x == 0) s->max = v_max;
-		}
-
-		template <class MS, class SC>
-		__global__ void findMinSmall_kernel(MS *s, SC *min, int *jmin, int *colsol, SC max, int size, int dim2)
-		{
-			int j = threadIdx.x;
-
-			SC v_min = max;
-			int v_jmin = dim2;
-			int v_colsol = 0;
-
-			while (j < size)
-			{
-				SC c_min = min[j];
-				int c_jmin = jmin[j];
-				int c_colsol = colsol[j];
-				bool is_better = (c_min < v_min);
-				if (c_jmin < v_jmin)
-				{
-					is_better = is_better || ((c_min == v_min) && ((c_colsol < 0) || (v_colsol >= 0)));
-				}
-				else
-				{
-					is_better = is_better || ((c_min == v_min) && (c_colsol < 0) && (v_colsol >= 0));
-				}
-				if (is_better)
-				{
-					v_min = c_min;
-					v_jmin = c_jmin;
-					v_colsol = c_colsol;
-				}
-				j += blockDim.x;
-			}
-			minWarpIndex(v_min, v_jmin, v_colsol);
-			if (threadIdx.x == 0)
-			{
-				s->min = v_min;
-				s->jmin = v_jmin;
-				s->colsol = v_colsol;
-			}
-		}
-
-		template <class MS, class SC>
-		__global__ void findMinMedium_kernel(MS *s, SC *min, int *jmin, int *colsol, SC max, int size, int dim2)
-		{
-			// 256 threads in 8 warps
-			__shared__ SC b_min[8];
-			__shared__ int b_jmin[8];
-			__shared__ int b_colsol[8];
-
-			int j = threadIdx.x;
-
-			SC v_min = max;
-			int v_jmin = dim2;
-			int v_colsol = 0;
-
-			while (j < size)
-			{
-				SC c_min = min[j];
-				int c_jmin = jmin[j];
-				int c_colsol = colsol[j];
-				bool is_better = (c_min < v_min);
-				if (c_jmin < v_jmin)
-				{
-					is_better = is_better || ((c_min == v_min) && ((c_colsol < 0) || (v_colsol >= 0)));
-				}
-				else
-				{
-					is_better = is_better || ((c_min == v_min) && (c_colsol < 0) && (v_colsol >= 0));
-				}
-				if (is_better)
-				{
-					v_min = c_min;
-					v_jmin = c_jmin;
-					v_colsol = c_colsol;
-				}
-				j += blockDim.x;
-			}
-			minWarpIndex(v_min, v_jmin, v_colsol);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int bidx = threadIdx.x >> 5;
-				b_min[bidx] = v_min;
-				b_jmin[bidx] = v_jmin;
-				b_colsol[bidx] = v_colsol;
-			}
-			__syncthreads();
-			if (threadIdx.x >= 8) return;
-			v_min = b_min[threadIdx.x];
-			v_jmin = b_jmin[threadIdx.x];
-			v_colsol = b_colsol[threadIdx.x];
-			minWarpIndex8(v_min, v_jmin, v_colsol);
-			if (threadIdx.x == 0)
-			{
-				s->min = v_min;
-				s->jmin = v_jmin;
-				s->colsol = v_colsol;
-			}
-		}
-
-		template <class MS, class SC>
-		__global__ void findMinLarge_kernel(MS *s, SC *min, int *jmin, int *colsol, SC max, int size, int dim2)
-		{
-			// 1024 threads in 32 warps
-			__shared__ SC b_min[32];
-			__shared__ int b_jmin[32];
-			__shared__ int b_colsol[32];
-
-			int j = threadIdx.x;
-
-			SC v_min = max;
-			int v_jmin = dim2;
-			int v_colsol = 0;
-
-			while (j < size)
-			{
-				SC c_min = min[j];
-				int c_jmin = jmin[j];
-				int c_colsol = colsol[j];
-				bool is_better = (c_min < v_min);
-				if (c_jmin < v_jmin)
-				{
-					is_better = is_better || ((c_min == v_min) && ((c_colsol < 0) || (v_colsol >= 0)));
-				}
-				else
-				{
-					is_better = is_better || ((c_min == v_min) && (c_colsol < 0) && (v_colsol >= 0));
-				}
-				if (is_better)
-				{
-					v_min = c_min;
-					v_jmin = c_jmin;
-					v_colsol = c_colsol;
-				}
-				j += blockDim.x;
-			}
-			minWarpIndex(v_min, v_jmin, v_colsol);
-			if ((threadIdx.x & 0x1f) == 0)
-			{
-				int bidx = threadIdx.x >> 5;
-				b_min[bidx] = v_min;
-				b_jmin[bidx] = v_jmin;
-				b_colsol[bidx] = v_colsol;
-			}
-			__syncthreads();
-			if (threadIdx.x >= 32) return;
-			v_min = b_min[threadIdx.x];
-			v_jmin = b_jmin[threadIdx.x];
-			v_colsol = b_colsol[threadIdx.x];
-			minWarpIndex(v_min, v_jmin, v_colsol);
-			if (threadIdx.x == 0)
-			{
-				s->min = v_min;
-				s->jmin = v_jmin;
-				s->colsol = v_colsol;
-			}
 		}
 
 		__global__ void setColInactive_kernel(char *colactive, int jmin)
