@@ -106,13 +106,13 @@ namespace lap
 				cudaStream_t stream = iterator.ws.stream[t];
 				cudaMalloc(&(mod_v_private[t]), num_items * sizeof(SC));
 				cudaMalloc(&(picked_private[t]), num_items * sizeof(int));
-				cudaMalloc(&(semaphore_private[0]), sizeof(unsigned int));
+				cudaMalloc(&(semaphore_private[t]), sizeof(unsigned int));
 				cudaMalloc(&(min_cost_private[t]), count * sizeof(SC));
 				cudaMalloc(&(max_cost_private[t]), count * sizeof(SC));
 				cudaMalloc(&(picked_cost_private[t]), count * sizeof(SC));
 				cudaMalloc(&(jmin_private[t]), count * sizeof(int));
 				cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
-				cudaMemsetAsync(semaphore_private[0], 0, sizeof(unsigned int), stream);
+				cudaMemsetAsync(semaphore_private[t], 0, sizeof(unsigned int), stream);
 			}
 
 			SC lower_bound = SC(0);
