@@ -280,7 +280,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__device__ __forceinline__ void getMinMaxBestReadTemp(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin)
+		__device__ __forceinline__ void getMinMaxBestReadTemp(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC min, SC max, int dim2)
 		{
 			if (threadIdx.x < gridDim.x)
 			{
@@ -289,10 +289,17 @@ namespace lap
 				t_picked_cost = o_picked_cost[threadIdx.x];
 				t_jmin = o_jmin[threadIdx.x];
 			}
+			else
+			{
+				t_min_cost = max;
+				t_max_cost = min;
+				t_picked_cost = max;
+				t_jmin = dim2;
+			}
 		}
 
 		template <class SC>
-		__device__ __forceinline__ void getMinMaxBestReadTempLarge(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin)
+		__device__ __forceinline__ void getMinMaxBestReadTempLarge(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC min, SC max, int dim2)
 		{
 			if (threadIdx.x < gridDim.x)
 			{
@@ -315,6 +322,13 @@ namespace lap
 						t_picked_cost = c_picked_cost;
 					}
 				}
+			}
+			else
+			{
+				t_min_cost = max;
+				t_max_cost = min;
+				t_picked_cost = max;
+				t_jmin = dim2;
 			}
 		}
 
@@ -345,7 +359,7 @@ namespace lap
 
 			if (semaphoreWarp(semaphore))
 			{
-				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin);
+				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
 				getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 			}
@@ -369,7 +383,7 @@ namespace lap
 
 			if (semaphoreBlock(semaphore))
 			{
-				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin);
+				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
 				getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 			}
@@ -393,7 +407,7 @@ namespace lap
 
 			if (semaphoreBlock(semaphore))
 			{
-				getMinMaxBestReadTempLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin);
+				getMinMaxBestReadTempLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
 				getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 			}
