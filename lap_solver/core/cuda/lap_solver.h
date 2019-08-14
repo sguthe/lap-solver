@@ -550,7 +550,7 @@ namespace lap
 					for (int i = dim - 1; i >= 0; --i)
 					{
 						int triggered = -1;
-						int t_start;
+						int t_start = -1;
 						bool available = false;
 						for (int t = 0; t < devices; t++)
 						{
