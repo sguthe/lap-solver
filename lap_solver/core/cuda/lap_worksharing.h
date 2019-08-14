@@ -168,6 +168,7 @@ namespace lap
 						}
 					}
 				}
+				std::cout << "Peer enabled." << std::endl;
 				return true;
 			}
 		};
