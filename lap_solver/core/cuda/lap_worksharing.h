@@ -156,7 +156,6 @@ namespace lap
 				int devices = (int)device.size();
 				for (int d0 = 0; d0 < devices - 1; d0++)
 				{
-					cudaSetDevice(device[d0]);
 					for (int d1 = d0 + 1; d1 < devices; d1++)
 					{
 						if (device[d0] != device[d1])
@@ -164,11 +163,15 @@ namespace lap
 							int canAccessPeer;
 							cudaDeviceCanAccessPeer(&canAccessPeer, device[d0], device[d1]);
 							if (canAccessPeer == 0) return false;
+							cudaDeviceCanAccessPeer(&canAccessPeer, device[d1], device[d0]);
+							if (canAccessPeer == 0) return false;
+							cudaSetDevice(device[d0]);
 							cudaDeviceEnablePeerAccess(device[d1], 0);
+							cudaSetDevice(device[d1]);
+							cudaDeviceEnablePeerAccess(device[d0], 0);
 						}
 					}
 				}
-				std::cout << "Peer enabled." << std::endl;
 				return true;
 			}
 		};
