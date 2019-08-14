@@ -121,12 +121,13 @@ namespace lap
 					else part[p].second = size;
 				}
 				stream.resize(devices);
-				event.resize(devices);
+				event.resize(2 * devices);
 				for (int t = 0; t < devices; t++)
 				{
 					cudaSetDevice(device[t]);
 					cudaStreamCreate(&stream[t]);
 					cudaEventCreateWithFlags(&event[t], cudaEventDisableTiming);
+					cudaEventCreateWithFlags(&event[t + devices], cudaEventDisableTiming);
 				}
 			}
 			~Worksharing()
@@ -138,6 +139,7 @@ namespace lap
 					cudaSetDevice(device[t]);
 					cudaStreamDestroy(stream[t]);
 					cudaEventDestroy(event[t]);
+					cudaEventDestroy(event[t + devices]);
 				}
 			}
 			int find(int x)
@@ -148,6 +150,25 @@ namespace lap
 					if ((x >= part[t].first) && (x < part[t].second)) return t;
 				}
 				return -1;
+			}
+			bool peerAccess()
+			{
+				int devices = (int)device.size();
+				for (int d0 = 0; d0 < devices - 1; d0++)
+				{
+					cudaSetDevice(device[d0]);
+					for (int d1 = d0 + 1; d1 < devices; d1++)
+					{
+						if (device[d0] != device[d1])
+						{
+							int canAccessPeer;
+							cudaDeviceCanAccessPeer(&canAccessPeer, device[d0], device[d1]);
+							if (canAccessPeer == 0) return false;
+							cudaDeviceEnablePeerAccess(device[d1], 0);
+						}
+					}
+				}
+				return true;
 			}
 		};
 	}

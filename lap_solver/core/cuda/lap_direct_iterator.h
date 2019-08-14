@@ -22,6 +22,7 @@ namespace lap
 			void getHitMiss(long long &hit, long long &miss) { hit = miss = 0; }
 
 			__forceinline const TC *getRow(int t, int i) { return costfunc.getRow(t, i); }
+			__forceinline bool checkRow(int t, int i) { return true; }
 		};
 	}
 }

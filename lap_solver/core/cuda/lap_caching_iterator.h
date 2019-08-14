@@ -61,6 +61,11 @@ namespace lap
 				}
 				return rows[t] + (long long)size * (long long)idx;
 			}
+
+			__forceinline bool checkRow(int t, int i)
+			{
+				return cache[t].present(i);
+			}
 		};
 	}
 }
