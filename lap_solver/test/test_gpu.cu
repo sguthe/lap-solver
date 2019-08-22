@@ -1,8 +1,8 @@
 #define LAP_CUDA
-#define LAP_QUIET
+//#define LAP_QUIET
 //#define LAP_DISPLAY_EVALUATED
-//#define LAP_DEBUG
-//#define LAP_NO_MEM_DEBUG
+#define LAP_DEBUG
+#define LAP_NO_MEM_DEBUG
 //#define LAP_ROWS_SCANNED
 // should only be enabled for testing purposes
 //#define LAP_CUDA_ALLOW_WDDM
@@ -144,13 +144,32 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	lap::SimpleCostFunction<TC, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu);
 	lap::TableCost<TC> costMatrix(N1, N2, cpuCostFunction);
 
+	int devices = (int)ws.device.size();
 	TC *buffer;
-	cudaMallocHost(&buffer, N2 * sizeof(TC));
-
-	// cost function (copy data from table)
-	auto get_cost_row = [&costMatrix, &buffer](TC *d_row, int t, cudaStream_t stream, int x, int start, int end)
+	// 16 should be enough
+	cudaMallocHost(&buffer, 16 * N2 * sizeof(TC));
+	std::vector<int> idx(devices);
+	for (int i = 0; i < devices; i++) idx[i] = 0;
+	std::vector<cudaEvent_t> cudaEvent(16 * devices);
+	for (int t = 0; t < devices; t++)
 	{
-		cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
+		cudaSetDevice(ws.device[t]);
+		for (int i = 0; i < 16; i++)
+		{
+			cudaEventCreateWithFlags(&cudaEvent[t * 16 + i], cudaEventDisableTiming);
+		}
+	}
+
+	// cost function (copy data from table, cudaMemcpy may not be complete prior to next call)
+	auto get_cost_row = [&costMatrix, &buffer, &idx, &N2, &cudaEvent](TC *d_row, int t, cudaStream_t stream, int x, int start, int end)
+	{
+		if (cudaEventQuery(cudaEvent[t * 16 + idx[t]]) != cudaSuccess) cudaEventSynchronize(cudaEvent[t * 16 + idx[t]]);
+		memcpy(buffer + start + N2 * idx[t], costMatrix.getRow(x) + start, (end - start) * sizeof(TC));
+		cudaMemcpyAsync(d_row, buffer + start + N2 * idx[t], (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
+		cudaEventRecord(cudaEvent[t * 16 + idx[t]], stream);
+		idx[t]++;
+		if (idx[t] >= 16) idx[t] = 0;
+		//cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
 	};
 
 	// cost function
@@ -168,6 +187,14 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 
 	cudaFreeHost(buffer);
+	for (int t = 0; t < devices; t++)
+	{
+		cudaSetDevice(ws.device[t]);
+		for (int i = 0; i < 4; i++)
+		{
+			cudaEventDestroy(cudaEvent[t * 4 + i]);
+		}
+	}
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costMatrix, rowsol);
