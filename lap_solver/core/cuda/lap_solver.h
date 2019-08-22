@@ -2618,8 +2618,6 @@ namespace lap
 			lapFree(scancount);
 #endif
 
-			for (int j = 0; j < dim2; j++) rowsol[colsol[j]] = j;
-
 			// free CUDA memory
 			for (int t = 0; t < devices; t++)
 			{
