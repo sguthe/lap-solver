@@ -521,7 +521,9 @@ namespace lap
 			upper_bound = std::min(upper_bound, old_upper_bound);
 			lower_bound = std::max(lower_bound, old_lower_bound);
 			greedy_gap = upper_bound - lower_bound;
+#ifdef LAP_DEBUG
 			double ratio = (double)greedy_gap / (double)initial_gap;
+#endif
 			double ratio2 = (double)greedy_gap / (double)initial_greedy_gap;
 
 #ifdef LAP_DEBUG
