@@ -352,21 +352,24 @@ namespace lap
 	template <class SC>
 	void getUpperLower(SC &upper, SC &lower, SC greedy_gap, SC initial_gap, int dim2)
 	{
-		if (greedy_gap < SC(0)) upper = SC(0);
+		if (SC(4) * greedy_gap > initial_gap) greedy_gap = initial_gap / SC(4);
+		if ((double)greedy_gap < 1.0e-6 * (double)initial_gap) upper = SC(0);
 		else upper = (SC)((double)greedy_gap * sqrt((double)greedy_gap / (double)initial_gap) / (double)dim2);
 		lower = (SC)((double)initial_gap / (16.0 * (double)dim2 * (double)dim2));
 		if (upper < lower) upper = lower = SC(0);
 	}
 
 	template <class SC, class I>
-	std::pair<SC, SC> estimateEpsilon(int dim, int dim2, I& iterator, SC *v)
+	std::pair<SC, SC> estimateEpsilon(int dim, int dim2, I& iterator, SC *v, int *perm)
 	{
 		SC *mod_v;
-		int *perm;
+		//int *perm;
 		int *picked;
+		SC *v2;
 
 		lapAlloc(mod_v, dim2, __FILE__, __LINE__);
-		lapAlloc(perm, dim, __FILE__, __LINE__);
+		lapAlloc(v2, dim2, __FILE__, __LINE__);
+		//lapAlloc(perm, dim, __FILE__, __LINE__);
 		lapAlloc(picked, dim2, __FILE__, __LINE__);
 
 		SC lower_bound = SC(0);
@@ -395,10 +398,19 @@ namespace lap
 
 		SC initial_gap = upper_bound - lower_bound;
 		SC greedy_gap = greedy_bound - lower_bound;
+		SC initial_greedy_gap = greedy_gap;
 
 #ifdef LAP_DEBUG
-		lapDebug << "  upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " initial_gap = " << initial_gap << std::endl;
-		lapDebug << "  upper_bound = " << greedy_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap << std::endl;
+		{
+			std::stringstream ss;
+			ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " initial_gap = " << initial_gap;
+			lap::displayTime(start_time, ss.str().c_str(), lapDebug);
+		}
+		{
+			std::stringstream ss;
+			ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+			lap::displayTime(start_time, ss.str().c_str(), lapDebug);
+		}
 #endif
 
 		SC upper = std::numeric_limits<SC>::max();
@@ -430,7 +442,11 @@ namespace lap
 		greedy_gap = upper_bound - lower_bound;
 
 #ifdef LAP_DEBUG
-		lapDebug << "  upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap << std::endl;
+		{
+			std::stringstream ss;
+			ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+			lap::displayTime(start_time, ss.str().c_str(), lapDebug);
+		}
 #endif
 		if (initial_gap < SC(4) * greedy_gap)
 		{
@@ -458,7 +474,11 @@ namespace lap
 			greedy_gap = upper_bound - lower_bound;
 
 #ifdef LAP_DEBUG
-			lapDebug << "  upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap << std::endl;
+			{
+				std::stringstream ss;
+				ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+				lap::displayTime(start_time, ss.str().c_str(), lapDebug);
+			}
 #endif
 
 			// update v in reverse order
@@ -501,17 +521,31 @@ namespace lap
 			upper_bound = std::min(upper_bound, old_upper_bound);
 			lower_bound = std::max(lower_bound, old_lower_bound);
 			greedy_gap = upper_bound - lower_bound;
+			double ratio = (double)greedy_gap / (double)initial_gap;
+			double ratio2 = (double)greedy_gap / (double)initial_greedy_gap;
 
 #ifdef LAP_DEBUG
-			lapDebug << "  upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap << std::endl;
+			{
+				std::stringstream ss;
+				ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+				lap::displayTime(start_time, ss.str().c_str(), lapDebug);
+			}
 #endif
+			if (ratio2 > 1.0e-09)
+			{
+				for (int i = 0; i < dim; i++)
+				{
+					v[i] = (SC)((double)v2[i] * ratio2 + (double)v[i] * (1.0 - ratio2));
+				}
+			}
 		}
 
 		getUpperLower(upper, lower, greedy_gap, initial_gap, dim2);
 
 		lapFree(mod_v);
-		lapFree(perm);
+		//lapFree(perm);
 		lapFree(picked);
+		lapFree(v2);
 
 		return std::pair<SC, SC>((SC)upper, (SC)lower);
 	}
@@ -652,6 +686,7 @@ namespace lap
 		SC epsilon_upper;
 		SC epsilon_lower;
 		SC *v;
+		int *perm;
 
 #ifdef LAP_DEBUG
 		std::vector<SC *> v_list;
@@ -664,6 +699,7 @@ namespace lap
 		lapAlloc(pred, dim2, __FILE__, __LINE__);
 		lapAlloc(colsol, dim2, __FILE__, __LINE__);
 		lapAlloc(v, dim2, __FILE__, __LINE__);
+		lapAlloc(perm, dim, __FILE__, __LINE__);
 
 #ifdef LAP_ROWS_SCANNED
 		unsigned long long *scancount;
@@ -678,7 +714,7 @@ namespace lap
 
 		if (use_epsilon)
 		{
-			std::pair<SC, SC> eps = estimateEpsilon(dim, dim2, iterator, v);
+			std::pair<SC, SC> eps = estimateEpsilon(dim, dim2, iterator, v, perm);
 			epsilon_upper = eps.first;
 			epsilon_lower = eps.second;
 		}
@@ -687,6 +723,7 @@ namespace lap
 			memset(v, 0, dim2 * sizeof(SC));
 			epsilon_upper = SC(0);
 			epsilon_lower = SC(0);
+			for (int i = 0; i < dim; i++) perm[i] = i;
 		}
 		epsilon = epsilon_upper;
 
@@ -736,8 +773,9 @@ namespace lap
 			displayProgress(start_time, elapsed, 0, dim2, " rows");
 #endif
 			int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
-			for (int f = 0; f < dim_limit; f++)
+			for (int fc = 0; fc < dim_limit; fc++)
 			{
+				int f = (fc < dim) ? perm[fc] : fc;
 #ifndef LAP_QUIET
 				if (f < dim) total_rows++; else total_virtual++;
 #else
@@ -940,7 +978,7 @@ namespace lap
 				resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 #ifndef LAP_QUIET
 				int level;
-				if ((level = displayProgress(start_time, elapsed, f + 1, dim2, " rows")) != 0)
+				if ((level = displayProgress(start_time, elapsed, fc + 1, dim2, " rows")) != 0)
 				{
 					long long hit, miss;
 					iterator.getHitMiss(hit, miss);
@@ -1081,6 +1119,7 @@ namespace lap
 		lapFree(d);
 		lapFree(v);
 		lapFree(colsol);
+		lapFree(perm);
 	}
 
 	// shortcut for square problems

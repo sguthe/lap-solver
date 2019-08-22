@@ -6,8 +6,8 @@
 //#define LAP_ROWS_SCANNED
 // should only be enabled for testing purposes
 //#define LAP_CUDA_ALLOW_WDDM
-// enable one thread per GPU maybe not a good idea after all...
-//#define LAP_CUDA_OPENMP
+// enable one thread per GPU
+#define LAP_CUDA_OPENMP
 //#define LAP_CUDA_COMPARE_CPU
 #define LAP_MINIMIZE_V
 

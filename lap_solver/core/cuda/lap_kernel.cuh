@@ -1197,7 +1197,7 @@ namespace lap
 		template <class MS, class SC>
 		__global__ void combineMinimalCost_kernel(MS *s, MS *o_s, int *picked, int *start, int idx, SC max, int num_items, int dim2, int devices)
 		{
-			SC t_min_cost, t_min_cost_real;
+			SC t_min_cost, t_min_cost_real, t_vjmin;
 			int t_jmin;
 
 			if (threadIdx.x >= devices)
@@ -1205,12 +1205,14 @@ namespace lap
 				t_min_cost = max;
 				t_min_cost_real = max;
 				t_jmin = dim2;
+				t_vjmin = max;
 			}
 			else
 			{
 				t_min_cost = s[threadIdx.x].picked;
 				t_min_cost_real = s[threadIdx.x].min;
 				t_jmin = s[threadIdx.x].jmin + start[threadIdx.x];
+				t_vjmin = s[threadIdx.x].v_jmin;
 				if (t_jmin > dim2) t_jmin = dim2;
 
 				// read additional values
@@ -1219,18 +1221,23 @@ namespace lap
 					SC c_min_cost = s[i].picked;
 					SC c_min_cost_real = s[i].min;
 					int c_jmin = s[i].jmin + start[i];
+					SC c_vjmin = s[i].v_jmin;
 					if (t_jmin > dim2) t_jmin = dim2;
 
 					if ((c_min_cost < t_min_cost) || ((c_min_cost == t_min_cost) && (c_jmin < t_jmin)))
 					{
 						t_jmin = c_jmin;
 						t_min_cost = c_min_cost;
+						t_vjmin = c_vjmin;
 					}
 					if (c_min_cost_real < t_min_cost_real) t_min_cost_real = c_min_cost_real;
 				}
 			}
 
+			int old_jmin = t_jmin;
 			getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
+			if (old_jmin != t_jmin) t_vjmin = max;
+			minWarp(t_vjmin);
 
 			if (threadIdx.x == 0)
 			{
@@ -1241,6 +1248,7 @@ namespace lap
 					o_s->picked = t_min_cost;
 					o_s->min = t_min_cost_real;
 					o_s->jmin = t_jmin;
+					o_s->v_jmin = t_vjmin;
 				}
 			}
 		}
@@ -2107,6 +2115,48 @@ namespace lap
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, v, max, size, dim2);
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void combineSearchMin(MS *s, MS *o_s, int *start, SC max, int dim2, int devices)
+		{
+			SC t_min;
+			int t_jmin;
+			int t_colsol;
+
+			if (threadIdx.x >= devices)
+			{
+				t_min = max;
+				t_jmin = dim2;
+				t_colsol = dim2;
+			}
+			else
+			{
+				t_min = s[threadIdx.x].min;
+				t_jmin = s[threadIdx.x].jmin + start[threadIdx.x];
+				t_colsol = s[threadIdx.x].colsol;
+
+				// read additional values
+				for (int i = threadIdx.x + blockDim.x; i < devices; i += blockDim.x)
+				{
+					SC c_min = s[i].min;
+					int c_jmin = s[i].jmin + start[i];
+					int c_colsol = s[i].colsol;
+					if ((c_min < t_min) || ((c_min == t_min) && (t_colsol >= 0) && (c_colsol < 0)))
+					{
+						t_min = c_min;
+						t_jmin = c_jmin;
+						t_colsol = c_colsol;
+					}
+				}
+			}
+			minWarpIndex(t_min, t_jmin, t_colsol);
+			if (threadIdx.x == 0)
+			{
+				o_s->min = t_min;
+				o_s->jmin = t_jmin;
+				o_s->colsol = t_colsol;
+			}
 		}
 
 		template <class MS, class SC, class TC>
