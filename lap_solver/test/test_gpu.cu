@@ -23,6 +23,7 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <cuda_profiler_api.h>
 
 template <class C> void testRandom(long long min_tab, long long max_tab, long long max_memory, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent);
 template <class C> void testSanity(long long min_tab, long long max_tab, long long max_memory, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent);
@@ -119,6 +120,7 @@ int main(int argc, char* argv[])
 	lap::allocationLogger.destroy();
 #endif
 
+	cudaProfilerStop();
 	return 0;
 }
 
