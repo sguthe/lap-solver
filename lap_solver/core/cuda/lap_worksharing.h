@@ -15,7 +15,9 @@ namespace lap
 			std::pair<int, int> *part;
 			std::vector<int> device;
 			std::vector<cudaStream_t> stream;
+#ifdef LAP_CUDA_EVENTS
 			std::vector<cudaEvent_t> event;
+#endif
 			std::vector<int> sm_count;
 			std::vector<int> threads_per_sm;
 		public:
@@ -121,13 +123,17 @@ namespace lap
 					else part[p].second = size;
 				}
 				stream.resize(devices);
+#ifdef LAP_CUDA_EVENTS
 				event.resize(2 * devices);
+#endif
 				for (int t = 0; t < devices; t++)
 				{
 					cudaSetDevice(device[t]);
 					cudaStreamCreate(&stream[t]);
+#ifdef LAP_CUDA_EVENTS
 					cudaEventCreateWithFlags(&event[t], cudaEventDisableTiming);
 					cudaEventCreateWithFlags(&event[t + devices], cudaEventDisableTiming);
+#endif
 				}
 			}
 			~Worksharing()
@@ -138,8 +144,10 @@ namespace lap
 				{
 					cudaSetDevice(device[t]);
 					cudaStreamDestroy(stream[t]);
+#ifdef LAP_CUDA_EVENTS
 					cudaEventDestroy(event[t]);
 					cudaEventDestroy(event[t + devices]);
+#endif
 				}
 			}
 			int find(int x)

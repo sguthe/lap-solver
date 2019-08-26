@@ -8,10 +8,12 @@
 //#define LAP_CUDA_ALLOW_WDDM
 // enable one thread per GPU
 #define LAP_CUDA_OPENMP
+// events seem to decrease the performance due to massive call overheads
+//#define LAP_CUDA_EVENTS
 //#define LAP_CUDA_COMPARE_CPU
 #define LAP_MINIMIZE_V
 
-//#define RANDOM_SEED 1234
+#define RANDOM_SEED 1234
 
 #include "../lap.h"
 
