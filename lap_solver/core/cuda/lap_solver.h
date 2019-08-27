@@ -1779,6 +1779,7 @@ namespace lap
 							int f = (fc < dim) ? perm[fc] : fc;
 #pragma omp barrier
 							// start search and find minimum value
+#if 0
 							if (peerEnabled)
 							{
 								if (require_colsol_copy)
@@ -1849,6 +1850,40 @@ namespace lap
 									}
 								}
 							}
+#else
+							if (require_colsol_copy)
+							{
+								if (f < dim)
+								{
+									auto tt = iterator.getRow(t, f);
+									if (num_items <= 1024) initializeSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else if (num_items <= 65536) initializeSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else initializeSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+								}
+								else
+								{
+									if (num_items <= 1024) initializeSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else if (num_items <= 65536) initializeSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else initializeSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+								}
+							}
+							else
+							{
+								if (f < dim)
+								{
+									auto tt = iterator.getRow(t, f);
+									if (num_items <= 1024) initializeSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else if (num_items <= 65536) initializeSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else initializeSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+								}
+								else
+								{
+									if (num_items <= 1024) initializeSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else if (num_items <= 65536) initializeSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else initializeSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+								}
+							}
+#endif
 #ifdef LAP_CUDA_EVENTS
 							cudaEventRecord(event, stream);
 #else
@@ -1860,6 +1895,7 @@ namespace lap
 #ifdef LAP_CUDA_EVENTS
 								for (int t2 = 1; t2 < devices; t2++) cudaStreamWaitEvent(stream, iterator.ws.event[t2], 0);
 #endif
+#if 0
 								if (peerEnabled)
 								{
 									combineSearchMin<<<1, 32, 0, stream>>>(gpu_min_private, host_min_private, start_private[t], std::numeric_limits<SC>::max(), dim2, devices);
@@ -1870,6 +1906,31 @@ namespace lap
 								}
 
 								checkCudaErrors(cudaStreamSynchronize(stream));
+
+								// Dijkstra search
+								min = host_min_private[0].min;
+								jmin = host_min_private[0].jmin;
+								colsol_old = host_min_private[0].colsol;
+#else
+								// Dijkstra search
+								min = host_min_private[0].min;
+								jmin = host_min_private[0].jmin;
+								colsol_old = host_min_private[0].colsol;
+
+								// read additional values
+								for (int i = 1; i < devices; i++)
+								{
+									SC c_min = host_min_private[i].min;
+									int c_jmin = host_min_private[i].jmin + iterator.ws.part[i].first;
+									int c_colsol = host_min_private[i].colsol;
+									if ((c_min < min) || ((c_min == min) && (colsol_old >= 0) && (c_colsol < 0)))
+									{
+										min = c_min;
+										jmin = c_jmin;
+										colsol_old = c_colsol;
+									}
+								}
+#endif
 
 								require_colsol_copy = false;
 #ifndef LAP_QUIET
@@ -1885,11 +1946,6 @@ namespace lap
 								count++;
 
 								unassignedfound = false;
-
-								// Dijkstra search
-								min = host_min_private[0].min;
-								jmin = host_min_private[0].jmin;
-								colsol_old = host_min_private[0].colsol;
 
 								// dijkstraCheck
 								if (colsol_old < 0)

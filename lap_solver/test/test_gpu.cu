@@ -13,7 +13,7 @@
 //#define LAP_CUDA_COMPARE_CPU
 #define LAP_MINIMIZE_V
 
-#define RANDOM_SEED 1234
+//#define RANDOM_SEED 1234
 
 #include "../lap.h"
 
