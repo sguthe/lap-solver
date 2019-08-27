@@ -1892,10 +1892,10 @@ namespace lap
 #pragma omp barrier
 							if (t == 0)
 							{
+#if 0
 #ifdef LAP_CUDA_EVENTS
 								for (int t2 = 1; t2 < devices; t2++) cudaStreamWaitEvent(stream, iterator.ws.event[t2], 0);
 #endif
-#if 0
 								if (peerEnabled)
 								{
 									combineSearchMin<<<1, 32, 0, stream>>>(gpu_min_private, host_min_private, start_private[t], std::numeric_limits<SC>::max(), dim2, devices);
@@ -1918,11 +1918,11 @@ namespace lap
 								colsol_old = host_min_private[0].colsol;
 
 								// read additional values
-								for (int i = 1; i < devices; i++)
+								for (int ti = 1; ti < devices; ti++)
 								{
-									SC c_min = host_min_private[i].min;
-									int c_jmin = host_min_private[i].jmin + iterator.ws.part[i].first;
-									int c_colsol = host_min_private[i].colsol;
+									SC c_min = host_min_private[ti].min;
+									int c_jmin = host_min_private[ti].jmin + iterator.ws.part[ti].first;
+									int c_colsol = host_min_private[ti].colsol;
 									if ((c_min < min) || ((c_min == min) && (colsol_old >= 0) && (c_colsol < 0)))
 									{
 										min = c_min;
@@ -2034,9 +2034,15 @@ namespace lap
 #endif
 									if (peerEnabled)
 									{
+#if 0
 										if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(gpu_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
 										else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(gpu_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
 										else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(gpu_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
+#else
+										if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
+										else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
+										else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
+#endif
 									}
 									else
 									{
@@ -2069,9 +2075,15 @@ namespace lap
 									// continue search
 									if (peerEnabled)
 									{
+#if 0
 										if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(gpu_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
 										else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(gpu_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
 										else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(gpu_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
+#else
+										if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
+										else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
+										else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), min, std::numeric_limits<SC>::max(), num_items, dim2);
+#endif
 									}
 									else
 									{
@@ -2091,6 +2103,7 @@ namespace lap
 #pragma omp barrier
 								if (t == 0)
 								{
+#if 0
 #ifdef LAP_CUDA_EVENTS
 									for (int t2 = 1; t2 < devices; t2++) cudaStreamWaitEvent(stream, iterator.ws.event[t2], 0);
 #endif
@@ -2104,6 +2117,30 @@ namespace lap
 									}
 
 									checkCudaErrors(cudaStreamSynchronize(stream));
+
+									min_n = host_min_private[0].min;
+									jmin = host_min_private[0].jmin;
+									colsol_old = host_min_private[0].colsol;
+#else
+									min_n = host_min_private[0].min;
+									jmin = host_min_private[0].jmin;
+									colsol_old = host_min_private[0].colsol;
+
+									// read additional values
+									for (int ti = 1; ti < devices; ti++)
+									{
+										SC c_min = host_min_private[ti].min;
+										int c_jmin = host_min_private[ti].jmin + iterator.ws.part[ti].first;
+										int c_colsol = host_min_private[ti].colsol;
+										if ((c_min < min_n) || ((c_min == min_n) && (colsol_old >= 0) && (c_colsol < 0)))
+										{
+											min_n = c_min;
+											jmin = c_jmin;
+											colsol_old = c_colsol;
+										}
+									}
+#endif
+
 #ifndef LAP_QUIET
 									if (i < dim) total_rows++; else total_virtual++;
 #else
@@ -2115,10 +2152,6 @@ namespace lap
 									scancount[i]++;
 #endif
 									count++;
-
-									min_n = host_min_private[0].min;
-									jmin = host_min_private[0].jmin;
-									colsol_old = host_min_private[0].colsol;
 
 									min = std::max(min, min_n);
 
