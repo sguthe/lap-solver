@@ -525,6 +525,7 @@ namespace lap
 			}
 		}
 
+#ifdef LAP_CUDA_COMBINE_KERNEL
 		template <class MS, class SC>
 		__global__ void combineMinMaxBest_kernel(MS *s, MS *o_s, SC *o_min_cost, int *o_jmin, int *start, int idx, SC min, SC max, int dim2, int devices)
 		{
@@ -577,7 +578,7 @@ namespace lap
 				}
 			}
 		}
-
+#endif
 
 		template <class SC, class TC>
 		__device__ __forceinline__ void getMinSecondBestRead(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin, int i, int j, TC *tt, SC *v, int *picked, SC max, int size, int dim2)
@@ -598,6 +599,33 @@ namespace lap
 				}
 			}
 		}
+
+#ifndef LAP_CUDA_COMBINE_KERNEL
+		template <class SC, class TC>
+		__device__ __forceinline__ void getMinSecondBestRead(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin, int i, int j, TC *tt, SC *v, int *picked, int last_picked, SC max, int size, int dim2)
+		{
+			t_min_cost = max;
+			t_second_cost = max;
+			t_picked_cost = max;
+			t_jmin = dim2;
+
+			if (j < size)
+			{
+				SC t_cost = (SC)tt[j] - v[j];
+				t_min_cost = t_cost;
+				if (j == last_picked)
+				{
+					picked[j] = 1;
+				}
+				else if (picked[j] == 0)
+				{
+					t_jmin = j;
+					t_picked_cost = t_cost;
+				}
+			}
+		}
+#endif
+
 
 		template <class SC>
 		__device__ __forceinline__ void getMinSecondBestCombineSmall(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin)
@@ -832,6 +860,7 @@ namespace lap
 			}
 		}
 
+#ifdef LAP_CUDA_COMBINE_KERNEL
 		template <class MS, class SC>
 		__global__ void combineMinSecondBest_kernel(MS *s, MS *o_s, int *picked, int *start, int idx, SC max, int num_items, int dim2, int devices)
 		{
@@ -899,6 +928,73 @@ namespace lap
 				}
 			}
 		}
+#else
+		template <class MS, class SC, class TC>
+		__global__ void getMinSecondBestSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, int last_picked, SC max, int i, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreWarp(semaphore))
+			{
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, v, max, dim2);
+			}
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void getMinSecondBestMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, int last_picked, SC max, int i, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[8], b_max_cost[8], b_picked_cost[8];
+			__shared__ int b_jmin[8];
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, v, max, dim2);
+			}
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void getMinSecondBestLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, int last_picked, SC max, int i, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[32], b_max_cost[32], b_picked_cost[32];
+			__shared__ int b_jmin[32];
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTempLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, v, max, dim2);
+			}
+		}
+#endif
 
 		template <class MS, class SC, class TC>
 		__global__ void getMinSecondBestSingleSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, SC max, int i, int size, int dim2)
@@ -987,6 +1083,31 @@ namespace lap
 				t_min_cost_real = t_cost;
 			}
 		}
+
+#ifndef LAP_CUDA_COMBINE_KERNEL
+		template <class SC, class TC>
+		__device__ __forceinline__ void getMinimalCostRead(SC &t_min_cost, int &t_jmin, SC &t_min_cost_real, int j, TC *tt, SC *v, int *taken, int last_taken, SC max, int size, int dim2)
+		{
+			t_min_cost_real = max;
+			t_min_cost = max;
+			t_jmin = dim2;
+
+			if (j < size)
+			{
+				SC t_cost = (SC)tt[j] - v[j];
+				if (j == last_taken)
+				{
+					taken[j] = 1;
+				}
+				else if (taken[j] == 0)
+				{
+					t_min_cost = t_cost;
+					t_jmin = j;
+				}
+				t_min_cost_real = t_cost;
+			}
+		}
+#endif
 
 		template <class SC>
 		__device__ __forceinline__ void getMinimalCostCombineSmall(SC &t_min_cost, int &t_jmin, SC &t_min_cost_real)
@@ -1194,6 +1315,7 @@ namespace lap
 			}
 		}
 
+#ifdef LAP_CUDA_COMBINE_KERNEL
 		template <class MS, class SC>
 		__global__ void combineMinimalCost_kernel(MS *s, MS *o_s, int *picked, int *start, int idx, SC max, int num_items, int dim2, int devices)
 		{
@@ -1222,7 +1344,7 @@ namespace lap
 					SC c_min_cost_real = s[i].min;
 					int c_jmin = s[i].jmin + start[i];
 					SC c_vjmin = s[i].v_jmin;
-					if (t_jmin > dim2) t_jmin = dim2;
+					if (c_jmin > dim2) c_jmin = dim2;
 
 					if ((c_min_cost < t_min_cost) || ((c_min_cost == t_min_cost) && (c_jmin < t_jmin)))
 					{
@@ -1252,6 +1374,73 @@ namespace lap
 				}
 			}
 		}
+#else
+		template <class MS, class SC, class TC>
+		__global__ void getMinimalCostSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, int last_picked, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min_cost, t_min_cost_real;
+			int t_jmin;
+
+			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
+			getMinimalCostWriteTemp(o_min_cost, o_jmin, o_min_cost_real, t_min_cost, t_jmin, t_min_cost_real);
+
+			if (semaphoreWarp(semaphore))
+			{
+				getMinimalCostReadTemp(t_min_cost, t_jmin, t_min_cost_real, o_min_cost, o_jmin, o_min_cost_real, max, dim2);
+				getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
+				getMinimalCostWrite(s, t_min_cost, t_jmin, t_min_cost_real, v, max, dim2);
+			}
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void getMinimalCostMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, int last_picked, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[8], b_min_cost_real[8];
+			__shared__ int b_jmin[8];
+
+			SC t_min_cost, t_min_cost_real;
+			int t_jmin;
+
+			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinimalCostCombineMedium(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
+			getMinimalCostWriteTemp(o_min_cost, o_jmin, o_min_cost_real, t_min_cost, t_jmin, t_min_cost_real);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinimalCostReadTemp(t_min_cost, t_jmin, t_min_cost_real, o_min_cost, o_jmin, o_min_cost_real, max, dim2);
+				getMinimalCostCombineMedium(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
+				getMinimalCostWrite(s, t_min_cost, t_jmin, t_min_cost_real, v, max, dim2);
+			}
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void getMinimalCostLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, int last_picked, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[32], b_min_cost_real[32];
+			__shared__ int b_jmin[32];
+
+			SC t_min_cost, t_min_cost_real;
+			int t_jmin;
+
+			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, tt, v, picked, last_picked, max, size, dim2);
+			getMinimalCostCombineLarge(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
+			getMinimalCostWriteTemp(o_min_cost, o_jmin, o_min_cost_real, t_min_cost, t_jmin, t_min_cost_real);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinimalCostReadTempLarge(t_min_cost, t_jmin, t_min_cost_real, o_min_cost, o_jmin, o_min_cost_real, max, dim2);
+				getMinimalCostCombineLarge(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
+				getMinimalCostWrite(s, t_min_cost, t_jmin, t_min_cost_real, v, max, dim2);
+			}
+		}
+#endif
 
 		template <class MS, class SC, class TC>
 		__global__ void getMinimalCostSingleSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, SC max, int size, int dim2)
@@ -1533,6 +1722,7 @@ namespace lap
 			}
 		}
 
+#ifdef LAP_CUDA_COMBINE_KERNEL
 		template <class MS, class SC>
 		__global__ void combineFinalCost_kernel(MS *s, MS *o_s, SC max, int devices)
 		{
@@ -1571,6 +1761,7 @@ namespace lap
 				o_s->v_jmin = t_picked_v;
 			}
 		}
+#endif
 
 		template <class SC, class TC>
 		__global__ void updateEstimatedVFirst_kernel(SC *min_v, TC *tt, int *picked, SC *min_cost, int *jmin, int size)
@@ -1615,6 +1806,51 @@ namespace lap
 			}
 			else if (tmp < v[j]) v[j] = tmp;
 			if (jmin[0] == j) picked[j] = 1;
+		}
+
+		template <class SC, class TC>
+		__global__ void updateEstimatedVFirst_kernel(SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			min_v[j] = (SC)tt[j] - min_cost;
+			if (jmin == j) picked[j] = 1;
+		}
+
+		template <class SC, class TC>
+		__global__ void updateEstimatedVSecond_kernel(SC *v, SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			SC tmp = (SC)tt[j] - min_cost;
+			if (tmp < min_v[j])
+			{
+				v[j] = min_v[j];
+				min_v[j] = tmp;
+			}
+			else v[j] = tmp;
+			if (jmin == j) picked[j] = 1;
+		}
+
+		template <class SC, class TC>
+		__global__ void updateEstimatedV_kernel(SC *v, SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			SC tmp = (SC)tt[j] - min_cost;
+			if (tmp < min_v[j])
+			{
+				v[j] = min_v[j];
+				min_v[j] = tmp;
+			}
+			else if (tmp < v[j]) v[j] = tmp;
+			if (jmin == j) picked[j] = 1;
 		}
 
 		template <class SC, class TC>
@@ -2117,6 +2353,7 @@ namespace lap
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
+#ifdef LAP_CUDA_COMBINE_KERNEL
 		template <class MS, class SC>
 		__global__ void combineSearchMin(MS *s, MS *o_s, int *start, SC max, int dim2, int devices)
 		{
@@ -2158,6 +2395,7 @@ namespace lap
 				o_s->colsol = t_colsol;
 			}
 		}
+#endif
 
 		template <class MS, class SC, class TC>
 		__global__ void continueSearchJMinMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
