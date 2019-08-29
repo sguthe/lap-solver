@@ -957,7 +957,7 @@ namespace lap
 
 						for (int i = dim - 1; i >= 0; --i)
 						{
-#ifdef LAP_CUDA_EVENTS
+#ifdef LAP_CUDA_EVENTS_x
 							if (i < dim - 1) for (int t2 = 0; t2 < devices; t2++) if (t != t2) cudaStreamWaitEvent(stream, iterator.ws.event[t2 + devices], 0);
 #else
 							if (i < dim - 1) cudaStreamSynchronize(stream);
@@ -974,7 +974,7 @@ namespace lap
 								}
 								if ((!peerEnabled) || (!available))
 								{
-#ifdef LAP_CUDA_EVENTS
+#ifdef LAP_CUDA_EVENTS_x
 									cudaEventRecord(iterator.ws.event[t], stream);
 #else
 									cudaStreamSynchronize(stream);
@@ -997,7 +997,7 @@ namespace lap
 								}
 								else
 								{
-#ifdef LAP_CUDA_EVENTS
+#ifdef LAP_CUDA_EVENTS_x
 									if (!available) cudaStreamWaitEvent(stream, iterator.ws.event[triggered], 0);
 #endif
 									updateVMulti_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(tt[t], v_private[t], tt[triggered], v_private[triggered], picked_private[t], picked[i] - t_start, num_items);
@@ -1007,14 +1007,14 @@ namespace lap
 							{
 								if (t != triggered)
 								{
-#ifdef LAP_CUDA_EVENTS
+#ifdef LAP_CUDA_EVENTS_x
 									cudaStreamWaitEvent(stream, iterator.ws.event[triggered], 0);
 #endif
 									cudaMemcpyAsync(min_cost_private[t], min_cost_private[triggered], sizeof(SC), cudaMemcpyDeviceToDevice, stream);
 								}
 								updateVMulti_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(tt[t], v_private[t], picked_private[t], min_cost_private[t], num_items);
 							}
-#ifdef LAP_CUDA_EVENTS
+#ifdef LAP_CUDA_EVENTS_x
 							if (i > 0) cudaEventRecord(iterator.ws.event[t + devices], stream);
 #endif
 						}
@@ -1316,7 +1316,7 @@ namespace lap
 						}
 					}
 #endif
-#ifdef LAP_CUDA_EVENTS
+#ifdef LAP_CUDA_EVENTS_x
 					checkCudaErrors(cudaEventSynchronize(iterator.ws.event[devices]));
 #endif
 
@@ -2256,9 +2256,6 @@ namespace lap
 									}
 									else
 									{
-#ifdef LAP_CUDA_EVENTS
-										if (t != triggered) cudaStreamWaitEvent(stream, iterator.ws.event[triggered + devices], 0);
-#endif
 										//if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 										//else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 										//else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
@@ -2276,8 +2273,12 @@ namespace lap
 										}
 									}
 								}
+#ifdef LAP_CUDA_COMBINE_KERNEL
 #ifdef LAP_CUDA_EVENTS
 								cudaEventRecord(event, stream);
+#else
+								cudaStreamSynchronize(stream);
+#endif
 #else
 								cudaStreamSynchronize(stream);
 #endif
