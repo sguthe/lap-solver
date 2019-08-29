@@ -20,8 +20,9 @@ namespace lap
 #endif
 			std::vector<int> sm_count;
 			std::vector<int> threads_per_sm;
+			bool silent;
 		public:
-			Worksharing(int size, int multiple, std::vector<int> &devs, bool silent)
+			Worksharing(int size, int multiple, std::vector<int> &devs, bool silent) : silent(silent)
 			{
 				int max_devices = (size + multiple - 1) / multiple;
 				int device_count;
@@ -162,6 +163,7 @@ namespace lap
 			bool peerAccess()
 			{
 				int devices = (int)device.size();
+				bool can_access = true;
 				for (int d0 = 0; d0 < devices - 1; d0++)
 				{
 					for (int d1 = d0 + 1; d1 < devices; d1++)
@@ -169,18 +171,33 @@ namespace lap
 						if (device[d0] != device[d1])
 						{
 							int canAccessPeer;
+							bool access = true;
 							cudaDeviceCanAccessPeer(&canAccessPeer, device[d0], device[d1]);
-							if (canAccessPeer == 0) return false;
+							if (canAccessPeer == 0) access = false;
 							cudaDeviceCanAccessPeer(&canAccessPeer, device[d1], device[d0]);
-							if (canAccessPeer == 0) return false;
-							cudaSetDevice(device[d0]);
-							cudaDeviceEnablePeerAccess(device[d1], 0);
-							cudaSetDevice(device[d1]);
-							cudaDeviceEnablePeerAccess(device[d0], 0);
+							if (canAccessPeer == 0) access = false;
+							if (!silent) lapInfo << "Peer access between device " << device[d0] << " and device " << device[d1] << (access?"":" not") << " possible." << std::endl;
+							can_access &= access;
 						}
 					}
 				}
-				return true;
+				if (can_access)
+				{
+					for (int d0 = 0; d0 < devices - 1; d0++)
+					{
+						for (int d1 = d0 + 1; d1 < devices; d1++)
+						{
+							if (device[d0] != device[d1])
+							{
+								cudaSetDevice(device[d0]);
+								cudaDeviceEnablePeerAccess(device[d1], 0);
+								cudaSetDevice(device[d1]);
+								cudaDeviceEnablePeerAccess(device[d0], 0);
+							}
+						}
+					}
+				}
+				return can_access;
 			}
 		};
 	}
