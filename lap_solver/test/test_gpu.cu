@@ -8,8 +8,8 @@
 //#define LAP_CUDA_ALLOW_WDDM
 // enable one thread per GPU
 #define LAP_CUDA_OPENMP
-// events seem to decrease the performance due to massive call overheads
-#define LAP_CUDA_EVENTS
+// events seem to decrease the performance due to massive call overheads (lock mutex)
+//#define LAP_CUDA_EVENTS
 //#define LAP_CUDA_COMPARE_CPU
 // running kernels to combine results from different gpu leads to massive call overhead
 //#define LAP_CUDA_COMBINE_KERNEL
