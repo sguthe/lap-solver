@@ -957,12 +957,6 @@ namespace lap
 
 						for (int i = dim - 1; i >= 0; --i)
 						{
-#ifdef LAP_CUDA_EVENTS_x
-							if (i < dim - 1) for (int t2 = 0; t2 < devices; t2++) if (t != t2) cudaStreamWaitEvent(stream, iterator.ws.event[t2 + devices], 0);
-#else
-							if (i < dim - 1) cudaStreamSynchronize(stream);
-#pragma omp barrier
-#endif							
 							if ((picked[i] >= start) && (picked[i] < end))
 							{
 								available = iterator.checkRow(t, perm[i]);
@@ -970,11 +964,11 @@ namespace lap
 
 								if (!peerEnabled)
 								{
-									updateVMultiStart_kernel<<<1, 1, 0, stream>>>(tt[t], v_private[t], picked_private[t], min_cost_private[t], picked[i] - start);
+									updateVMultiStart_kernel<<<1, 1, 0, stream>>>(tt[t], v_private[t], picked_private[t], &(mod_v[0]), picked[i] - start);
 								}
 								if ((!peerEnabled) || (!available))
 								{
-#ifdef LAP_CUDA_EVENTS_x
+#ifdef LAP_CUDA_EVENTS
 									cudaEventRecord(iterator.ws.event[t], stream);
 #else
 									cudaStreamSynchronize(stream);
@@ -987,7 +981,6 @@ namespace lap
 							{
 								tt[t] = iterator.getRow(t, perm[i]);
 							}
-							cudaStreamSynchronize(stream);
 #pragma omp barrier
 							if (peerEnabled)
 							{
@@ -997,7 +990,7 @@ namespace lap
 								}
 								else
 								{
-#ifdef LAP_CUDA_EVENTS_x
+#ifdef LAP_CUDA_EVENTS
 									if (!available) cudaStreamWaitEvent(stream, iterator.ws.event[triggered], 0);
 #endif
 									updateVMulti_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(tt[t], v_private[t], tt[triggered], v_private[triggered], picked_private[t], picked[i] - t_start, num_items);
@@ -1005,20 +998,17 @@ namespace lap
 							}
 							else
 							{
+#ifdef LAP_CUDA_EVENTS
 								if (t != triggered)
 								{
-#ifdef LAP_CUDA_EVENTS_x
 									cudaStreamWaitEvent(stream, iterator.ws.event[triggered], 0);
-#endif
-									cudaMemcpyAsync(min_cost_private[t], min_cost_private[triggered], sizeof(SC), cudaMemcpyDeviceToDevice, stream);
 								}
-								updateVMulti_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(tt[t], v_private[t], picked_private[t], min_cost_private[t], num_items);
-							}
-#ifdef LAP_CUDA_EVENTS_x
-							if (i > 0) cudaEventRecord(iterator.ws.event[t + devices], stream);
 #endif
+								updateVMulti_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(tt[t], v_private[t], picked_private[t], &(mod_v[0]), num_items);
+							}
+							cudaStreamSynchronize(stream);
+#pragma omp barrier
 						}
-						cudaStreamSynchronize(stream);
 						findMaximum(v_private[t], &(host_struct_private[t]), stream, num_items);
 						checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 #pragma omp barrier
