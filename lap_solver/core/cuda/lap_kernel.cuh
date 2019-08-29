@@ -1963,7 +1963,7 @@ namespace lap
 
 			if (j < size)
 			{
-				if (j == jmin) colactive[jmin] = 0;
+				if (j == jmin) colactive[j] = 0;
 				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
@@ -1984,7 +1984,7 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__device__ __forceinline__ void continueSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *pred, SC *d, int j, int i, TC *tt, SC *v, SC min, SC tt_jmin, SC v_jmin, SC max, int size, int dim2)
+		__device__ __forceinline__ void continueSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *pred, SC *d, int j, int i, TC *tt, SC *v, SC min, SC tt_jmin, SC v_jmin, int jmin, SC max, int size, int dim2)
 		{
 			t_min = max;
 			t_jmin = dim2;
@@ -1992,7 +1992,8 @@ namespace lap
 
 			if (j < size)
 			{
-				if (colactive[j] != 0)
+				if (j == jmin) colactive[j] = 0;
+				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
 					SC v2 = ((SC)tt[j] - tt_jmin) - (v[j] - v_jmin) + min;
@@ -2012,7 +2013,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__device__ __forceinline__ void continueSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *pred, SC *d, int j, int i, SC *v, SC min, SC v_jmin, SC max, int size, int dim2)
+		__device__ __forceinline__ void continueSearchMinRead(SC &t_min, int &t_jmin, int &t_colsol, char *colactive, int *colsol, int *pred, SC *d, int j, int i, SC *v, SC min, SC v_jmin, int jmin, SC max, int size, int dim2)
 		{
 			t_min = max;
 			t_jmin = dim2;
@@ -2020,7 +2021,8 @@ namespace lap
 
 			if (j < size)
 			{
-				if (colactive[j] != 0)
+				if (j == jmin) colactive[j] = 1;
+				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
 					SC v2 = (v[j] - v_jmin) + min;
@@ -2533,7 +2535,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -2553,12 +2555,12 @@ namespace lap
 			SC tt_jmin = b_tt_jmin;
 			SC v_jmin = b_v_jmin;
 
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, max, size, dim2);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -2578,12 +2580,12 @@ namespace lap
 			SC tt_jmin = b_tt_jmin;
 			SC v_jmin = b_v_jmin;
 
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, max, size, dim2);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -2603,12 +2605,12 @@ namespace lap
 			SC tt_jmin = b_tt_jmin;
 			SC v_jmin = b_v_jmin;
 
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, max, size, dim2);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC>
-		__global__ void continueSearchMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -2623,12 +2625,12 @@ namespace lap
 			__syncthreads();
 			SC v_jmin = b_v_jmin;
 
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, max, size, dim2);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
 			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC>
-		__global__ void continueSearchMinMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -2643,12 +2645,12 @@ namespace lap
 			__syncthreads();
 			SC v_jmin = b_v_jmin;
 
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, max, size, dim2);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
 			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC>
-		__global__ void continueSearchMinLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -2663,7 +2665,7 @@ namespace lap
 			__syncthreads();
 			SC v_jmin = b_v_jmin;
 
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, max, size, dim2);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
