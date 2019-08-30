@@ -274,7 +274,7 @@ namespace lap
 				cudaStream_t stream = iterator.ws.stream[0];
 				int num_items = iterator.ws.part[0].second - iterator.ws.part[0].first;
 
-				cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
+				cudaMemsetAsync(picked_private[0], 0, num_items * sizeof(int), stream);
 
 				for (int i = dim - 1; i >= 0; --i)
 				{
