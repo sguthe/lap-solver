@@ -362,7 +362,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__device__ __forceinline__ void getMinMaxBestWrite(MS *s, SC t_min_cost, SC t_max_cost, SC t_picked_cost, int t_jmin)
+		__device__ __forceinline__ void getMinMaxBestWrite(MS *s, SC t_min_cost, SC t_max_cost, SC t_picked_cost, int t_jmin, int * data_valid)
 		{
 			if (threadIdx.x == 0)
 			{
@@ -370,6 +370,9 @@ namespace lap
 				s->max = t_max_cost;
 				s->picked = t_picked_cost;
 				s->jmin = t_jmin;
+
+				__threadfence_system();
+				data_valid[0] = 1;
 			}
 		}
 
@@ -381,6 +384,7 @@ namespace lap
 				s->min = t_min_cost;
 				s->max = t_max_cost;
 				s->picked = t_picked_cost;
+				s->jmin = t_jmin;
 
 				o_min_cost[0] = t_min_cost;
 				o_jmin[0] = t_jmin;
@@ -389,14 +393,14 @@ namespace lap
 
 		// 32 threads per block, up to 32 blocks, requires no shared memory and no thread synchronization
 		template <class MS, class SC, class TC>
-		__global__ void getMinMaxBestSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int size, int dim2)
+		__global__ void getMinMaxBestSmall_kernel(MS *s, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			SC t_min_cost, t_max_cost, t_picked_cost;
 			int t_jmin;
 
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, tt, picked, min, max, size, dim2);
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, tt, picked, min, max, size, dim2);
 			getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
@@ -404,13 +408,13 @@ namespace lap
 			{
 				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
 				getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin + start, data_valid);
 			}
 		}
 
 		// 256 threads per block, up to 256 blocks
 		template <class MS, class SC, class TC>
-		__global__ void getMinMaxBestMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int size, int dim2)
+		__global__ void getMinMaxBestMedium_kernel(MS *s, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -420,7 +424,7 @@ namespace lap
 			SC t_min_cost, t_max_cost, t_picked_cost;
 			int t_jmin;
 
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, tt, picked, min, max, size, dim2);
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, tt, picked, min, max, size, dim2);
 			getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
@@ -428,13 +432,13 @@ namespace lap
 			{
 				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
 				getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
-				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin + start, data_valid);
 			}
 		}
 
 		// 1024 threads per block, can be more than 1024 blocks
 		template <class MS, class SC, class TC>
-		__global__ void getMinMaxBestLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int size, int dim2)
+		__global__ void getMinMaxBestLarge_kernel(MS *s, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -444,7 +448,7 @@ namespace lap
 			SC t_min_cost, t_max_cost, t_picked_cost;
 			int t_jmin;
 
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, tt, picked, min, max, size, dim2);
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start , j, tt, picked, min, max, size, dim2);
 			getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
@@ -452,7 +456,7 @@ namespace lap
 			{
 				getMinMaxBestReadTempLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
 				getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
-				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
+				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin + start, data_valid);
 			}
 		}
 
@@ -1808,23 +1812,72 @@ namespace lap
 			if (jmin[0] == j) picked[j] = 1;
 		}
 
-		template <class SC, class TC>
-		__global__ void updateEstimatedVFirst_kernel(SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
+		template <class MS, class SC>
+		__device__ __forceinline__ void updateEstimateVGetMin(int &jmin, SC &min_cost, volatile int *data_valid, MS *s, int start, int dim, SC max, int devices)
+		{
+			__shared__ int b_jmin;
+			__shared__ SC b_min_cost;
+
+			if (threadIdx.x < 32)
+			{
+				bool is_valid = false;
+				do
+				{
+					if (!is_valid)
+					{
+						is_valid = true;
+						for (int t = threadIdx.x; t < devices; t += 32) is_valid &= (data_valid[t] != 0);
+					}
+				} while (!__all_sync(0xffffffff, is_valid));
+
+				int t_jmin = dim;
+				SC t_min_cost = max;
+
+				for (int t = threadIdx.x; t < devices; t += 32)
+				{
+					int c_jmin = s[t].jmin;
+					SC c_min_cost = s[t].min;
+					if ((c_min_cost < t_min_cost) || ((c_min_cost == t_min_cost) && (c_jmin < t_jmin)))
+					{
+						t_jmin = c_jmin;
+						t_min_cost = t_min_cost;
+					}
+				}
+				minWarpIndex(t_min_cost, t_jmin);
+				b_jmin = t_jmin;
+				b_min_cost = t_min_cost;
+			}
+
+			__syncthreads();
+			jmin = b_jmin;
+			min_cost = b_min_cost;
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void updateEstimatedVFirst_kernel(SC *min_v, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim, SC max, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			if (j >= size) return;
+
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMin(jmin, min_cost, data_valid, s, start, dim, max, devices);
 
 			min_v[j] = (SC)tt[j] - min_cost;
 			if (jmin == j) picked[j] = 1;
 		}
 
-		template <class SC, class TC>
-		__global__ void updateEstimatedVSecond_kernel(SC *v, SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
+		template <class MS, class SC, class TC>
+		__global__ void updateEstimatedVSecond_kernel(SC *v, SC *min_v, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim, SC max, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			if (j >= size) return;
+
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMin(jmin, min_cost, data_valid, s, start, dim, max, devices);
 
 			SC tmp = (SC)tt[j] - min_cost;
 			if (tmp < min_v[j])
@@ -1836,12 +1889,16 @@ namespace lap
 			if (jmin == j) picked[j] = 1;
 		}
 
-		template <class SC, class TC>
-		__global__ void updateEstimatedV_kernel(SC *v, SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
+		template <class MS, class SC, class TC>
+		__global__ void updateEstimatedV_kernel(SC *v, SC *min_v, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim, SC max, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			if (j >= size) return;
+
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMin(jmin, min_cost, data_valid, s, start, dim, max, devices);
 
 			SC tmp = (SC)tt[j] - min_cost;
 			if (tmp < min_v[j])
