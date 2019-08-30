@@ -819,30 +819,28 @@ namespace lap
 			__shared__ int b_last_picked;
 			if (threadIdx.x < 32)
 			{
-				SC t_picked_cost;
 				do
 				{
 					last_picked = dim2;
-					t_picked_cost = max;
-					for (int i = threadIdx.x; i < devices; i += 32)
+					for (int ii = threadIdx.x; ii < devices; ii += 32)
 					{
-						int c_last_picked = s_old[i].jmin;
-						if (c_last_picked < 0)
-						{
-							last_picked = c_last_picked;
-							break;
-						}
-						else
-						{
-							SC c_picked_cost = s_old[i].picked;
-							if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_last_picked < last_picked)))
-							{
-								last_picked = c_last_picked;
-								t_picked_cost = c_picked_cost;
-							}
-						}
+						int c_last_picked = s_old[ii].jmin;
+						if (c_last_picked < last_picked) last_picked = c_last_picked;
 					}
 				} while (__any_sync(0xffffffff, last_picked <0));
+
+				last_picked = dim2;
+				SC t_picked_cost = max;
+				for (int ii = threadIdx.x; ii < devices; ii += 32)
+				{
+					int c_last_picked = s_old[ii].jmin;
+					SC c_picked_cost = s_old[ii].picked;
+					if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_last_picked < last_picked)))
+					{
+						last_picked = c_last_picked;
+						t_picked_cost = c_picked_cost;
+					}
+				}
 				minWarpIndex(t_picked_cost, last_picked);
 				last_picked -= start;
 				if (threadIdx.x == 0) b_last_picked = last_picked;
