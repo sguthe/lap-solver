@@ -265,14 +265,6 @@ namespace lap
 			SC upper = std::numeric_limits<SC>::max();
 			SC lower;
 
-			for (int t = 0; t < devices; t++)
-			{
-				cudaSetDevice(iterator.ws.device[t]);
-				int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
-				cudaStream_t stream = iterator.ws.stream[t];
-				cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
-			}
-
 			lower_bound = SC(0);
 			upper_bound = SC(0);
 
@@ -281,6 +273,8 @@ namespace lap
 				cudaSetDevice(iterator.ws.device[0]);
 				cudaStream_t stream = iterator.ws.stream[0];
 				int num_items = iterator.ws.part[0].second - iterator.ws.part[0].first;
+
+				cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
 
 				for (int i = dim - 1; i >= 0; --i)
 				{
@@ -316,11 +310,12 @@ namespace lap
 					int num_items = iterator.ws.part[t].second - start;
 					cudaStream_t stream = iterator.ws.stream[t];
 
+					cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
+
 					for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].jmin = -1;
 #pragma omp barrier
 					for (int i = dim - 1; i >= 0; --i)
 					{
-						if (i > 0) host_struct_private[i - 1].jmin = dim2;
 						auto *tt = iterator.getRow(t, i);
 
 						if (i == dim - 1)
