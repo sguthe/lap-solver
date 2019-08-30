@@ -317,7 +317,7 @@ namespace lap
 					cudaStream_t stream = iterator.ws.stream[t];
 
 					for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].jmin = -1;
-
+#pragma omp barrier
 					for (int i = dim - 1; i >= 0; --i)
 					{
 						if (i > 0) host_struct_private[i - 1].jmin = dim2;

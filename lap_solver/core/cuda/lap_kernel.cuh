@@ -842,7 +842,7 @@ namespace lap
 							}
 						}
 					}
-				} while (last_picked <0);
+				} while (__any_sync(0xffffffff, last_picked <0));
 				minWarpIndex(t_picked_cost, last_picked);
 				last_picked -= start;
 				if (threadIdx.x == 0) b_last_picked = last_picked;
