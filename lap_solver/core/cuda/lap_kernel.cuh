@@ -807,6 +807,57 @@ namespace lap
 			}
 		}
 
+		template <class MS, class SC>
+		__device__ int getLastPicked(MS *s, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
+		{
+			int last_picked;
+			__shared__ int b_last_picked;
+			if (threadIdx.x < 32)
+			{
+				last_picked = s->last_picked;
+				if (last_picked < 0)
+				{
+					do
+					{
+						last_picked = dim2;
+						for (int ii = threadIdx.x; ii < devices; ii += 32)
+						{
+							int c_last_picked = s_old[ii].jmin;
+							if (c_last_picked < last_picked) last_picked = c_last_picked;
+						}
+					} while (last_picked < 0);
+
+					__syncwarp(0xffffffff);
+
+					last_picked = s->last_picked;
+
+					if (last_picked < 0)
+					{
+						last_picked = dim2;
+						SC t_picked_cost = max;
+						for (int ii = threadIdx.x; ii < devices; ii += 32)
+						{
+							int c_last_picked = s_old[ii].jmin;
+							SC c_picked_cost = s_old[ii].picked;
+							if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_last_picked < last_picked)))
+							{
+								last_picked = c_last_picked;
+								t_picked_cost = c_picked_cost;
+							}
+						}
+						minWarpIndex(t_picked_cost, last_picked);
+						if (threadIdx.x == 0) s->last_picked = last_picked;
+						__threadfence_system();
+					}
+				}
+				last_picked -= start;
+				if (threadIdx.x == 0) b_last_picked = last_picked;
+			}
+			__syncthreads();
+			last_picked = b_last_picked;
+			return last_picked;
+		}
+
 		template <class MS, class SC, class TC>
 		__global__ void getMinSecondBestSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
 		{
@@ -815,38 +866,7 @@ namespace lap
 			SC t_min_cost, t_second_cost, t_picked_cost;
 			int t_jmin;
 
-			int last_picked;
-			__shared__ int b_last_picked;
-			if (threadIdx.x < 32)
-			{
-				do
-				{
-					last_picked = dim2;
-					for (int ii = threadIdx.x; ii < devices; ii += 32)
-					{
-						int c_last_picked = s_old[ii].jmin;
-						if (c_last_picked < last_picked) last_picked = c_last_picked;
-					}
-				} while (__any_sync(0xffffffff, last_picked <0));
-
-				last_picked = dim2;
-				SC t_picked_cost = max;
-				for (int ii = threadIdx.x; ii < devices; ii += 32)
-				{
-					int c_last_picked = s_old[ii].jmin;
-					SC c_picked_cost = s_old[ii].picked;
-					if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_last_picked < last_picked)))
-					{
-						last_picked = c_last_picked;
-						t_picked_cost = c_picked_cost;
-					}
-				}
-				minWarpIndex(t_picked_cost, last_picked);
-				last_picked -= start;
-				if (threadIdx.x == 0) b_last_picked = last_picked;
-			}
-			__syncthreads();
-			last_picked = b_last_picked;
+			int last_picked = getLastPicked(s, s_old, max, start, size, dim2, devices);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, tt, v, picked, last_picked, max, size, dim2);
 			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
@@ -871,40 +891,7 @@ namespace lap
 			SC t_min_cost, t_second_cost, t_picked_cost;
 			int t_jmin;
 
-			int last_picked;
-			__shared__ int b_last_picked;
-			if (threadIdx.x < 32)
-			{
-				SC t_picked_cost;
-				do
-				{
-					last_picked = dim2;
-					t_picked_cost = max;
-					for (int i = threadIdx.x; i < devices; i += 32)
-					{
-						int c_last_picked = s_old[i].jmin;
-						if (c_last_picked < 0)
-						{
-							last_picked = c_last_picked;
-							break;
-						}
-						else
-						{
-							SC c_picked_cost = s_old[i].picked;
-							if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_last_picked < last_picked)))
-							{
-								last_picked = c_last_picked;
-								t_picked_cost = c_picked_cost;
-							}
-						}
-					}
-				} while (last_picked < 0);
-				minWarpIndex(t_picked_cost, last_picked);
-				last_picked -= start;
-				if (threadIdx.x == 0) b_last_picked = last_picked;
-			}
-			__syncthreads();
-			last_picked = b_last_picked;
+			int last_picked = getLastPicked(s, s_old, max, start, size, dim2, devices);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, tt, v, picked, last_picked, max, size, dim2);
 			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
@@ -929,40 +916,7 @@ namespace lap
 			SC t_min_cost, t_second_cost, t_picked_cost;
 			int t_jmin;
 
-			int last_picked;
-			__shared__ int b_last_picked;
-			if (threadIdx.x < 32)
-			{
-				SC t_picked_cost;
-				do
-				{
-					last_picked = dim2;
-					t_picked_cost = max;
-					for (int i = threadIdx.x; i < devices; i += 32)
-					{
-						int c_last_picked = s_old[i].jmin;
-						if (c_last_picked < 0)
-						{
-							last_picked = c_last_picked;
-							break;
-						}
-						else
-						{
-							SC c_picked_cost = s_old[i].picked;
-							if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_last_picked < last_picked)))
-							{
-								last_picked = c_last_picked;
-								t_picked_cost = c_picked_cost;
-							}
-						}
-					}
-				} while (last_picked < 0);
-				minWarpIndex(t_picked_cost, last_picked);
-				last_picked -= start;
-				if (threadIdx.x == 0) b_last_picked = last_picked;
-			}
-			__syncthreads();
-			last_picked = b_last_picked;
+			int last_picked = getLastPicked(s, s_old, max, start, size, dim2, devices);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, tt, v, picked, last_picked, max, size, dim2);
 			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);

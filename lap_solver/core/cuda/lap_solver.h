@@ -19,8 +19,9 @@ namespace lap
 			SC min;
 			SC max;
 			SC picked;
-			int jmin;
 			SC v_jmin;
+			int jmin;
+			int last_picked;
 		};
 
 		template <class SC>
@@ -313,6 +314,7 @@ namespace lap
 					cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
 
 					for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].jmin = -1;
+					for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].last_picked = -1;
 #pragma omp barrier
 					for (int i = dim - 1; i >= 0; --i)
 					{
