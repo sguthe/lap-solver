@@ -8,6 +8,8 @@
 
 #include "lap_kernel.cuh"
 
+#include <fstream>
+
 namespace lap
 {
 	namespace cuda
@@ -170,7 +172,6 @@ namespace lap
 					upper_bound += host_struct_private[i].max;
 					greedy_bound += host_struct_private[i].picked;
 				}
-
 				findMaximum(v_private[0], gpu_struct_private, stream, dim2);
 				subtractMaximum_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[0], gpu_struct_private, dim2);
 			}
@@ -192,11 +193,20 @@ namespace lap
 
 						if (num_items <= 1024) getMinMaxBestSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
 						else if (num_items <= 65536) getMinMaxBestMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
-						else getMinMaxBestLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[t + 4 * devices]), semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
-
-						if (i == 0) updateEstimatedVFirst_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
-						else if (i == 1) updateEstimatedVSecond_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
-						else updateEstimatedV_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+						else getMinMaxBestLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
+#pragma omp barrier
+						if (devices > 32)
+						{
+							if (i == 0) updateEstimatedVFirstLarge_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+							else if (i == 1) updateEstimatedVSecondLarge_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+							else updateEstimatedVLarge_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+						}
+						else
+						{
+							if (i == 0) updateEstimatedVFirst_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+							else if (i == 1) updateEstimatedVSecond_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+							else updateEstimatedV_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+						}
 					}
 					checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
@@ -230,14 +240,11 @@ namespace lap
 							greedy_bound += t_picked_cost;
 						}
 					}
-					findMaximum(v_private[t], &(host_struct_private[dim + t]), stream, num_items);
+#pragma omp barrier
+					findMaximum(v_private[t], &(host_struct_private[t]), stream, num_items);
 					checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
-					if (t == 0)
-					{
-						max_v = mergeMaximum<SC>(&(host_struct_private[dim]), devices);
-					}
-#pragma omp barrier
+					max_v = mergeMaximum<SC>(host_struct_private, devices);
 					subtractMaximum_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>> (v_private[t], max_v, num_items);
 				}
 			}
@@ -315,9 +322,9 @@ namespace lap
 
 					for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].jmin = -1;
 					for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].last_picked = -1;
-#pragma omp barrier
 					for (int i = dim - 1; i >= 0; --i)
 					{
+#pragma omp barrier
 						auto *tt = iterator.getRow(t, i);
 
 						if (i == dim - 1)
@@ -333,7 +340,6 @@ namespace lap
 							else getMinSecondBestLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt, v_private[t], picked_private[t], &(host_struct_private[(i + 1) * devices]), std::numeric_limits<SC>::max(), i, start, num_items, dim2, devices);
 						}
 					}
-					cudaStreamSynchronize(stream);
 				}
 				for (int i = dim - 1; i >= 0; --i)
 				{
@@ -429,73 +435,75 @@ namespace lap
 				}
 				else
 				{
-					int last_picked = -1;
 #pragma omp parallel num_threads(devices)
 					{
 						int t = omp_get_thread_num();
 
 						cudaSetDevice(iterator.ws.device[t]);
-						int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
+						int start = iterator.ws.part[t].first;
+						int num_items = iterator.ws.part[t].second - start;
 						cudaStream_t stream = iterator.ws.stream[t];
 
 						cudaMemcpyAsync(mod_v_private[t], v_private[t], num_items * sizeof(SC), cudaMemcpyDeviceToDevice, stream);
 						cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
+						for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].jmin = -1;
+						for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].last_picked = -1;
+
 						for (int i = 0; i < dim; i++)
 						{
+#pragma omp barrier
 							auto *tt = iterator.getRow(t, perm[i]);
-							if (num_items <= 1024) getMinimalCostSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[dim + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], last_picked - iterator.ws.part[t].first, std::numeric_limits<SC>::max(), num_items, dim2);
-							else if (num_items <= 65536) getMinimalCostMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[dim + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], last_picked - iterator.ws.part[t].first, std::numeric_limits<SC>::max(), num_items, dim2);
-							else getMinimalCostLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[dim + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], last_picked - iterator.ws.part[t].first, std::numeric_limits<SC>::max(), num_items, dim2);
 
-							cudaStreamSynchronize(stream);
-#pragma omp barrier
-							if (t == 0)
+							if (i == 0)
 							{
-								SC t_min_cost = host_struct_private[dim].picked;
-								SC t_min_cost_real = host_struct_private[dim].min;
-								int t_jmin = host_struct_private[dim].jmin;
-								SC t_vjmin = host_struct_private[dim].v_jmin;
-
-								// read additional values
-								for (int ti = 1; ti < devices; ti++)
-								{
-									SC c_min_cost = host_struct_private[dim + ti].picked;
-									SC c_min_cost_real = host_struct_private[dim + ti].min;
-									int c_jmin = host_struct_private[dim + ti].jmin;
-									SC c_vjmin = host_struct_private[dim + ti].v_jmin;
-									if (c_jmin < dim2) c_jmin += iterator.ws.part[ti].first;
-
-									if ((c_min_cost < t_min_cost) || ((c_min_cost == t_min_cost) && (c_jmin < t_jmin)))
-									{
-										t_jmin = c_jmin;
-										t_min_cost = c_min_cost;
-										t_vjmin = c_vjmin;
-									}
-									if (c_min_cost_real < t_min_cost_real) t_min_cost_real = c_min_cost_real;
-								}
-								host_struct_private[i].picked = t_min_cost;
-								host_struct_private[i].min = t_min_cost_real;
-								host_struct_private[i].jmin = t_jmin;
-								host_struct_private[i].v_jmin = t_vjmin;
-								last_picked = t_jmin;
+								if (num_items <= 1024) getMinimalCostSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], std::numeric_limits<SC>::max(), start, num_items, dim2);
+								else if (num_items <= 65536) getMinimalCostMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], std::numeric_limits<SC>::max(), start, num_items, dim2);
+								else getMinimalCostLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], std::numeric_limits<SC>::max(), start, num_items, dim2);
 							}
-#pragma omp barrier
+							else if (devices > 32)
+							{
+								if (num_items <= 1024) getMinimalCostLargeSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], &(host_struct_private[(i - 1) * devices]), std::numeric_limits<SC>::max(), start, num_items, dim2, devices);
+								else if (num_items <= 65536) getMinimalCostLargeMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], &(host_struct_private[(i - 1) * devices]), std::numeric_limits<SC>::max(), start, num_items, dim2, devices);
+								else getMinimalCostLargeLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], &(host_struct_private[(i - 1) * devices]), std::numeric_limits<SC>::max(), start, num_items, dim2, devices);
+							}
+							else
+							{
+								if (num_items <= 1024) getMinimalCostSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], &(host_struct_private[(i - 1) * devices]), std::numeric_limits<SC>::max(), start, num_items, dim2, devices);
+								else if (num_items <= 65536) getMinimalCostMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], &(host_struct_private[(i - 1) * devices]), std::numeric_limits<SC>::max(), start, num_items, dim2, devices);
+								else getMinimalCostLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], &(host_struct_private[(i - 1) * devices]), std::numeric_limits<SC>::max(), start, num_items, dim2, devices);
+							}
 						}
-						checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
+						cudaStreamSynchronize(stream);
 					}
 
 					for (int i = 0; i < dim; i++)
 					{
-						SC min_cost = host_struct_private[i].picked;
-						SC min_cost_real = host_struct_private[i].min;
-						int jmin = host_struct_private[i].jmin;
-						SC v_jmin = host_struct_private[i].v_jmin;
+						SC t_min_cost = host_struct_private[i * devices].picked;
+						SC t_min_cost_real = host_struct_private[i * devices].min;
+						int t_jmin = host_struct_private[i * devices].jmin;
+						SC t_vjmin = host_struct_private[i * devices].v_jmin;
 
-						upper_bound += min_cost + v_jmin;
+						// read additional values
+						for (int ti = 1; ti < devices; ti++)
+						{
+							SC c_min_cost = host_struct_private[i * devices + ti].picked;
+							SC c_min_cost_real = host_struct_private[i * devices + ti].min;
+							int c_jmin = host_struct_private[i * devices + ti].jmin;
+							SC c_vjmin = host_struct_private[i * devices + ti].v_jmin;
+
+							if ((c_min_cost < t_min_cost) || ((c_min_cost == t_min_cost) && (c_jmin < t_jmin)))
+							{
+								t_jmin = c_jmin;
+								t_min_cost = c_min_cost;
+								t_vjmin = c_vjmin;
+							}
+							if (c_min_cost_real < t_min_cost_real) t_min_cost_real = c_min_cost_real;
+						}
+						upper_bound += t_min_cost + t_vjmin;
 						// need to use the same v values in total
-						lower_bound += min_cost_real + v_jmin;
+						lower_bound += t_min_cost_real + t_vjmin;
 
-						picked[i] = jmin;
+						picked[i] = t_jmin;
 					}
 				}
 				greedy_gap = upper_bound - lower_bound;
@@ -633,6 +641,7 @@ namespace lap
 						cudaStream_t stream = iterator.ws.stream[t];
 						for (int i = 0; i < dim; i++)
 						{
+#pragma omp barrier
 							tt[t] = iterator.getRow(t, perm[i]);
 
 							if (num_items <= 1024) getFinalCostSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], min_cost_private[t], picked_cost_private[t], max_cost_private[t], tt[t], v_private[t], std::numeric_limits<SC>::max(), picked[i] - iterator.ws.part[t].first, num_items);
@@ -1228,7 +1237,6 @@ namespace lap
 				{
 					int triggered = -1;
 					int start_t = -1;
-					bool need_sync = false;
 #pragma omp parallel num_threads(devices) shared(triggered, start_t, unassignedfound, require_colsol_copy, min, jmin, colsol_old)
 					{
 						int t = omp_get_thread_num();
@@ -1368,7 +1376,6 @@ namespace lap
 								int i = colsol_old;
 								if (i < dim)
 								{
-									if ((jmin >= start) && (jmin < end)) need_sync = (!iterator.checkRow(t, i)) || (!peerEnabled);
 									// get row
 									tt[t] = iterator.getRow(t, i);
 									// initialize Search
@@ -1376,29 +1383,29 @@ namespace lap
 									{
 										triggered = t;
 										start_t = start;
-										if (need_sync)
+										host_min_private[triggered].data_valid = 0;
+										if (peerEnabled)
 										{
-											host_min_private[triggered].data_valid = 0;
+											if (num_items <= 1024) continueSearchMinPeerSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+											else if (num_items <= 65536) continueSearchMinPeerMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+											else continueSearchMinPeerLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 										}
-									}
-#pragma omp barrier
-									// continue search
-									if (peerEnabled)
-									{
-										if (num_items <= 1024) continueSearchMinPeerSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (num_items <= 65536) continueSearchMinPeerMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else continueSearchMinPeerLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-									}
-									else
-									{
-										//if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										//else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										//else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										if (triggered == t)
+										else
 										{
 											if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 											else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 											else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+										}
+									}
+#pragma omp barrier
+									// continue search
+									if (t != triggered)
+									{
+										if (peerEnabled)
+										{
+											if (num_items <= 1024) continueSearchMinPeerSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+											else if (num_items <= 65536) continueSearchMinPeerMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+											else continueSearchMinPeerLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 										}
 										else
 										{
@@ -1410,35 +1417,29 @@ namespace lap
 								}
 								else
 								{
-									need_sync = !peerEnabled;
 									if ((jmin >= start) && (jmin < end))
 									{
 										triggered = t;
 										start_t = start;
-										if (!peerEnabled)
+										host_min_private[triggered].data_valid = 0;
+										if (peerEnabled)
 										{
-											cudaMemcpyAsync(tt_jmin, &(tt[t][jmin - start]), sizeof(TC), cudaMemcpyDeviceToHost, stream);
-											cudaMemcpyAsync(v_jmin, &(v_private[t][jmin - start]), sizeof(SC), cudaMemcpyDeviceToHost, stream);
+											if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+											else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+											else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 										}
-										if (need_sync)
+										else
 										{
-											cudaStreamSynchronize(stream);
+											if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+											else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+											else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 										}
 									}
 #pragma omp barrier
 									// continue search
-									if (peerEnabled)
+									if (t != triggered)
 									{
-										if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-									}
-									else
-									{
-										//if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										//else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										//else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										if (t == triggered)
+										if (peerEnabled)
 										{
 											if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 											else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
