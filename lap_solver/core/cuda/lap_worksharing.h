@@ -108,13 +108,13 @@ namespace lap
 				for (int p = 0; p < devices; p++)
 				{
 					long long x0 = (long long)p * (long long)size;
-					x0 += (devices * multiple) >> 1;
+					x0 += devices * multiple - 1;
 					x0 /= devices * multiple;
 					part[p].first = (int)(multiple * x0);
 					if (p + 1 != devices)
 					{
 						long long x1 = ((long long)p + 1ll) * (long long)size;
-						x1 += (devices * multiple) >> 1;
+						x1 += devices * multiple - 1;
 						x1 /= devices * multiple;
 						part[p].second = (int)(multiple * x1);
 					}

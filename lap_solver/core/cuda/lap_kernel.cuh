@@ -2312,6 +2312,57 @@ namespace lap
 			}
 		}
 
+		template <class MS, class SC>
+		__device__ __forceinline__ void searchSmall(MS *s, volatile MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC &t_min, int &t_jmin, int &t_colsol, SC max, int size, int dim2)
+		{
+			minWarpIndex(t_min, t_jmin, t_colsol);
+			searchWriteTemp(o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol);
+
+			if (semaphoreWarp(semaphore))
+			{
+				searchReadTemp(t_min, t_jmin, t_colsol, o_min, o_jmin, o_colsol, max, dim2);
+				minWarpIndex(t_min, t_jmin, t_colsol);
+				searchWrite(s, t_min, t_jmin, t_colsol);
+				if (threadIdx.x == 0) s2->data_valid = 0;
+			}
+		}
+
+		template <class MS, class SC>
+		__device__ __forceinline__ void searchMedium(MS *s, volatile MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC &t_min, int &t_jmin, int &t_colsol, SC max, int size, int dim2)
+		{
+			__shared__ SC b_min[8];
+			__shared__ int b_jmin[8], b_colsol[8];
+
+			searchCombineMedium(t_min, t_jmin, t_colsol, b_min, b_jmin, b_colsol);
+			searchWriteTemp(o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol);
+
+			if (semaphoreBlock(semaphore))
+			{
+				searchReadTemp(t_min, t_jmin, t_colsol, o_min, o_jmin, o_colsol, max, dim2);
+				searchCombineMedium(t_min, t_jmin, t_colsol, b_min, b_jmin, b_colsol);
+				searchWrite(s, t_min, t_jmin, t_colsol);
+				if (threadIdx.x == 0) s2->data_valid = 0;
+			}
+		}
+
+		template <class MS, class SC>
+		__device__ __forceinline__ void searchLarge(MS *s, volatile MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC &t_min, int &t_jmin, int &t_colsol, SC max, int size, int dim2)
+		{
+			__shared__ SC b_min[32];
+			__shared__ int b_jmin[32], b_colsol[32];
+
+			searchCombineLarge(t_min, t_jmin, t_colsol, b_min, b_jmin, b_colsol);
+			searchWriteTemp(o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol);
+
+			if (semaphoreBlock(semaphore))
+			{
+				searchReadTempLarge(t_min, t_jmin, t_colsol, o_min, o_jmin, o_colsol, max, dim2);
+				searchCombineLarge(t_min, t_jmin, t_colsol, b_min, b_jmin, b_colsol);
+				searchWrite(s, t_min, t_jmin, t_colsol);
+				if (threadIdx.x == 0) s2->data_valid = 0;
+			}
+		}
+
 		// normal
 		template <class MS, class SC, class TC>
 		__global__ void initializeSearchMinSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
@@ -2460,6 +2511,178 @@ namespace lap
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
+		// normal + initialize second struct
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, tt, v, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, tt, v, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, tt, v, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		// copy colsol + initialize second struct
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, tt, v, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, tt, v, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void initializeSearchMinLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, tt, v, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		// virtual row + initialize second struct
+		template <class MS, class SC>
+		__global__ void initializeSearchMinSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, v, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void initializeSearchMinMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, v, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void initializeSearchMinLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, v, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		// copy colsol, virtual row + initialize second struct
+		template <class MS, class SC>
+		__global__ void initializeSearchMinSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, v, max, size, dim2);
+			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void initializeSearchMinMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, v, max, size, dim2);
+			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void initializeSearchMinLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->data_valid = 0;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+
+			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, v, max, size, dim2);
+			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
 		template <class MS, class SC, class TC>
 		__global__ void continueSearchJMinMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
 		{
@@ -2595,189 +2818,122 @@ namespace lap
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
-		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinPeerSmall_kernel(MS *s, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		template <class MS, class SC, class TC>
+		__device__ __forceinline__ void continueSearchMinPeerExchange(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, SC *v2, TC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
 		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			SC t_min;
-			int t_jmin, t_colsol;
-
-			__shared__ SC b_tt_jmin, b_v_jmin;
-			if ((jmin >= 0) && (jmin < size))
-			{
-				if (threadIdx.x == 0) data_valid[0] = 1;
-			}
-			else
-			{
-				if (threadIdx.x == 0) while (data_valid[0] == 0) {}
-			}
-			__threadfence_system();
-			__syncthreads();
-			if (threadIdx.x == 0)
-			{
-				b_tt_jmin = (SC)tt2[0];
-			}
-			else if (threadIdx.x == 1)
-			{
-				b_v_jmin = v2[0];
-			}
-			__syncthreads();
-			SC tt_jmin = b_tt_jmin;
-			SC v_jmin = b_v_jmin;
-
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
-			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
-		}
-
-		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinPeerMedium_kernel(MS *s, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			SC t_min;
-			int t_jmin, t_colsol;
-
-			__shared__ SC b_tt_jmin, b_v_jmin;
-			if ((jmin >= 0) && (jmin < size))
-			{
-				if (threadIdx.x == 0) data_valid[0] = 1;
-			}
-			else
-			{
-				if (threadIdx.x == 0) while (data_valid[0] == 0) {}
-			}
-			__threadfence_system();
-			__syncthreads();
-			if (threadIdx.x == 0)
-			{
-				b_tt_jmin = (SC)tt2[0];
-			}
-			else if (threadIdx.x == 1)
-			{
-				b_v_jmin = v2[0];
-			}
-			__syncthreads();
-			SC tt_jmin = b_tt_jmin;
-			SC v_jmin = b_v_jmin;
-
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
-			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
-		}
-
-		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinPeerLarge_kernel(MS *s, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			SC t_min;
-			int t_jmin, t_colsol;
-
-			__shared__ SC b_tt_jmin, b_v_jmin;
-			if ((jmin >= 0) && (jmin < size))
-			{
-				if (threadIdx.x == 0) data_valid[0] = 1;
-			}
-			else
-			{
-				if (threadIdx.x == 0) while (data_valid[0] == 0) {}
-			}
-			__threadfence_system();
-			__syncthreads();
-			if (threadIdx.x == 0)
-			{
-				b_tt_jmin = (SC)tt2[0];
-			}
-			else if (threadIdx.x == 1)
-			{
-				b_v_jmin = v2[0];
-			}
-			__syncthreads();
-			SC tt_jmin = b_tt_jmin;
-			SC v_jmin = b_v_jmin;
-
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
-			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
-		}
-
-		template <class MS, class SC>
-		__global__ void continueSearchMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			SC t_min;
-			int t_jmin, t_colsol;
-
-			__shared__ SC b_v_jmin;
-			if (threadIdx.x == 0)
-			{
-				b_v_jmin = v2[0];
-			}
-			__syncthreads();
-			SC v_jmin = b_v_jmin;
-
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
-			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
-		}
-
-		template <class MS, class SC>
-		__global__ void continueSearchMinMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			SC t_min;
-			int t_jmin, t_colsol;
-
-			__shared__ SC b_v_jmin;
-			if (threadIdx.x == 0)
-			{
-				b_v_jmin = v2[0];
-			}
-			__syncthreads();
-			SC v_jmin = b_v_jmin;
-
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
-			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
-		}
-
-		template <class MS, class SC>
-		__global__ void continueSearchMinLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			SC t_min;
-			int t_jmin, t_colsol;
-
-			__shared__ SC b_v_jmin;
-			if (threadIdx.x == 0)
-			{
-				b_v_jmin = v2[0];
-			}
-			__syncthreads();
-			SC v_jmin = b_v_jmin;
-
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
-			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
-		}
-
-		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinSmall_kernel(MS *s, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile TC2 *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			SC t_min;
-			int t_jmin, t_colsol;
-
 			__shared__ SC b_tt_jmin, b_v_jmin;
 
 			if ((jmin >= 0) && (jmin < size))
 			{
 				if (threadIdx.x == 0)
 				{
-					if (data_valid[0] == 0)
+					b_tt_jmin = tt_jmin = (SC)tt[jmin];
+					b_v_jmin = v_jmin = v[jmin];
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0) data_valid[0] = 1;
+				}
+			}
+			else
+			{
+				if (threadIdx.x == 0)
+				{
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0)
 					{
-						tt2[0] = tt[jmin];
-						v2[0] = v[jmin];
+						while (data_valid[0] == 0) {}
+						__threadfence();
+						b_tt_jmin = s2->min = (SC)tt2[0];
+						b_v_jmin = s2->max = v2[0];
+						__threadfence();
+						s2->data_valid = 1;
+					}
+					else
+					{
+						while (s2->data_valid == 0) {}
+						__threadfence();
+						b_tt_jmin = s2->min;
+						b_v_jmin = s2->max;
+					}
+				}
+			}
+			__syncthreads();
+			tt_jmin = b_tt_jmin;
+			v_jmin = b_v_jmin;
+		}
+
+		template <class MS, class SC, class TC>
+		__device__ __forceinline__ void continueSearchMinPeerExchangeSmall(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, SC *v2, TC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
+		{
+			if ((jmin >= 0) && (jmin < size))
+			{
+				if (threadIdx.x == 0)
+				{
+					tt_jmin = (SC)tt[jmin];
+					v_jmin = v[jmin];
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0) data_valid[0] = 1;
+				}
+			}
+			else
+			{
+				if (threadIdx.x == 0)
+				{
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0)
+					{
+						while (data_valid[0] == 0) {}
+						__threadfence_system();
+						s2->min = tt_jmin = (SC)tt2[0];
+						s2->max = v_jmin = v2[0];
+						__threadfence();
+						s2->data_valid = 1;
+					}
+					else
+					{
+						while (s2->data_valid == 0) {}
+						__threadfence();
+						tt_jmin = s2->min;
+						v_jmin = s2->max;
+					}
+				}
+			}
+			tt_jmin = __shfl_sync(0xffffffff, tt_jmin, 0, 32);
+			v_jmin = __shfl_sync(0xffffffff, v_jmin, 0, 32);
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void continueSearchMinPeerExchange(SC *v2, SC &v_jmin)
+		{
+			__shared__ SC b_v_jmin;
+
+			if (threadIdx.x == 0) b_v_jmin = v2[0];
+			__syncthreads();
+			v_jmin = b_v_jmin;
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void continueSearchMinPeerExchangeSmall(SC *v2, SC &v_jmin)
+		{
+			if (threadIdx.x == 0) v_jmin = v2[0];
+			v_jmin = __shfl_sync(0xffffffff, v_jmin, 0, 32);
+		}
+
+		template <class MS, class SC, class TC>
+		__device__ __forceinline__ void continueSearchMinExchange(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, volatile SC *v2, volatile SC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
+		{
+			__shared__ SC b_tt_jmin, b_v_jmin;
+
+			if ((jmin >= 0) && (jmin < size))
+			{
+				if (threadIdx.x == 0)
+				{
+					b_tt_jmin = tt_jmin = (SC)tt[jmin];
+					b_v_jmin = v_jmin = v[jmin];
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0)
+					{
+						tt2[0] = tt_jmin;
+						v2[0] = v_jmin;
 						__threadfence_system();
 						data_valid[0] = 1;
 					}
@@ -2785,117 +2941,329 @@ namespace lap
 			}
 			else
 			{
-				if (threadIdx.x == 0) while (data_valid[0] == 0) {}
+				if (threadIdx.x == 0)
+				{
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0)
+					{
+						while (data_valid[0] == 0) {}
+						__threadfence_system();
+						b_tt_jmin = s2->min = (SC)tt2[0];
+						b_v_jmin = s2->max = v2[0];
+						__threadfence();
+						s2->data_valid = 1;
+					}
+					else
+					{
+						while (s2->data_valid == 0) {}
+						__threadfence();
+						b_tt_jmin = s2->min;
+						b_v_jmin = s2->max;
+					}
+				}
 			}
-			__threadfence_system();
 			__syncthreads();
+			tt_jmin = b_tt_jmin;
+			v_jmin = b_v_jmin;
+		}
 
-			if (threadIdx.x == 0)
+		template <class MS, class SC, class TC>
+		__device__ __forceinline__ void continueSearchMinExchangeSmall(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, volatile SC *v2, volatile SC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
+		{
+			if ((jmin >= 0) && (jmin < size))
 			{
-				b_tt_jmin = (SC)tt2[0];
+				if (threadIdx.x == 0)
+				{
+					tt_jmin = (SC)tt[jmin];
+					v_jmin = v[jmin];
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0)
+					{
+						tt2[0] = tt_jmin;
+						v2[0] = v_jmin;
+						__threadfence_system();
+						data_valid[0] = 1;
+					}
+				}
 			}
-			else if (threadIdx.x == 1)
+			else
 			{
-				b_v_jmin = v2[0];
+				if (threadIdx.x == 0)
+				{
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0)
+					{
+						while (data_valid[0] == 0) {}
+						__threadfence_system();
+						s2->min = tt_jmin = (SC)tt2[0];
+						s2->max = v_jmin = v2[0];
+						__threadfence();
+						s2->data_valid = 1;
+					}
+					else
+					{
+						while (s2->data_valid == 0) {}
+						__threadfence();
+						tt_jmin = s2->min;
+						v_jmin = s2->max;
+					}
+				}
+			}
+			tt_jmin = __shfl_sync(0xffffffff, tt_jmin, 0, 32);
+			v_jmin = __shfl_sync(0xffffffff, v_jmin, 0, 32);
+		}
+
+		template <class MS, class SC>
+		__device__ __forceinline__ void continueSearchMinExchange(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, volatile SC *v2, SC &v_jmin, int jmin, int size)
+		{
+			__shared__ SC b_v_jmin;
+
+			if ((jmin >= 0) && (jmin < size))
+			{
+				if (threadIdx.x == 0)
+				{
+					b_v_jmin = v_jmin = v[jmin];
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0)
+					{
+						v2[0] = v_jmin;
+						__threadfence_system();
+						data_valid[0] = 1;
+					}
+				}
+			}
+			else
+			{
+				if (threadIdx.x == 0)
+				{
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0)
+					{
+						while (data_valid[0] == 0) {}
+						__threadfence_system();
+						b_v_jmin = s2->max = v2[0];
+						__threadfence();
+						s2->data_valid = 1;
+					}
+					else
+					{
+						while (s2->data_valid == 0) {}
+						__threadfence();
+						b_v_jmin = s2->max;
+					}
+				}
 			}
 			__syncthreads();
-			SC tt_jmin = b_tt_jmin;
-			SC v_jmin = b_v_jmin;
+			v_jmin = b_v_jmin;
+		}
 
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
+		template <class MS, class SC>
+		__device__ __forceinline__ void continueSearchMinExchangeSmall(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, volatile SC *v2, SC &v_jmin, int jmin, int size)
+		{
+			if ((jmin >= 0) && (jmin < size))
+			{
+				if (threadIdx.x == 0)
+				{
+					v_jmin = v[jmin];
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0)
+					{
+						v2[0] = v_jmin;
+						__threadfence_system();
+						data_valid[0] = 1;
+					}
+				}
+			}
+			else
+			{
+				if (threadIdx.x == 0)
+				{
+					int sem = atomicInc(semaphore, gridDim.x - 1);
+					if (sem == 0)
+					{
+						while (data_valid[0] == 0) {}
+						__threadfence_system();
+						s2->max = v_jmin = v2[0];
+						__threadfence();
+						s2->data_valid = 1;
+					}
+					else
+					{
+						while (s2->data_valid == 0) {}
+						__threadfence();
+						v_jmin = s2->max;
+					}
+				}
+			}
+			v_jmin = __shfl_sync(0xffffffff, v_jmin, 0, 32);
+		}
+
+		template <class MS, class SC>
+		__global__ void continueSearchMinPeerSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+			SC v_jmin;
+
+			continueSearchMinPeerExchangeSmall(v2, v_jmin);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
 			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
-		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinMedium_kernel(MS *s, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile TC2 *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		template <class MS, class SC>
+		__global__ void continueSearchMinPeerMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			SC t_min;
 			int t_jmin, t_colsol;
+			SC v_jmin;
 
-			__shared__ SC b_tt_jmin, b_v_jmin;
-
-			if ((jmin >= 0) && (jmin < size))
-			{
-				if (threadIdx.x == 0)
-				{
-					if (data_valid[0] == 0)
-					{
-						tt2[0] = (TC2)tt[jmin];
-						v2[0] = v[jmin];
-						__threadfence_system();
-						data_valid[0] = 1;
-					}
-				}
-			}
-			else
-			{
-				if (threadIdx.x == 0) while (data_valid[0] == 0) {}
-			}
-			__threadfence_system();
-			__syncthreads();
-
-			if (threadIdx.x == 0)
-			{
-				b_tt_jmin = (SC)tt2[0];
-			}
-			else if (threadIdx.x == 1)
-			{
-				b_v_jmin = v2[0];
-			}
-			__syncthreads();
-			SC tt_jmin = b_tt_jmin;
-			SC v_jmin = b_v_jmin;
-
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
+			continueSearchMinPeerExchange(v2, v_jmin);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
 			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
-		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinLarge_kernel(MS *s, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile TC2 *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		template <class MS, class SC>
+		__global__ void continueSearchMinPeerLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			SC t_min;
 			int t_jmin, t_colsol;
+			SC v_jmin;
 
-			__shared__ SC b_tt_jmin, b_v_jmin;
-
-			if ((jmin >= 0) && (jmin < size))
-			{
-				if (threadIdx.x == 0)
-				{
-					if (data_valid[0] == 0)
-					{
-						tt2[0] = (TC2)tt[jmin];
-						v2[0] = v[jmin];
-						__threadfence_system();
-						data_valid[0] = 1;
-					}
-				}
-			}
-			else
-			{
-				if (threadIdx.x == 0) while (data_valid[0] == 0) {}
-			}
-			__threadfence_system();
-			__syncthreads();
-
-			if (threadIdx.x == 0)
-			{
-				b_tt_jmin = (SC)tt2[0];
-			}
-			else if (threadIdx.x == 1)
-			{
-				b_v_jmin = v2[0];
-			}
-			__syncthreads();
-			SC tt_jmin = b_tt_jmin;
-			SC v_jmin = b_v_jmin;
-
-			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
+			continueSearchMinPeerExchange(v2, v_jmin);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC, class TC2>
+		__global__ void continueSearchMinPeerSmall_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+			SC tt_jmin, v_jmin;
+
+			continueSearchMinPeerExchangeSmall(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
+			searchSmall(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC, class TC2>
+		__global__ void continueSearchMinPeerMedium_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+			SC tt_jmin, v_jmin;
+
+			continueSearchMinPeerExchange(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
+			searchMedium(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC, class TC2>
+		__global__ void continueSearchMinPeerLarge_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+			SC tt_jmin, v_jmin;
+
+			continueSearchMinPeerExchange(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
+			searchLarge(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void continueSearchMinSmall_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+			SC v_jmin;
+
+			continueSearchMinExchangeSmall(s2, semaphore + 1, data_valid, v, v2, v_jmin, jmin, size);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
+			searchSmall(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void continueSearchMinMedium_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+			SC v_jmin;
+
+			continueSearchMinExchange(s2, semaphore + 1, data_valid, v, v2, v_jmin, jmin, size);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
+			searchMedium(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC>
+		__global__ void continueSearchMinLarge_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+			SC v_jmin;
+
+			continueSearchMinExchange(s2, semaphore + 1, data_valid, v, v2, v_jmin, jmin, size);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim2);
+			searchLarge(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void continueSearchMinSmall_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile SC *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+			SC tt_jmin, v_jmin;
+
+			continueSearchMinExchangeSmall(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
+			searchSmall(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void continueSearchMinMedium_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile SC *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+			SC tt_jmin, v_jmin;
+
+			continueSearchMinExchange(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
+			searchMedium(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+		}
+
+		template <class MS, class SC, class TC>
+		__global__ void continueSearchMinLarge_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile SC *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min;
+			int t_jmin, t_colsol;
+			SC tt_jmin, v_jmin;
+
+			continueSearchMinExchange(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
+			searchLarge(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC>
