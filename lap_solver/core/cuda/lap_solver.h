@@ -23,7 +23,6 @@ namespace lap
 			SC picked;
 			SC v_jmin;
 			int jmin;
-			int last_picked;
 		};
 
 		template <class SC>
@@ -321,7 +320,6 @@ namespace lap
 					cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
 
 					for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].jmin = -1;
-					for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].last_picked = -1;
 					for (int i = dim - 1; i >= 0; --i)
 					{
 #pragma omp barrier
@@ -340,6 +338,7 @@ namespace lap
 							else getMinSecondBestLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i * devices + t]), semaphore_private[t], min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt, v_private[t], picked_private[t], &(host_struct_private[(i + 1) * devices]), std::numeric_limits<SC>::max(), i, start, num_items, dim2, devices);
 						}
 					}
+					checkCudaErrors(cudaStreamSynchronize(stream));
 				}
 				for (int i = dim - 1; i >= 0; --i)
 				{
@@ -447,7 +446,6 @@ namespace lap
 						cudaMemcpyAsync(mod_v_private[t], v_private[t], num_items * sizeof(SC), cudaMemcpyDeviceToDevice, stream);
 						cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
 						for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].jmin = -1;
-						for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].last_picked = -1;
 
 						for (int i = 0; i < dim; i++)
 						{

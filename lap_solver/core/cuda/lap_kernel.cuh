@@ -1247,7 +1247,6 @@ namespace lap
 			{
 				s->min = t_min_cost_real;
 				s->picked = t_min_cost;
-				s->jmin = t_jmin + start;
 				if (t_jmin < dim2)
 				{
 					s->v_jmin = v[t_jmin];
@@ -1256,6 +1255,8 @@ namespace lap
 				{
 					s->v_jmin = max;
 				}
+				__threadfence_system();
+				s->jmin = t_jmin + start;
 			}
 		}
 
