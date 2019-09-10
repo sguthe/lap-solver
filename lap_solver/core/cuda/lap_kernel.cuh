@@ -390,9 +390,11 @@ namespace lap
 
 		// 32 threads per block, up to 32 blocks, requires no shared memory and no thread synchronization
 		template <class MS, class SC, class TC>
-		__global__ void getMinMaxBestSmall_kernel(MS *s, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int start, int size, int dim2)
+		__global__ void getMinMaxBestSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->jmin = -1;
 
 			SC t_min_cost, t_max_cost, t_picked_cost;
 			int t_jmin;
@@ -411,9 +413,11 @@ namespace lap
 
 		// 256 threads per block, up to 256 blocks
 		template <class MS, class SC, class TC>
-		__global__ void getMinMaxBestMedium_kernel(MS *s, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int start, int size, int dim2)
+		__global__ void getMinMaxBestMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->jmin = -1;
 
 			__shared__ SC b_min_cost[8], b_max_cost[8], b_picked_cost[8];
 			__shared__ int b_jmin[8];
@@ -435,9 +439,11 @@ namespace lap
 
 		// 1024 threads per block, can be more than 1024 blocks
 		template <class MS, class SC, class TC>
-		__global__ void getMinMaxBestLarge_kernel(MS *s, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int start, int size, int dim2)
+		__global__ void getMinMaxBestLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, int *picked, SC min, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j == 0) s2->jmin = -1;
 
 			__shared__ SC b_min_cost[32], b_max_cost[32], b_picked_cost[32];
 			__shared__ int b_jmin[32];
@@ -1796,94 +1802,126 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__device__ __forceinline__ void updateEstimateVGetMin(int &jmin, SC &min_cost, volatile int *data_valid, volatile MS *s, int start, int dim2, SC max, int devices)
+		__device__ __forceinline__ void updateEstimateVGetMin(int &jmin, SC &min_cost, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, volatile MS *s, int start, int dim2, SC max, int devices)
 		{
 			__shared__ int b_jmin;
 			__shared__ SC b_min_cost;
 
 			if (threadIdx.x < 32)
 			{
-				if (threadIdx.x < devices)
+				int sem;
+				if (threadIdx.x == 0) sem = atomicInc(semaphore, gridDim.x - 1);
+				sem = __shfl_sync(0xffffffff, sem, 0, 32);
+				if (sem == 0)
 				{
-					while (data_valid[threadIdx.x] == 0);
-				}
-				__threadfence_system();
-				__syncwarp(0xffffffff);
+					if (threadIdx.x < devices) while (data_valid[threadIdx.x] == 0);
+					__threadfence_system();
+					__syncwarp(0xffffffff);
 
-				int t_jmin;
-				SC t_min_cost;
-				SC t_picked_cost;
-				if (threadIdx.x < devices)
-				{
-					t_jmin = s[threadIdx.x].jmin;
-					t_picked_cost = s[threadIdx.x].picked;
-					t_min_cost = s[threadIdx.x].min;
+					int t_jmin;
+					SC t_min_cost;
+					SC t_picked_cost;
+					if (threadIdx.x < devices)
+					{
+						t_jmin = s[threadIdx.x].jmin;
+						t_picked_cost = s[threadIdx.x].picked;
+						t_min_cost = s[threadIdx.x].min;
+					}
+					else
+					{
+						t_jmin = dim2;
+						t_picked_cost = max;
+						t_min_cost = max;
+					}
+					minWarpIndex(t_picked_cost, t_jmin);
+					minWarp(t_min_cost);
+					if (threadIdx.x == 0)
+					{
+						s2->min = b_min_cost = t_min_cost;
+						__threadfence();
+						s2->jmin = b_jmin = t_jmin;
+					}
 				}
 				else
 				{
-					t_jmin = dim2;
-					t_picked_cost = max;
-					t_min_cost = max;
-				}
-				minWarpIndex(t_picked_cost, t_jmin);
-				minWarp(t_min_cost);
-				if (threadIdx.x == 0)
-				{
-					b_jmin = t_jmin - start;
-					b_min_cost = t_min_cost;
+					if (threadIdx.x == 0)
+					{
+						int t_jmin;
+						while ((t_jmin = s2->jmin) < 0) {}
+						__threadfence();
+						b_jmin = t_jmin;
+						b_min_cost = s2->min;
+					}
 				}
 			}
-
 			__syncthreads();
-			jmin = b_jmin;
+			jmin = b_jmin - start;
 			min_cost = b_min_cost;
 		}
 
 		template <class MS, class SC>
-		__device__ __forceinline__ void updateEstimateVGetMinLarge(int &jmin, SC &min_cost, volatile int *data_valid, volatile MS *s, int start, int dim2, SC max, int devices)
+		__device__ __forceinline__ void updateEstimateVGetMinLarge(int &jmin, SC &min_cost, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, volatile MS *s, int start, int dim2, SC max, int devices)
 		{
 			__shared__ int b_jmin;
 			__shared__ SC b_min_cost;
 
 			if (threadIdx.x < 32)
 			{
-				bool is_valid = false;
-				do
+				int sem;
+				if (threadIdx.x == 0) sem = atomicInc(semaphore, gridDim.x - 1);
+				sem = __shfl_sync(0xffffffff, sem, 0, 32);
+				if (sem == 0)
 				{
-					is_valid = true;
-					for (int t = threadIdx.x; t < devices; t += 32) is_valid &= (data_valid[t] != 0);
-				} while (!is_valid);
-
-				__threadfence_system();
-				__syncwarp(0xffffffff);
-
-				int t_jmin = dim2;
-				SC t_min_cost = max;
-				SC t_picked_cost = max;
-
-				for (int t = threadIdx.x; t < devices; t += 32)
-				{
-					int c_jmin = s[t].jmin;
-					SC c_min_cost = s[t].min;
-					SC c_picked_cost = s[t].picked;
-					if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_jmin < t_jmin)))
+					bool is_valid = false;
+					do
 					{
-						t_jmin = c_jmin;
-						t_picked_cost = c_picked_cost;
+						is_valid = true;
+						for (int t = threadIdx.x; t < devices; t += 32) is_valid &= (data_valid[t] != 0);
+					} while (!is_valid);
+
+					__threadfence_system();
+					__syncwarp(0xffffffff);
+
+					int t_jmin = dim2;
+					SC t_min_cost = max;
+					SC t_picked_cost = max;
+
+					for (int t = threadIdx.x; t < devices; t += 32)
+					{
+						int c_jmin = s[t].jmin;
+						SC c_min_cost = s[t].min;
+						SC c_picked_cost = s[t].picked;
+						if ((c_picked_cost < t_picked_cost) || ((c_picked_cost == t_picked_cost) && (c_jmin < t_jmin)))
+						{
+							t_jmin = c_jmin;
+							t_picked_cost = c_picked_cost;
+						}
+						if (c_min_cost < t_min_cost) t_min_cost = c_min_cost;
 					}
-					if (c_min_cost < t_min_cost) t_min_cost = c_min_cost;
+					minWarpIndex(t_picked_cost, t_jmin);
+					minWarp(t_min_cost);
+					if (threadIdx.x == 0)
+					{
+						s2->min = b_min_cost = t_min_cost;
+						__threadfence();
+						s2->jmin = b_jmin = t_jmin;
+					}
 				}
-				minWarpIndex(t_picked_cost, t_jmin);
-				minWarp(t_min_cost);
-				if (threadIdx.x == 0)
+				else
 				{
-					b_jmin = t_jmin - start;
-					b_min_cost = t_min_cost;
+					if (threadIdx.x == 0)
+					{
+						int t_jmin;
+						while ((t_jmin = s2->jmin) < 0) {}
+						__threadfence();
+						b_jmin = t_jmin;
+						b_min_cost = s2->min;
+					}
 				}
 			}
 
 			__syncthreads();
-			jmin = b_jmin;
+			jmin = b_jmin - start;
 			min_cost = b_min_cost;
 		}
 
@@ -1906,56 +1944,56 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void updateEstimatedVFirst_kernel(SC *min_v, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		__global__ void updateEstimatedVFirst_kernel(SC *min_v, volatile MS *s2, unsigned int *semaphore, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
 		{
 			int jmin;
 			SC min_cost;
-			updateEstimateVGetMin(jmin, min_cost, data_valid, s, start, dim2, max, devices);
+			updateEstimateVGetMin(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
 			updateEstimatedVFirst(min_v, tt, picked, min_cost, jmin, size);
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void updateEstimatedVSecond_kernel(SC *v, SC *min_v, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		__global__ void updateEstimatedVSecond_kernel(SC *v, SC *min_v, volatile MS *s2, unsigned int *semaphore, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
 		{
 			int jmin;
 			SC min_cost;
-			updateEstimateVGetMin(jmin, min_cost, data_valid, s, start, dim2, max, devices);
+			updateEstimateVGetMin(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
 			updateEstimatedVSecond(v, min_v, tt, picked, min_cost, jmin, size);
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void updateEstimatedV_kernel(SC *v, SC *min_v, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		__global__ void updateEstimatedV_kernel(SC *v, SC *min_v, volatile MS *s2, unsigned int *semaphore, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
 		{
 			int jmin;
 			SC min_cost;
-			updateEstimateVGetMin(jmin, min_cost, data_valid, s, start, dim2, max, devices);
+			updateEstimateVGetMin(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
 			updateEstimatedV(v, min_v, tt, picked, min_cost, jmin, size);
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void updateEstimatedVFirstLarge_kernel(SC *min_v, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		__global__ void updateEstimatedVFirstLarge_kernel(SC *min_v, volatile MS *s2, unsigned int *semaphore, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
 		{
 			int jmin;
 			SC min_cost;
-			updateEstimateVGetMinLarge(jmin, min_cost, data_valid, s, start, dim2, max, devices);
+			updateEstimateVGetMinLarge(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
 			updateEstimatedVFirst(min_v, tt, picked, min_cost, jmin, size);
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void updateEstimatedVSecondLarge_kernel(SC *v, SC *min_v, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		__global__ void updateEstimatedVSecondLarge_kernel(SC *v, SC *min_v, volatile MS *s2, unsigned int *semaphore, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
 		{
 			int jmin;
 			SC min_cost;
-			updateEstimateVGetMinLarge(jmin, min_cost, data_valid, s, start, dim2, max, devices);
+			updateEstimateVGetMinLarge(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
 			updateEstimatedVSecond(v, min_v, tt, picked, min_cost, jmin, size);
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void updateEstimatedVLarge_kernel(SC *v, SC *min_v, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		__global__ void updateEstimatedVLarge_kernel(SC *v, SC *min_v, volatile MS *s2, unsigned int *semaphore, TC *tt, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
 		{
 			int jmin;
 			SC min_cost;
-			updateEstimateVGetMinLarge(jmin, min_cost, data_valid, s, start, dim2, max, devices);
+			updateEstimateVGetMinLarge(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
 			updateEstimatedV(v, min_v, tt, picked, min_cost, jmin, size);
 		}
 

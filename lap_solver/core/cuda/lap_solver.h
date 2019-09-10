@@ -81,7 +81,7 @@ namespace lap
 			int *picked;
 			int *data_valid;
 			estimateEpsilon_struct<SC> *host_struct_private;
-			estimateEpsilon_struct<SC> *gpu_struct_private;
+			estimateEpsilon_struct<SC> **gpu_struct_private;
 			unsigned int **semaphore_private;
 
 			int devices = (int)iterator.ws.device.size();
@@ -104,6 +104,7 @@ namespace lap
 			lapAlloc(picked, dim2, __FILE__, __LINE__);
 			lapAlloc(semaphore_private, devices, __FILE__, __LINE__);
 			lapAlloc(start_private, devices, __FILE__, __LINE__);
+			lapAlloc(gpu_struct_private, devices, __FILE__, __LINE__);
 			cudaMallocHost(&host_struct_private, (dim * devices) * sizeof(estimateEpsilon_struct<SC>));
 			cudaMallocHost(&data_valid, (dim * devices) * sizeof(int));
 
@@ -125,7 +126,7 @@ namespace lap
 					cudaMalloc(&(max_cost_private[t]), count * sizeof(SC));
 					cudaMalloc(&(picked_cost_private[t]), count * sizeof(SC));
 					cudaMalloc(&(jmin_private[t]), count * sizeof(int));
-					if (t == 0) cudaMalloc(&(gpu_struct_private), devices * sizeof(estimateEpsilon_struct<SC>));
+					cudaMalloc(&(gpu_struct_private[t]), sizeof(estimateEpsilon_struct<SC>));
 					cudaMalloc(&(start_private[t]), devices * sizeof(int));
 				}
 				for (int t = 0; t < devices; t++)
@@ -151,6 +152,20 @@ namespace lap
 				cudaStream_t stream = iterator.ws.stream[0];
 				int num_items = iterator.ws.part[0].second - iterator.ws.part[0].first;
 
+				int bs, gs;
+				if (num_items <= 1024)
+				{
+					bs = 32; gs = (num_items + 31) >> 5;
+				}
+				else if (num_items <= 65536)
+				{
+					bs = 256; gs = (num_items + 255) >> 8;
+				}
+				else
+				{
+					bs = 1024; gs = (num_items + 1023) >> 10;
+				}
+
 				for (int i = 0; i < dim; i++)
 				{
 					auto *tt = iterator.getRow(0, i);
@@ -159,9 +174,9 @@ namespace lap
 					else if (num_items <= 65536) getMinMaxBestSingleMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], max_cost_private[0], picked_cost_private[0], jmin_private[0], tt, picked_private[0], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, num_items, dim2);
 					else getMinMaxBestSingleLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], max_cost_private[0], picked_cost_private[0], jmin_private[0], tt, picked_private[0], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, num_items, dim2);
 
-					if (i == 0) updateEstimatedVFirst_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(mod_v_private[0], tt, picked_private[0], min_cost_private[0], jmin_private[0], dim2);
-					else if (i == 1) updateEstimatedVSecond_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[0], mod_v_private[0], tt, picked_private[0], min_cost_private[0], jmin_private[0], dim2);
-					else updateEstimatedV_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[0], mod_v_private[0], tt, picked_private[0], min_cost_private[0], jmin_private[0], dim2);
+					if (i == 0) updateEstimatedVFirst_kernel<<<gs, bs, 0, stream>>>(mod_v_private[0], tt, picked_private[0], min_cost_private[0], jmin_private[0], dim2);
+					else if (i == 1) updateEstimatedVSecond_kernel<<<gs, bs, 0, stream>>>(v_private[0], mod_v_private[0], tt, picked_private[0], min_cost_private[0], jmin_private[0], dim2);
+					else updateEstimatedV_kernel<<<gs, bs, 0, stream>>>(v_private[0], mod_v_private[0], tt, picked_private[0], min_cost_private[0], jmin_private[0], dim2);
 				}
 
 				checkCudaErrors(cudaStreamSynchronize(stream));
@@ -171,8 +186,8 @@ namespace lap
 					upper_bound += host_struct_private[i].max;
 					greedy_bound += host_struct_private[i].picked;
 				}
-				findMaximum(v_private[0], gpu_struct_private, stream, dim2);
-				subtractMaximum_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[0], gpu_struct_private, dim2);
+				findMaximum(v_private[0], gpu_struct_private[0], stream, dim2);
+				subtractMaximum_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[0], gpu_struct_private[0], dim2);
 			}
 			else
 			{
@@ -186,25 +201,39 @@ namespace lap
 					int num_items = iterator.ws.part[t].second - start;
 					cudaStream_t stream = iterator.ws.stream[t];
 
+					int bs, gs;
+					if (num_items <= 1024)
+					{
+						bs = 32; gs = (num_items + 31) >> 5;
+					}
+					else if (num_items <= 65536)
+					{
+						bs = 256; gs = (num_items + 255) >> 8;
+					}
+					else
+					{
+						bs = 1024; gs = (num_items + 1023) >> 10;
+					}
+
 					for (int i = 0; i < dim; i++)
 					{
 						tt[t] = iterator.getRow(t, i);
 
-						if (num_items <= 1024) getMinMaxBestSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
-						else if (num_items <= 65536) getMinMaxBestMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
-						else getMinMaxBestLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
+						if (num_items <= 1024) getMinMaxBestSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[t + i * devices]), gpu_struct_private[t], semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
+						else if (num_items <= 65536) getMinMaxBestMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[t + i * devices]), gpu_struct_private[t], semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
+						else getMinMaxBestLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[t + i * devices]), gpu_struct_private[t], semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
 #pragma omp barrier
 						if (devices > 32)
 						{
-							if (i == 0) updateEstimatedVFirstLarge_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
-							else if (i == 1) updateEstimatedVSecondLarge_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
-							else updateEstimatedVLarge_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+							if (i == 0) updateEstimatedVFirstLarge_kernel<<<gs, bs, 0, stream>>>(mod_v_private[t], gpu_struct_private[t], semaphore_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+							else if (i == 1) updateEstimatedVSecondLarge_kernel<<<gs, bs, 0, stream>>>(v_private[t], mod_v_private[t], gpu_struct_private[t], semaphore_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+							else updateEstimatedVLarge_kernel<<<gs, bs, 0, stream>>>(v_private[t], mod_v_private[t], gpu_struct_private[t], semaphore_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
 						}
 						else
 						{
-							if (i == 0) updateEstimatedVFirst_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
-							else if (i == 1) updateEstimatedVSecond_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
-							else updateEstimatedV_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], mod_v_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+							if (i == 0) updateEstimatedVFirst_kernel<<<gs, bs, 0, stream>>>(mod_v_private[t], gpu_struct_private[t], semaphore_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+							else if (i == 1) updateEstimatedVSecond_kernel<<<gs, bs, 0, stream>>>(v_private[t], mod_v_private[t], gpu_struct_private[t], semaphore_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
+							else updateEstimatedV_kernel<<<gs, bs, 0, stream>>>(v_private[t], mod_v_private[t], gpu_struct_private[t], semaphore_private[t], tt[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
 						}
 					}
 					checkCudaErrors(cudaStreamSynchronize(stream));
@@ -703,7 +732,7 @@ namespace lap
 				cudaFree(max_cost_private[t]);
 				cudaFree(picked_cost_private[t]);
 				cudaFree(jmin_private[t]);
-				if (t == 0) cudaFree(gpu_struct_private);
+				cudaFree(gpu_struct_private[t]);
 				cudaFree(start_private[t]);
 			}
 
@@ -720,6 +749,7 @@ namespace lap
 			cudaFreeHost(host_struct_private);
 			lapFree(tt);
 			lapFree(start_private);
+			lapFree(gpu_struct_private);
 
 			if (max_threads < devices) omp_set_num_threads(max_threads);
 			return std::pair<SC, SC>((SC)upper, (SC)lower);
