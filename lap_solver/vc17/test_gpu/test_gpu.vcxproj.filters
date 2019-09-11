@@ -15,6 +15,9 @@
     <Filter Include="core\cuda">
       <UniqueIdentifier>{c36b662e-b00b-40ea-80fc-49941e07b0d0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="core\cuda\kernel">
+      <UniqueIdentifier>{25d54fb5-0c3a-401c-98ab-c1736629062c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\test\test_gpu.cu">
@@ -67,8 +70,26 @@
     <ClInclude Include="..\..\core\cuda\lap_cuda_helper.h">
       <Filter>core\cuda</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_get_min_max_best.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\core\cuda\lap_kernel.cuh">
-      <Filter>core\cuda</Filter>
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_update_v.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_get_min_second_best.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_get_minimal_cost.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_get_final_cost.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_update_estimated_v.cuh">
+      <Filter>core\cuda\kernel</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

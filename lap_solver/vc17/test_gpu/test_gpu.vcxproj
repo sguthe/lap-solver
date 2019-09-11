@@ -14,13 +14,19 @@
     <CudaCompile Include="..\..\test\test_gpu.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\core\cuda\lap_get_final_cost.cuh" />
+    <ClInclude Include="..\..\core\cuda\lap_get_minimal_cost.cuh" />
+    <ClInclude Include="..\..\core\cuda\lap_get_min_max_best.cuh" />
     <ClInclude Include="..\..\core\cuda\lap_cache.h" />
     <ClInclude Include="..\..\core\cuda\lap_caching_iterator.h" />
     <ClInclude Include="..\..\core\cuda\lap_cost.h" />
     <ClInclude Include="..\..\core\cuda\lap_cuda_helper.h" />
     <ClInclude Include="..\..\core\cuda\lap_direct_iterator.h" />
+    <ClInclude Include="..\..\core\cuda\lap_get_min_second_best.cuh" />
     <ClInclude Include="..\..\core\cuda\lap_kernel.cuh" />
     <ClInclude Include="..\..\core\cuda\lap_solver.h" />
+    <ClInclude Include="..\..\core\cuda\lap_update_estimated_v.cuh" />
+    <ClInclude Include="..\..\core\cuda\lap_update_v.cuh" />
     <ClInclude Include="..\..\core\cuda\lap_worksharing.h" />
     <ClInclude Include="..\..\core\lap_cache.h" />
     <ClInclude Include="..\..\core\lap_caching_iterator.h" />
