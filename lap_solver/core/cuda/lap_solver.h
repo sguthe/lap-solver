@@ -567,10 +567,8 @@ namespace lap
 				}
 				else
 				{
-					int triggered = -1;
-					int t_start = -1;
-					bool available = false;
-#pragma omp parallel num_threads(devices) shared(triggered, t_start, available)
+					for (int i = 0; i < dim; i++) host_struct_private[i].jmin = 0; 
+#pragma omp parallel num_threads(devices)
 					{
 						int t = omp_get_thread_num();
 
@@ -580,49 +578,19 @@ namespace lap
 						int num_items = end - start;
 						cudaStream_t stream = iterator.ws.stream[t];
 
+						cudaMemsetAsync(&(gpu_struct_private[t]->jmin), 0, sizeof(int), stream);
 						for (int i = dim - 1; i >= 0; --i)
 						{
-							if ((picked[i] >= start) && (picked[i] < end))
-							{
-								available = iterator.checkRow(t, perm[i]);
-								tt[t] = iterator.getRow(t, perm[i]);
-
-								if (!peerEnabled)
-								{
-									updateVMultiStart_kernel<<<1, 1, 0, stream>>>(tt[t], v_private[t], picked_private[t], &(mod_v[0]), picked[i] - start);
-								}
-								if ((!peerEnabled) || (!available))
-								{
-									cudaStreamSynchronize(stream);
-								}
-								triggered = t;
-								t_start = start;
-							}
-							else
-							{
-								tt[t] = iterator.getRow(t, perm[i]);
-							}
-#pragma omp barrier
-							if (peerEnabled)
-							{
-								if (t == triggered)
-								{
-									updateVSingle_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(tt[t], v_private[t], picked_private[t], picked[i] - start, num_items);
-								}
-								else
-								{
-									updateVMulti_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(tt[t], v_private[t], tt[triggered], v_private[triggered], picked_private[t], picked[i] - t_start, num_items);
-								}
-							}
-							else
-							{
-								updateVMulti_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(tt[t], v_private[t], picked_private[t], mod_v[0], num_items);
-							}
-							cudaStreamSynchronize(stream);
+							tt[t] = iterator.getRow(t, perm[i]);
+							if (num_items <= 1024) updateVMultiSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[i]), gpu_struct_private[t], semaphore_private[t], tt[t], v_private[t], picked_private[t], picked[i] - start, num_items);
+							else if (num_items <= 65536) updateVMulti_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i]), gpu_struct_private[t], semaphore_private[t], tt[t], v_private[t], picked_private[t], picked[i] - start, num_items);
+							else updateVMulti_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i]), gpu_struct_private[t], semaphore_private[t], tt[t], v_private[t], picked_private[t], picked[i] - start, num_items);
 #pragma omp barrier
 						}
+						checkCudaErrors(cudaStreamSynchronize(stream));
+#pragma omp barrier
 						findMaximum(v_private[t], &(host_struct_private[t]), stream, num_items);
-						checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
+						checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 						SC max_v = mergeMaximum<SC>(host_struct_private, devices);
 						subtractMaximum_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], max_v, num_items);

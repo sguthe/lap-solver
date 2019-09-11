@@ -172,7 +172,7 @@ namespace lap
 				}
 
 				minWarpIndex(t_picked_cost, last_picked);
-				minWarpIndex(t_picked_cost, last_picked);
+
 				if (threadIdx.x == 0)
 				{
 					s2->jmin = last_picked;

@@ -91,5 +91,17 @@
     <ClInclude Include="..\..\core\cuda\lap_update_estimated_v.cuh">
       <Filter>core\cuda\kernel</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_initialize_search.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_continue_search.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_search.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_update_column.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
