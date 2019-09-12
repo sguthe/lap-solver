@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
 	lap::allocationLogger.destroy();
 #endif
 
-	cudaProfilerStop();
+	checkCudaErrors(cudaProfilerStop());
 	return 0;
 }
 
@@ -147,26 +147,26 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	int devices = (int)ws.device.size();
 	TC *buffer;
 	// 16 should be enough
-	cudaMallocHost(&buffer, 16 * N2 * sizeof(TC));
+	checkCudaErrors(cudaMallocHost(&buffer, 16 * N2 * sizeof(TC)));
 	std::vector<int> idx(devices);
 	for (int i = 0; i < devices; i++) idx[i] = 0;
 	std::vector<cudaEvent_t> cudaEvent(16 * devices);
 	for (int t = 0; t < devices; t++)
 	{
-		cudaSetDevice(ws.device[t]);
+		checkCudaErrors(cudaSetDevice(ws.device[t]));
 		for (int i = 0; i < 16; i++)
 		{
-			cudaEventCreateWithFlags(&cudaEvent[t * 16 + i], cudaEventDisableTiming);
+			checkCudaErrors(cudaEventCreateWithFlags(&cudaEvent[t * 16 + i], cudaEventDisableTiming));
 		}
 	}
 
 	// cost function (copy data from table, cudaMemcpy may not be complete prior to next call)
 	auto get_cost_row = [&costMatrix, &buffer, &idx, &N2, &cudaEvent](TC *d_row, int t, cudaStream_t stream, int x, int start, int end)
 	{
-		if (cudaEventQuery(cudaEvent[t * 16 + idx[t]]) != cudaSuccess) cudaEventSynchronize(cudaEvent[t * 16 + idx[t]]);
+		if (cudaEventQuery(cudaEvent[t * 16 + idx[t]]) != cudaSuccess) checkCudaErrors(cudaEventSynchronize(cudaEvent[t * 16 + idx[t]]));
 		memcpy(buffer + start + N2 * idx[t], costMatrix.getRow(x) + start, (end - start) * sizeof(TC));
-		cudaMemcpyAsync(d_row, buffer + start + N2 * idx[t], (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
-		cudaEventRecord(cudaEvent[t * 16 + idx[t]], stream);
+		checkCudaErrors(cudaMemcpyAsync(d_row, buffer + start + N2 * idx[t], (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream));
+		checkCudaErrors(cudaEventRecord(cudaEvent[t * 16 + idx[t]], stream));
 		idx[t]++;
 		if (idx[t] >= 16) idx[t] = 0;
 		//cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
@@ -186,13 +186,13 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 
 	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 
-	cudaFreeHost(buffer);
+	checkCudaErrors(cudaFreeHost(buffer));
 	for (int t = 0; t < devices; t++)
 	{
-		cudaSetDevice(ws.device[t]);
-		for (int i = 0; i < 4; i++)
+		checkCudaErrors(cudaSetDevice(ws.device[t]));
+		for (int i = 0; i < 16; i++)
 		{
-			cudaEventDestroy(cudaEvent[t * 4 + i]);
+			checkCudaErrors(cudaEventDestroy(cudaEvent[t * 16 + i]));
 		}
 	}
 
@@ -277,11 +277,11 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 
 			for (int i = 0; i < num_enabled; i++)
 			{
-				cudaSetDevice(ws.device[i]);
-				cudaMalloc(&(d_state[i].tab_s), 2 * N * sizeof(C));
-				cudaMalloc(&(d_state[i].tab_t), 2 * N * sizeof(C));
-				cudaMemcpy(d_state[i].tab_s, tab_s, 2 * N * sizeof(C), cudaMemcpyHostToDevice);
-				cudaMemcpy(d_state[i].tab_t, tab_t, 2 * N * sizeof(C), cudaMemcpyHostToDevice);
+				checkCudaErrors(cudaSetDevice(ws.device[i]));
+				checkCudaErrors(cudaMalloc(&(d_state[i].tab_s), 2 * N * sizeof(C)));
+				checkCudaErrors(cudaMalloc(&(d_state[i].tab_t), 2 * N * sizeof(C)));
+				checkCudaErrors(cudaMemcpy(d_state[i].tab_s, tab_s, 2 * N * sizeof(C), cudaMemcpyHostToDevice));
+				checkCudaErrors(cudaMemcpy(d_state[i].tab_t, tab_t, 2 * N * sizeof(C), cudaMemcpyHostToDevice));
 			}
 
 			int *rowsol = new int[N];
@@ -298,9 +298,9 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 
 			for (int i = 0; i < num_enabled; i++)
 			{
-				cudaSetDevice(ws.device[i]);
-				cudaFree(d_state[i].tab_s);
-				cudaFree(d_state[i].tab_t);
+				checkCudaErrors(cudaSetDevice(ws.device[i]));
+				checkCudaErrors(cudaFree(d_state[i].tab_s));
+				checkCudaErrors(cudaFree(d_state[i].tab_t));
 			}
 
 			delete[] rowsol;
@@ -368,9 +368,9 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 
 			for (int i = 0; i < num_enabled; i++)
 			{
-				cudaSetDevice(ws.device[i]);
-				cudaMalloc(&(d_state[i].vec), 2 * N * sizeof(C));
-				cudaMemcpy(d_state[i].vec, vec, 2 * N * sizeof(C), cudaMemcpyHostToDevice);
+				checkCudaErrors(cudaSetDevice(ws.device[i]));
+				checkCudaErrors(cudaMalloc(&(d_state[i].vec), 2 * N * sizeof(C)));
+				checkCudaErrors(cudaMemcpy(d_state[i].vec, vec, 2 * N * sizeof(C), cudaMemcpyHostToDevice));
 			}
 
 			int *rowsol = new int[N];
@@ -396,19 +396,19 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			else ss << "test failed: ";
 			{
 				// set device back to 0
-				cudaSetDevice(ws.device[0]);
+				checkCudaErrors(cudaSetDevice(ws.device[0]));
 				C my_cost(0);
 				C *row = new C[N];
 				// calculate costs directly
 				{
 					C *d_row;
-					cudaMalloc(&d_row, N * sizeof(C));
+					checkCudaErrors(cudaMalloc(&d_row, N * sizeof(C)));
 					dim3 block_size, grid_size;
 					block_size.x = 256;
 					grid_size.x = (N + block_size.x - 1) / block_size.x;
 					getGTCost_sanity_kernel<<<grid_size, block_size>>>(d_row, get_cost, d_state[0], N);
-					cudaMemcpy(row, d_row, N * sizeof(C), cudaMemcpyDeviceToHost);
-					cudaFree(d_row);
+					checkCudaErrors(cudaMemcpy(row, d_row, N * sizeof(C), cudaMemcpyDeviceToHost));
+					checkCudaErrors(cudaFree(d_row));
 				}
 				for (int i = 0; i < N; i++) my_cost += row[i];
 				delete[] row;
@@ -418,8 +418,8 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 
 			for (int i = 0; i < num_enabled; i++)
 			{
-				cudaSetDevice(ws.device[i]);
-				cudaFree(d_state[i].vec);
+				checkCudaErrors(cudaSetDevice(ws.device[i]));
+				checkCudaErrors(cudaFree(d_state[i].vec));
 			}
 
 			delete[] rowsol;
@@ -475,9 +475,9 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 
 				for (int i = 0; i < num_enabled; i++)
 				{
-					cudaSetDevice(ws.device[i]);
-					cudaMalloc(&(d_state[i].vec), N * rank * sizeof(C));
-					cudaMemcpy(d_state[i].vec, vec, N * rank * sizeof(C), cudaMemcpyHostToDevice);
+					checkCudaErrors(cudaSetDevice(ws.device[i]));
+					checkCudaErrors(cudaMalloc(&(d_state[i].vec), N * rank * sizeof(C)));
+					checkCudaErrors(cudaMemcpy(d_state[i].vec, vec, N * rank * sizeof(C), cudaMemcpyHostToDevice));
 				}
 
 				int *rowsol = new int[N];
@@ -499,8 +499,8 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 
 				for (int i = 0; i < num_enabled; i++)
 				{
-					cudaSetDevice(ws.device[i]);
-					cudaFree(d_state[i].vec);
+					checkCudaErrors(cudaSetDevice(ws.device[i]));
+					checkCudaErrors(cudaFree(d_state[i].vec));
 				}
 
 				delete[] rowsol;
@@ -865,32 +865,34 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 				}
 				for (int t = 0; t < num_devices; t++)
 				{
-					cudaSetDevice(ws.device[t]);
+					checkCudaErrors(cudaSetDevice(ws.device[t]));
 					if (img_a.width * img_a.height < img_b.width * img_b.height)
 					{
 						img[0][t].width = img_a.width;
 						img[0][t].height = img_a.height;
 						img[0][t].max_val = img_a.max_val;
-						cudaMalloc(&img[0][t].raw, img[0][t].width * img[0][t].height * 3);
-						cudaMemcpyAsync(img[0][t].raw, buf_a, img[0][t].width * img[0][t].height * 3, cudaMemcpyHostToDevice);
+						checkCudaErrors(cudaMalloc(&img[0][t].raw, img[0][t].width * img[0][t].height * 3));
 						img[1][t].width = img_b.width;
 						img[1][t].height = img_b.height;
 						img[1][t].max_val = img_b.max_val;
-						cudaMalloc(&img[1][t].raw, img[1][t].width * img[1][t].height * 3);
-						cudaMemcpyAsync(img[1][t].raw, buf_b, img[1][t].width * img[1][t].height * 3, cudaMemcpyHostToDevice);
+						checkCudaErrors(cudaMalloc(&img[1][t].raw, img[1][t].width * img[1][t].height * 3));
+
+						checkCudaErrors(cudaMemcpyAsync(img[0][t].raw, buf_a, img[0][t].width * img[0][t].height * 3, cudaMemcpyHostToDevice));
+						checkCudaErrors(cudaMemcpyAsync(img[1][t].raw, buf_b, img[1][t].width * img[1][t].height * 3, cudaMemcpyHostToDevice));
 					}
 					else
 					{
 						img[0][t].width = img_b.width;
 						img[0][t].height = img_b.height;
 						img[0][t].max_val = img_b.max_val;
-						cudaMalloc(&img[0][t].raw, img[0][t].width * img[0][t].height * 3);
-						cudaMemcpyAsync(img[0][t].raw, buf_b, img[0][t].width * img[0][t].height * 3, cudaMemcpyHostToDevice);
+						checkCudaErrors(cudaMalloc(&img[0][t].raw, img[0][t].width * img[0][t].height * 3));
 						img[1][t].width = img_a.width;
 						img[1][t].height = img_a.height;
 						img[1][t].max_val = img_a.max_val;
-						cudaMalloc(&img[1][t].raw, img[1][t].width * img[1][t].height * 3);
-						cudaMemcpyAsync(img[1][t].raw, buf_a, img[1][t].width * img[1][t].height * 3, cudaMemcpyHostToDevice);
+						checkCudaErrors(cudaMalloc(&img[1][t].raw, img[1][t].width * img[1][t].height * 3));
+
+						checkCudaErrors(cudaMemcpyAsync(img[1][t].raw, buf_a, img[1][t].width * img[1][t].height * 3, cudaMemcpyHostToDevice));
+						checkCudaErrors(cudaMemcpyAsync(img[0][t].raw, buf_b, img[0][t].width * img[0][t].height * 3, cudaMemcpyHostToDevice));
 					}
 					checkCudaErrors(cudaDeviceSynchronize());
 				}
@@ -934,8 +936,8 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				for (int t = 0; t < num_devices; t++)
 				{
-					cudaFree(img[0][t].raw); img[0][t].raw = 0;
-					cudaFree(img[1][t].raw); img[1][t].raw = 0;
+					checkCudaErrors(cudaFree(img[0][t].raw)); img[0][t].raw = 0;
+					checkCudaErrors(cudaFree(img[1][t].raw)); img[1][t].raw = 0;
 				}
 				delete[] rowsol;
 				delete[] img[0];
