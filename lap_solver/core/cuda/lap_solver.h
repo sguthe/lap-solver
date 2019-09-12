@@ -90,7 +90,7 @@ namespace lap
 			int max_threads = omp_get_max_threads();
 			if (max_threads < devices) omp_set_num_threads(devices);
 
-			decltype(iterator.getRow(0, 0)) *tt;
+			decltype(iterator.getRow(0, 0, false)) *tt;
 			lapAlloc(tt, devices, __FILE__, __LINE__);
 
 			checkCudaErrors(cudaMallocHost(&mod_v, dim2 * sizeof(SC)));
@@ -168,7 +168,7 @@ namespace lap
 
 				for (int i = 0; i < dim; i++)
 				{
-					auto *tt = iterator.getRow(0, i);
+					auto *tt = iterator.getRow(0, i, true);
 
 					if (num_items <= 1024) getMinMaxBestSingleSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], max_cost_private[0], picked_cost_private[0], jmin_private[0], tt, picked_private[0], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, num_items, dim2);
 					else if (num_items <= 65536) getMinMaxBestSingleMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], max_cost_private[0], picked_cost_private[0], jmin_private[0], tt, picked_private[0], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, num_items, dim2);
@@ -217,7 +217,7 @@ namespace lap
 
 					for (int i = 0; i < dim; i++)
 					{
-						tt[t] = iterator.getRow(t, i);
+						tt[t] = iterator.getRow(t, i, true);
 
 						if (num_items <= 1024) getMinMaxBestSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[t + i * devices]), gpu_struct_private[t], semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
 						else if (num_items <= 65536) getMinMaxBestMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[t + i * devices]), gpu_struct_private[t], semaphore_private[t], &(data_valid[t + i * devices]), min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], picked_private[t], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, start, num_items, dim2);
@@ -314,7 +314,7 @@ namespace lap
 
 				for (int i = dim - 1; i >= 0; --i)
 				{
-					auto *tt = iterator.getRow(0, i);
+					auto *tt = iterator.getRow(0, i, true);
 
 					if (num_items <= 1024) getMinSecondBestSingleSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], max_cost_private[0], picked_cost_private[0], jmin_private[0], tt, v_private[0], picked_private[0], std::numeric_limits<SC>::max(), i, num_items, dim2);
 					else if (num_items <= 65536) getMinSecondBestSingleMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], max_cost_private[0], picked_cost_private[0], jmin_private[0], tt, v_private[0], picked_private[0], std::numeric_limits<SC>::max(), i, num_items, dim2);
@@ -352,7 +352,7 @@ namespace lap
 					for (int i = dim - 1; i >= 0; --i)
 					{
 #pragma omp barrier
-						auto *tt = iterator.getRow(t, i);
+						auto *tt = iterator.getRow(t, i, true);
 
 						if (i == dim - 1)
 						{
@@ -444,7 +444,7 @@ namespace lap
 
 					for (int i = 0; i < dim; i++)
 					{
-						auto *tt = iterator.getRow(0, perm[i]);
+						auto *tt = iterator.getRow(0, perm[i], true);
 
 						if (num_items <= 1024) getMinimalCostSingleSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], picked_cost_private[0], jmin_private[0], min_cost_private[0], tt, v_private[0], picked_private[0], std::numeric_limits<SC>::max(), num_items, dim2);
 						else if (num_items <= 65536) getMinimalCostSingleMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], picked_cost_private[0], jmin_private[0], min_cost_private[0], tt, v_private[0], picked_private[0], std::numeric_limits<SC>::max(), num_items, dim2);
@@ -485,7 +485,7 @@ namespace lap
 						for (int i = 0; i < dim; i++)
 						{
 #pragma omp barrier
-							auto *tt = iterator.getRow(t, perm[i]);
+							auto *tt = iterator.getRow(t, perm[i], true);
 
 							if (i == 0)
 							{
@@ -559,7 +559,7 @@ namespace lap
 
 					for (int i = dim - 1; i >= 0; --i)
 					{
-						auto *tt = iterator.getRow(0, perm[i]);
+						auto *tt = iterator.getRow(0, perm[i], true);
 						updateVSingle_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(tt, v_private[0], picked_private[0], picked[i], dim2);
 					}
 					findMaximum(v_private[0], &(host_struct_private[0]), stream, dim2);
@@ -581,7 +581,7 @@ namespace lap
 						checkCudaErrors(cudaMemsetAsync(&(gpu_struct_private[t]->jmin), 0, sizeof(int), stream));
 						for (int i = dim - 1; i >= 0; --i)
 						{
-							tt[t] = iterator.getRow(t, perm[i]);
+							tt[t] = iterator.getRow(t, perm[i], true);
 							if (num_items <= 1024) updateVMultiSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[i]), gpu_struct_private[t], semaphore_private[t], tt[t], v_private[t], picked_private[t], picked[i] - start, num_items);
 							else if (num_items <= 65536) updateVMulti_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i]), gpu_struct_private[t], semaphore_private[t], tt[t], v_private[t], picked_private[t], picked[i] - start, num_items);
 							else updateVMulti_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i]), gpu_struct_private[t], semaphore_private[t], tt[t], v_private[t], picked_private[t], picked[i] - start, num_items);
@@ -609,7 +609,7 @@ namespace lap
 
 					for (int i = 0; i < dim; i++)
 					{
-						auto *tt = iterator.getRow(0, perm[i]);
+						auto *tt = iterator.getRow(0, perm[i], true);
 
 						if (num_items <= 1024) getFinalCostSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], picked_cost_private[0], max_cost_private[0], tt, v_private[0], std::numeric_limits<SC>::max(), picked[i], num_items);
 						else if (num_items <= 65536) getFinalCostMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], picked_cost_private[0], max_cost_private[0], tt, v_private[0], std::numeric_limits<SC>::max(), picked[i], num_items);
@@ -643,7 +643,7 @@ namespace lap
 						for (int i = 0; i < dim; i++)
 						{
 #pragma omp barrier
-							tt[t] = iterator.getRow(t, perm[i]);
+							tt[t] = iterator.getRow(t, perm[i], true);
 
 							if (num_items <= 1024) getFinalCostSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], min_cost_private[t], picked_cost_private[t], max_cost_private[t], tt[t], v_private[t], std::numeric_limits<SC>::max(), picked[i] - iterator.ws.part[t].first, num_items);
 							else if (num_items <= 65536) getFinalCostMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], min_cost_private[t], picked_cost_private[t], max_cost_private[t], tt[t], v_private[t], std::numeric_limits<SC>::max(), picked[i] - iterator.ws.part[t].first, num_items);
@@ -986,7 +986,7 @@ namespace lap
 						{
 							if (f < dim)
 							{
-								auto tt = iterator.getRow(t, f);
+								auto tt = iterator.getRow(t, f, false);
 								if (num_items <= 1024) initializeSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], colsol, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
 								else if (num_items <= 65536) initializeSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], colsol, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
 								else initializeSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], colsol, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
@@ -1003,7 +1003,7 @@ namespace lap
 						{
 							if (f < dim)
 							{
-								auto tt = iterator.getRow(t, f);
+								auto tt = iterator.getRow(t, f, false);
 								if (num_items <= 1024) initializeSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
 								else if (num_items <= 65536) initializeSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
 								else initializeSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
@@ -1084,7 +1084,7 @@ namespace lap
 							if (i < dim)
 							{
 								// get row
-								auto tt = iterator.getRow(t, i);
+								auto tt = iterator.getRow(t, i, false);
 								// continue search
 								if (num_items <= 1024) continueSearchJMinMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], i, jmin, min, std::numeric_limits<SC>::max(), num_items, dim2);
 								else if (num_items <= 65536) continueSearchJMinMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], i, jmin, min, std::numeric_limits<SC>::max(), num_items, dim2);
@@ -1251,7 +1251,7 @@ namespace lap
 							{
 								if (f < dim)
 								{
-									auto tt = iterator.getRow(t, f);
+									auto tt = iterator.getRow(t, f, false);
 									if (peerEnabled)
 									{
 										if (num_items <= 1024) initializeSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
@@ -1285,7 +1285,7 @@ namespace lap
 							{
 								if (f < dim)
 								{
-									auto tt = iterator.getRow(t, f);
+									auto tt = iterator.getRow(t, f, false);
 									if (peerEnabled)
 									{
 										if (num_items <= 1024) initializeSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt, colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
@@ -1417,7 +1417,7 @@ namespace lap
 									if (peerEnabled)
 									{
 										// get row
-										tt[t] = iterator.getRow(t, i);
+										tt[t] = iterator.getRow(t, i, false);
 #pragma omp barrier
 										if (num_items <= 1024) continueSearchMinPeerSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 										else if (num_items <= 65536) continueSearchMinPeerMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
@@ -1427,7 +1427,7 @@ namespace lap
 									{
 #pragma omp barrier
 										// get row
-										tt[t] = iterator.getRow(t, i);
+										tt[t] = iterator.getRow(t, i, false);
 										if (num_items <= 1024) continueSearchMinSmall_kernel<<<(num_items + 31) >> 5, 32, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 										else if (num_items <= 65536) continueSearchMinMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 										else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);

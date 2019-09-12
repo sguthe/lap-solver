@@ -161,12 +161,12 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	}
 
 	// cost function (copy data from table, cudaMemcpy may not be complete prior to next call)
-	auto get_cost_row = [&costMatrix, &buffer, &idx, &N2, &cudaEvent](TC *d_row, int t, cudaStream_t stream, int x, int start, int end)
+	auto get_cost_row = [&costMatrix, &buffer, &idx, &N2, &cudaEvent](TC *d_row, int t, cudaStream_t stream, int x, int start, int end, bool async)
 	{
-		if (cudaEventQuery(cudaEvent[t * 16 + idx[t]]) != cudaSuccess) checkCudaErrors(cudaEventSynchronize(cudaEvent[t * 16 + idx[t]]));
+		if (async) if (cudaEventQuery(cudaEvent[t * 16 + idx[t]]) != cudaSuccess) checkCudaErrors(cudaEventSynchronize(cudaEvent[t * 16 + idx[t]]));
 		memcpy(buffer + start + N2 * idx[t], costMatrix.getRow(x) + start, (end - start) * sizeof(TC));
 		checkCudaErrors(cudaMemcpyAsync(d_row, buffer + start + N2 * idx[t], (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream));
-		checkCudaErrors(cudaEventRecord(cudaEvent[t * 16 + idx[t]], stream));
+		if (async) checkCudaErrors(cudaEventRecord(cudaEvent[t * 16 + idx[t]], stream));
 		idx[t]++;
 		if (idx[t] >= 16) idx[t] = 0;
 		//cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);

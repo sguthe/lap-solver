@@ -23,7 +23,7 @@ namespace lap
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
 			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
 			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
-			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end) const { getcostrow(row, t, stream, x, start, end); }
+			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, bool async) const { getcostrow(row, t, stream, x, start, end, async); }
 			__forceinline void getCost(TC *row, cudaStream_t stream, int *rowsol, int dim) const { getcost(row, stream, rowsol, dim); }
 		};
 
@@ -65,7 +65,7 @@ namespace lap
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
 			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
 			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
-			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end) const
+			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, bool async) const
 			{
 				dim3 block_size, grid_size;
 				block_size.x = 256;

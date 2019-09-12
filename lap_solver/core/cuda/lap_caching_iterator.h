@@ -50,14 +50,14 @@ namespace lap
 
 			__forceinline void getHitMiss(long long &hit, long long &miss) { cache[0].getHitMiss(hit, miss); }
 
-			__forceinline const TC *getRow(int t, int i)
+			__forceinline const TC *getRow(int t, int i, bool async)
 			{
 				int size = ws.part[t].second - ws.part[t].first;
 				int idx;
 				bool found = cache[t].find(idx, i);
 				if (!found)
 				{
-					costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, t, ws.stream[t], i, ws.part[t].first, ws.part[t].second);
+					costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, t, ws.stream[t], i, ws.part[t].first, ws.part[t].second, async);
 				}
 				return rows[t] + (long long)size * (long long)idx;
 			}
