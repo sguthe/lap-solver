@@ -93,7 +93,7 @@ namespace lap
 			decltype(iterator.getRow(0, 0)) *tt;
 			lapAlloc(tt, devices, __FILE__, __LINE__);
 
-			cudaMallocHost(&mod_v, dim2 * sizeof(SC));
+			checkCudaErrors(cudaMallocHost(&mod_v, dim2 * sizeof(SC)));
 			lapAlloc(mod_v_private, devices, __FILE__, __LINE__);
 			lapAlloc(min_cost_private, devices, __FILE__, __LINE__);
 			lapAlloc(max_cost_private, devices, __FILE__, __LINE__);
@@ -105,41 +105,41 @@ namespace lap
 			lapAlloc(semaphore_private, devices, __FILE__, __LINE__);
 			lapAlloc(start_private, devices, __FILE__, __LINE__);
 			lapAlloc(gpu_struct_private, devices, __FILE__, __LINE__);
-			cudaMallocHost(&host_struct_private, (dim * devices) * sizeof(estimateEpsilon_struct<SC>));
-			cudaMallocHost(&data_valid, (dim * devices) * sizeof(int));
+			checkCudaErrors(cudaMallocHost(&host_struct_private, (dim * devices) * sizeof(estimateEpsilon_struct<SC>)));
+			checkCudaErrors(cudaMallocHost(&data_valid, (dim * devices) * sizeof(int)));
 
 			{
 				int *host_start;
-				cudaMallocHost(&host_start, devices * sizeof(int));
+				checkCudaErrors(cudaMallocHost(&host_start, devices * sizeof(int)));
 				for (int t = 0; t < devices; t++)
 				{
 					host_start[t] = iterator.ws.part[t].first;
 
-					cudaSetDevice(iterator.ws.device[t]);
+					checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					int count = getMinSize(num_items);
 
-					cudaMalloc(&(mod_v_private[t]), num_items * sizeof(SC));
-					cudaMalloc(&(picked_private[t]), num_items * sizeof(int));
-					cudaMalloc(&(semaphore_private[t]), 2 * sizeof(unsigned int));
-					cudaMalloc(&(min_cost_private[t]), count * sizeof(SC));
-					cudaMalloc(&(max_cost_private[t]), count * sizeof(SC));
-					cudaMalloc(&(picked_cost_private[t]), count * sizeof(SC));
-					cudaMalloc(&(jmin_private[t]), count * sizeof(int));
-					cudaMalloc(&(gpu_struct_private[t]), sizeof(estimateEpsilon_struct<SC>));
-					cudaMalloc(&(start_private[t]), devices * sizeof(int));
+					checkCudaErrors(cudaMalloc(&(mod_v_private[t]), num_items * sizeof(SC)));
+					checkCudaErrors(cudaMalloc(&(picked_private[t]), num_items * sizeof(int)));
+					checkCudaErrors(cudaMalloc(&(semaphore_private[t]), 2 * sizeof(unsigned int)));
+					checkCudaErrors(cudaMalloc(&(min_cost_private[t]), count * sizeof(SC)));
+					checkCudaErrors(cudaMalloc(&(max_cost_private[t]), count * sizeof(SC)));
+					checkCudaErrors(cudaMalloc(&(picked_cost_private[t]), count * sizeof(SC)));
+					checkCudaErrors(cudaMalloc(&(jmin_private[t]), count * sizeof(int)));
+					checkCudaErrors(cudaMalloc(&(gpu_struct_private[t]), sizeof(estimateEpsilon_struct<SC>)));
+					checkCudaErrors(cudaMalloc(&(start_private[t]), devices * sizeof(int)));
 				}
 				for (int t = 0; t < devices; t++)
 				{
-					cudaSetDevice(iterator.ws.device[t]);
+					checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					cudaStream_t stream = iterator.ws.stream[t];
 
-					cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
-					cudaMemsetAsync(semaphore_private[t], 0, 2 * sizeof(unsigned int), stream);
-					cudaMemcpyAsync(start_private[t], host_start, devices * sizeof(int), cudaMemcpyHostToDevice, stream);
+					checkCudaErrors(cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream));
+					checkCudaErrors(cudaMemsetAsync(semaphore_private[t], 0, 2 * sizeof(unsigned int), stream));
+					checkCudaErrors(cudaMemcpyAsync(start_private[t], host_start, devices * sizeof(int), cudaMemcpyHostToDevice, stream));
 				}
-				cudaFreeHost(host_start);
+				checkCudaErrors(cudaFreeHost(host_start));
 			}
 
 			SC lower_bound = SC(0);
@@ -148,7 +148,7 @@ namespace lap
 
 			if (devices == 1)
 			{
-				cudaSetDevice(iterator.ws.device[0]);
+				checkCudaErrors(cudaSetDevice(iterator.ws.device[0]));
 				cudaStream_t stream = iterator.ws.stream[0];
 				int num_items = iterator.ws.part[0].second - iterator.ws.part[0].first;
 
@@ -196,7 +196,7 @@ namespace lap
 #pragma omp parallel num_threads(devices) shared(max_v)
 				{
 					int t = omp_get_thread_num();
-					cudaSetDevice(iterator.ws.device[t]);
+					checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 					int start = iterator.ws.part[t].first;
 					int num_items = iterator.ws.part[t].second - start;
 					cudaStream_t stream = iterator.ws.stream[t];
@@ -306,11 +306,11 @@ namespace lap
 
 			if (devices == 1)
 			{
-				cudaSetDevice(iterator.ws.device[0]);
+				checkCudaErrors(cudaSetDevice(iterator.ws.device[0]));
 				cudaStream_t stream = iterator.ws.stream[0];
 				int num_items = iterator.ws.part[0].second - iterator.ws.part[0].first;
 
-				cudaMemsetAsync(picked_private[0], 0, num_items * sizeof(int), stream);
+				checkCudaErrors(cudaMemsetAsync(picked_private[0], 0, num_items * sizeof(int), stream));
 
 				for (int i = dim - 1; i >= 0; --i)
 				{
@@ -341,12 +341,12 @@ namespace lap
 #pragma omp parallel num_threads(devices)
 				{
 					int t = omp_get_thread_num();
-					cudaSetDevice(iterator.ws.device[t]);
+					checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 					int start = iterator.ws.part[t].first;
 					int num_items = iterator.ws.part[t].second - start;
 					cudaStream_t stream = iterator.ws.stream[t];
 
-					cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
+					checkCudaErrors(cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream));
 
 					for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].jmin = -1;
 					for (int i = dim - 1; i >= 0; --i)
@@ -435,12 +435,12 @@ namespace lap
 				// greedy search
 				if (devices == 1)
 				{
-					cudaSetDevice(iterator.ws.device[0]);
+					checkCudaErrors(cudaSetDevice(iterator.ws.device[0]));
 					cudaStream_t stream = iterator.ws.stream[0];
 					int num_items = iterator.ws.part[0].second - iterator.ws.part[0].first;
 
-					cudaMemcpyAsync(mod_v_private[0], v_private[0], dim2 * sizeof(SC), cudaMemcpyDeviceToDevice, stream);
-					cudaMemsetAsync(picked_private[0], 0, dim2 * sizeof(int), stream);
+					checkCudaErrors(cudaMemcpyAsync(mod_v_private[0], v_private[0], dim2 * sizeof(SC), cudaMemcpyDeviceToDevice, stream));
+					checkCudaErrors(cudaMemsetAsync(picked_private[0], 0, dim2 * sizeof(int), stream));
 
 					for (int i = 0; i < dim; i++)
 					{
@@ -478,8 +478,8 @@ namespace lap
 						int num_items = iterator.ws.part[t].second - start;
 						cudaStream_t stream = iterator.ws.stream[t];
 
-						cudaMemcpyAsync(mod_v_private[t], v_private[t], num_items * sizeof(SC), cudaMemcpyDeviceToDevice, stream);
-						cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream);
+						checkCudaErrors(cudaMemcpyAsync(mod_v_private[t], v_private[t], num_items * sizeof(SC), cudaMemcpyDeviceToDevice, stream));
+						checkCudaErrors(cudaMemsetAsync(picked_private[t], 0, num_items * sizeof(int), stream));
 						for (int i = 0; i < dim; i++) host_struct_private[i * devices + t].jmin = -1;
 
 						for (int i = 0; i < dim; i++)
@@ -506,7 +506,7 @@ namespace lap
 								else getMinimalCostLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i * devices + t]), gpu_struct_private[t], semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], tt, v_private[t], picked_private[t], &(host_struct_private[(i - 1) * devices]), std::numeric_limits<SC>::max(), start, num_items, dim2, devices);
 							}
 						}
-						cudaStreamSynchronize(stream);
+						checkCudaErrors(cudaStreamSynchronize(stream));
 					}
 
 					for (int i = 0; i < dim; i++)
@@ -551,7 +551,7 @@ namespace lap
 
 				if (devices == 1)
 				{
-					cudaSetDevice(iterator.ws.device[0]);
+					checkCudaErrors(cudaSetDevice(iterator.ws.device[0]));
 					int start = iterator.ws.part[0].first;
 					int end = iterator.ws.part[0].second;
 					int num_items = end - start;
@@ -572,13 +572,13 @@ namespace lap
 					{
 						int t = omp_get_thread_num();
 
-						cudaSetDevice(iterator.ws.device[t]);
+						checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 						int start = iterator.ws.part[t].first;
 						int end = iterator.ws.part[t].second;
 						int num_items = end - start;
 						cudaStream_t stream = iterator.ws.stream[t];
 
-						cudaMemsetAsync(&(gpu_struct_private[t]->jmin), 0, sizeof(int), stream);
+						checkCudaErrors(cudaMemsetAsync(&(gpu_struct_private[t]->jmin), 0, sizeof(int), stream));
 						for (int i = dim - 1; i >= 0; --i)
 						{
 							tt[t] = iterator.getRow(t, perm[i]);
@@ -603,7 +603,7 @@ namespace lap
 				lower_bound = SC(0);
 				if (devices == 1)
 				{
-					cudaSetDevice(iterator.ws.device[0]);
+					checkCudaErrors(cudaSetDevice(iterator.ws.device[0]));
 					cudaStream_t stream = iterator.ws.stream[0];
 					int num_items = iterator.ws.part[0].second - iterator.ws.part[0].first;
 
@@ -635,7 +635,7 @@ namespace lap
 					{
 						int t = omp_get_thread_num();
 
-						cudaSetDevice(iterator.ws.device[t]);
+						checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 						int start = iterator.ws.part[t].first;
 						int end = iterator.ws.part[t].second;
 						int num_items = end - start;
@@ -649,7 +649,7 @@ namespace lap
 							else if (num_items <= 65536) getFinalCostMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], min_cost_private[t], picked_cost_private[t], max_cost_private[t], tt[t], v_private[t], std::numeric_limits<SC>::max(), picked[i] - iterator.ws.part[t].first, num_items);
 							else getFinalCostLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], min_cost_private[t], picked_cost_private[t], max_cost_private[t], tt[t], v_private[t], std::numeric_limits<SC>::max(), picked[i] - iterator.ws.part[t].first, num_items);
 						}
-						cudaStreamSynchronize(stream);
+						checkCudaErrors(cudaStreamSynchronize(stream));
 					}
 
 					for (int i = 0; i < dim; i++)
@@ -698,19 +698,19 @@ namespace lap
 
 			for (int t = 0; t < devices; t++)
 			{
-				cudaSetDevice(iterator.ws.device[t]);
-				cudaFree(mod_v_private[t]);
-				cudaFree(picked_private[t]);
-				cudaFree(semaphore_private[t]);
-				cudaFree(min_cost_private[t]);
-				cudaFree(max_cost_private[t]);
-				cudaFree(picked_cost_private[t]);
-				cudaFree(jmin_private[t]);
-				cudaFree(gpu_struct_private[t]);
-				cudaFree(start_private[t]);
+				checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
+				checkCudaErrors(cudaFree(mod_v_private[t]));
+				checkCudaErrors(cudaFree(picked_private[t]));
+				checkCudaErrors(cudaFree(semaphore_private[t]));
+				checkCudaErrors(cudaFree(min_cost_private[t]));
+				checkCudaErrors(cudaFree(max_cost_private[t]));
+				checkCudaErrors(cudaFree(picked_cost_private[t]));
+				checkCudaErrors(cudaFree(jmin_private[t]));
+				checkCudaErrors(cudaFree(gpu_struct_private[t]));
+				checkCudaErrors(cudaFree(start_private[t]));
 			}
 
-			cudaFreeHost(mod_v);
+			checkCudaErrors(cudaFreeHost(mod_v));
 			lapFree(mod_v_private);
 			lapFree(min_cost_private);
 			lapFree(max_cost_private);
@@ -720,7 +720,7 @@ namespace lap
 			lapFree(picked_private);
 			lapFree(picked);
 			lapFree(semaphore_private);
-			cudaFreeHost(host_struct_private);
+			checkCudaErrors(cudaFreeHost(host_struct_private));
 			lapFree(tt);
 			lapFree(start_private);
 			lapFree(gpu_struct_private);
@@ -795,13 +795,13 @@ namespace lap
 			min_struct<SC> *host_min_private;
 			min_struct<SC> **gpu_min_private;
 #ifdef LAP_DEBUG
-			cudaMallocHost(&v, dim2 * sizeof(SC));
+			checkCudaErrors(cudaMallocHost(&v, dim2 * sizeof(SC)));
 #endif
-			cudaMallocHost(&h_total_d, dim2 * sizeof(SC));
-			cudaMallocHost(&h_total_eps, dim2 * sizeof(SC));
-			cudaMallocHost(&host_min_private, devices * sizeof(min_struct<SC>));
-			cudaMallocHost(&tt_jmin, sizeof(SC));
-			cudaMallocHost(&v_jmin, sizeof(SC));
+			checkCudaErrors(cudaMallocHost(&h_total_d, dim2 * sizeof(SC)));
+			checkCudaErrors(cudaMallocHost(&h_total_eps, dim2 * sizeof(SC)));
+			checkCudaErrors(cudaMallocHost(&host_min_private, devices * sizeof(min_struct<SC>)));
+			checkCudaErrors(cudaMallocHost(&tt_jmin, sizeof(SC)));
+			checkCudaErrors(cudaMallocHost(&v_jmin, sizeof(SC)));
 
 			SC **min_private;
 			int **jmin_private;
@@ -833,48 +833,41 @@ namespace lap
 			lapAlloc(perm, dim, __FILE__, __LINE__);
 			lapAlloc(start_private, devices, __FILE__, __LINE__);
 			lapAlloc(gpu_min_private, devices, __FILE__, __LINE__);
-			cudaMallocHost(&colsol, sizeof(int) * dim2);
-			cudaMallocHost(&pred, sizeof(int) * dim2);
+			checkCudaErrors(cudaMallocHost(&colsol, sizeof(int) * dim2));
+			checkCudaErrors(cudaMallocHost(&pred, sizeof(int) * dim2));
 
 			int *host_start;
-			cudaMallocHost(&host_start, devices * sizeof(int));
-			for (int t = 0; t < devices; t++) host_start[t] = iterator.ws.part[t].first;
-
+			checkCudaErrors(cudaMallocHost(&host_start, devices * sizeof(int)));
+			for (int t = 0; t < devices; t++)
 			{
-				int *host_start;
-				cudaMallocHost(&host_start, devices * sizeof(int));
-				for (int t = 0; t < devices; t++)
-				{
-					cudaSetDevice(iterator.ws.device[t]);
-					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
-					int count = getMinSize(num_items);
+				checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
+				int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
+				int count = getMinSize(num_items);
 
-					host_start[t] = iterator.ws.part[t].first;
-					cudaMalloc(&(min_private[t]), sizeof(SC) * count);
-					cudaMalloc(&(jmin_private[t]), sizeof(int) * count);
-					cudaMalloc(&(csol_private[t]), sizeof(int) * count);
-					cudaMalloc(&(colactive_private[t]), sizeof(char) * num_items);
-					cudaMalloc(&(d_private[t]), sizeof(SC) * num_items);
-					cudaMalloc(&(v_private[t]), sizeof(SC) * num_items);
-					cudaMalloc(&(total_d_private[t]), sizeof(SC) * num_items);
-					cudaMalloc(&(total_eps_private[t]), sizeof(SC) * num_items);
-					cudaMalloc(&(colsol_private[t]), sizeof(int) * num_items);
-					cudaMalloc(&(pred_private[t]), sizeof(int) * num_items);
-					cudaMalloc(&(semaphore_private[t]), 2 * sizeof(int));
-					cudaMalloc(&(start_private[t]), sizeof(int) * devices);
-					cudaMalloc(&(gpu_min_private[t]), sizeof(min_struct<SC>));
-				}
-				for (int t = 0; t < devices; t++)
-				{
-					cudaSetDevice(iterator.ws.device[t]);
-					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
-					cudaStream_t stream = iterator.ws.stream[t];
+				host_start[t] = iterator.ws.part[t].first;
+				checkCudaErrors(cudaMalloc(&(min_private[t]), sizeof(SC) * count));
+				checkCudaErrors(cudaMalloc(&(jmin_private[t]), sizeof(int) * count));
+				checkCudaErrors(cudaMalloc(&(csol_private[t]), sizeof(int) * count));
+				checkCudaErrors(cudaMalloc(&(colactive_private[t]), sizeof(char) * num_items));
+				checkCudaErrors(cudaMalloc(&(d_private[t]), sizeof(SC) * num_items));
+				checkCudaErrors(cudaMalloc(&(v_private[t]), sizeof(SC) * num_items));
+				checkCudaErrors(cudaMalloc(&(total_d_private[t]), sizeof(SC) * num_items));
+				checkCudaErrors(cudaMalloc(&(total_eps_private[t]), sizeof(SC) * num_items));
+				checkCudaErrors(cudaMalloc(&(colsol_private[t]), sizeof(int) * num_items));
+				checkCudaErrors(cudaMalloc(&(pred_private[t]), sizeof(int) * num_items));
+				checkCudaErrors(cudaMalloc(&(semaphore_private[t]), 2 * sizeof(int)));
+				checkCudaErrors(cudaMalloc(&(start_private[t]), sizeof(int) * devices));
+				checkCudaErrors(cudaMalloc(&(gpu_min_private[t]), sizeof(min_struct<SC>)));
+			}
+			for (int t = 0; t < devices; t++)
+			{
+				checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
+				int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
+				cudaStream_t stream = iterator.ws.stream[t];
 
-					if (!use_epsilon) cudaMemsetAsync(v_private[t], 0, sizeof(SC) * num_items, stream);
-					cudaMemsetAsync(semaphore_private[t], 0, 2 * sizeof(unsigned int), stream);
-					cudaMemcpyAsync(start_private[t], host_start, devices * sizeof(int), cudaMemcpyHostToDevice, stream);
-				}
-				cudaFreeHost(host_start);
+				if (!use_epsilon) checkCudaErrors(cudaMemsetAsync(v_private[t], 0, sizeof(SC) * num_items, stream));
+				checkCudaErrors(cudaMemsetAsync(semaphore_private[t], 0, 2 * sizeof(unsigned int), stream));
+				checkCudaErrors(cudaMemcpyAsync(start_private[t], host_start, devices * sizeof(int), cudaMemcpyHostToDevice, stream));
 			}
 
 			SC epsilon_upper, epsilon_lower;
@@ -917,12 +910,12 @@ namespace lap
 				{
 					for (int t = 0; t < devices; t++)
 					{
-						cudaSetDevice(iterator.ws.device[t]);
+						checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 						int start = iterator.ws.part[t].first;
 						int end = iterator.ws.part[t].second;
 						int num_items = end - start;
 						cudaStream_t stream = iterator.ws.stream[t];
-						cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream);
+						checkCudaErrors(cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
 					}
 					for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 					SC *vv;
@@ -950,12 +943,12 @@ namespace lap
 				for (int t = 0; t < devices; t++)
 				{
 					// upload v to devices
-					cudaSetDevice(iterator.ws.device[t]);
+					checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					cudaStream_t stream = iterator.ws.stream[t];
-					cudaMemsetAsync(total_d_private[t], 0, sizeof(SC) * num_items, stream);
-					cudaMemsetAsync(total_eps_private[t], 0, sizeof(SC) * num_items, stream);
-					cudaMemsetAsync(colsol_private[t], -1, num_items * sizeof(int), stream);
+					checkCudaErrors(cudaMemsetAsync(total_d_private[t], 0, sizeof(SC) * num_items, stream));
+					checkCudaErrors(cudaMemsetAsync(total_eps_private[t], 0, sizeof(SC) * num_items, stream));
+					checkCudaErrors(cudaMemsetAsync(colsol_private[t], -1, num_items * sizeof(int), stream));
 				}
 
 				int jmin, colsol_old;
@@ -979,7 +972,7 @@ namespace lap
 				if (devices == 1)
 				{
 					int t = 0;
-					cudaSetDevice(iterator.ws.device[t]);
+					checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 					int start = iterator.ws.part[t].first;
 					int end = iterator.ws.part[t].second;
 					int num_items = end - start;
@@ -1056,8 +1049,8 @@ namespace lap
 
 #ifdef LAP_CUDA_COMPARE_CPU
 						{
-							cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream);
-							cudaMemcpyAsync(colactive_tmp, colactive_private[t], dim2 * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
+							checkCudaErrors(cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream));
+							checkCudaErrors(cudaMemcpyAsync(colactive_tmp, colactive_private[t], dim2 * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
 							checkCudaErrors(cudaStreamSynchronize(stream));
 							SC min_tmp = std::numeric_limits<SC>::max();
 							int jmin_tmp = dim2;
@@ -1137,8 +1130,8 @@ namespace lap
 
 #ifdef LAP_CUDA_COMPARE_CPU
 							{
-								cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream);
-								cudaMemcpyAsync(colactive_tmp, colactive_private[t], dim2 * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
+								checkCudaErrors(cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream));
+								checkCudaErrors(cudaMemcpyAsync(colactive_tmp, colactive_private[t], dim2 * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
 								checkCudaErrors(cudaStreamSynchronize(stream));
 								SC min_tmp = std::numeric_limits<SC>::max();
 								int jmin_tmp = dim2;
@@ -1229,10 +1222,10 @@ namespace lap
 					if (dim2 != dim_limit) updateUnassignedColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colsol_private[t], v_private[t], total_eps_private[t], epsilon, num_items);
 
 					// download updated v
-					cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream);
-					cudaMemcpyAsync(&(h_total_eps[start]), total_eps_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream);
+					checkCudaErrors(cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
+					checkCudaErrors(cudaMemcpyAsync(&(h_total_eps[start]), total_eps_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
 #ifdef LAP_DEBUG
-					cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream);
+					checkCudaErrors(cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
 #endif
 					checkCudaErrors(cudaStreamSynchronize(stream));
 				}
@@ -1243,7 +1236,7 @@ namespace lap
 #pragma omp parallel num_threads(devices) shared(triggered, start_t, unassignedfound, require_colsol_copy, min, jmin, colsol_old)
 					{
 						int t = omp_get_thread_num();
-						cudaSetDevice(iterator.ws.device[t]);
+						checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 						int start = iterator.ws.part[t].first;
 						int end = iterator.ws.part[t].second;
 						int num_items = end - start;
@@ -1322,7 +1315,7 @@ namespace lap
 									}
 								}
 							}
-							cudaStreamSynchronize(stream);
+							checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 							if (t == 0)
 							{
@@ -1379,8 +1372,8 @@ namespace lap
 
 #ifdef LAP_CUDA_COMPARE_CPU
 							{
-								cudaMemcpyAsync(&(d_tmp[start]), d_private[t], num_items * sizeof(SC), cudaMemcpyDeviceToHost, stream);
-								cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], num_items * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
+								checkCudaErrors(cudaMemcpyAsync(&(d_tmp[start]), d_private[t], num_items * sizeof(SC), cudaMemcpyDeviceToHost, stream));
+								checkCudaErrors(cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], num_items * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
 								checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 #pragma omp barrier
 								if (t == 0)
@@ -1460,7 +1453,7 @@ namespace lap
 										else continueSearchMinLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
 									}
 								}
-								cudaStreamSynchronize(stream);
+								checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 								if (t == 0)
 								{
@@ -1516,8 +1509,8 @@ namespace lap
 
 #ifdef LAP_CUDA_COMPARE_CPU
 								{
-									cudaMemcpyAsync(&(d_tmp[start]), d_private[t], num_items * sizeof(SC), cudaMemcpyDeviceToHost, stream);
-									cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], num_items * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream);
+									checkCudaErrors(cudaMemcpyAsync(&(d_tmp[start]), d_private[t], num_items * sizeof(SC), cudaMemcpyDeviceToHost, stream));
+									checkCudaErrors(cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], num_items * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
 									checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 #pragma omp barrier
 									if (t == 0)
@@ -1628,10 +1621,10 @@ namespace lap
 
 						// download updated v
 						if (dim2 != dim_limit) updateUnassignedColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colsol_private[t], v_private[t], total_eps_private[t], epsilon, num_items);
-						cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream);
-						cudaMemcpyAsync(&(h_total_eps[start]), total_eps_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream);
+						checkCudaErrors(cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
+						checkCudaErrors(cudaMemcpyAsync(&(h_total_eps[start]), total_eps_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
 #ifdef LAP_DEBUG
-						cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream);
+						checkCudaErrors(cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
 #endif
 						checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 					}
@@ -1641,7 +1634,7 @@ namespace lap
 				{
 					if (devices == 1)
 					{
-						cudaSetDevice(iterator.ws.device[0]);
+						checkCudaErrors(cudaSetDevice(iterator.ws.device[0]));
 						int start = iterator.ws.part[0].first;
 						int end = iterator.ws.part[0].second;
 						int num_items = end - start;
@@ -1654,7 +1647,7 @@ namespace lap
 					{
 						for (int t = 0; t < devices; t++)
 						{
-							cudaSetDevice(iterator.ws.device[t]);
+							checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 							int start = iterator.ws.part[t].first;
 							int end = iterator.ws.part[t].second;
 							int num_items = end - start;
@@ -1665,7 +1658,7 @@ namespace lap
 						SC max_v = mergeMaximum<SC>(host_min_private, devices);
 						for (int t = 0; t < devices; t++)
 						{
-							cudaSetDevice(iterator.ws.device[t]);
+							checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
 							int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 							cudaStream_t stream = iterator.ws.stream[t];
 
@@ -1746,36 +1739,36 @@ namespace lap
 			// free CUDA memory
 			for (int t = 0; t < devices; t++)
 			{
-				cudaSetDevice(iterator.ws.device[t]);
-				cudaFree(min_private[t]);
-				cudaFree(jmin_private[t]);
-				cudaFree(csol_private[t]);
-				cudaFree(colactive_private[t]);
-				cudaFree(d_private[t]);
-				cudaFree(v_private[t]);
-				cudaFree(total_d_private[t]);
-				cudaFree(total_eps_private[t]);
-				cudaFree(pred_private[t]);
-				cudaFree(colsol_private[t]);
-				cudaFree(semaphore_private[t]);
-				cudaFree(start_private[t]);
-				cudaFree(gpu_min_private[t]);
+				checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
+				checkCudaErrors(cudaFree(min_private[t]));
+				checkCudaErrors(cudaFree(jmin_private[t]));
+				checkCudaErrors(cudaFree(csol_private[t]));
+				checkCudaErrors(cudaFree(colactive_private[t]));
+				checkCudaErrors(cudaFree(d_private[t]));
+				checkCudaErrors(cudaFree(v_private[t]));
+				checkCudaErrors(cudaFree(total_d_private[t]));
+				checkCudaErrors(cudaFree(total_eps_private[t]));
+				checkCudaErrors(cudaFree(pred_private[t]));
+				checkCudaErrors(cudaFree(colsol_private[t]));
+				checkCudaErrors(cudaFree(semaphore_private[t]));
+				checkCudaErrors(cudaFree(start_private[t]));
+				checkCudaErrors(cudaFree(gpu_min_private[t]));
 			}
 
 			// free reserved memory.
 #ifdef LAP_DEBUG
-			cudaFreeHost(v);
+			checkCudaErrors(cudaFreeHost(v));
 #endif
-			cudaFreeHost(colsol);
-			cudaFreeHost(pred);
-			cudaFreeHost(h_total_d);
-			cudaFreeHost(h_total_eps);
-			cudaFreeHost(tt_jmin);
-			cudaFreeHost(v_jmin);
+			checkCudaErrors(cudaFreeHost(colsol));
+			checkCudaErrors(cudaFreeHost(pred));
+			checkCudaErrors(cudaFreeHost(h_total_d));
+			checkCudaErrors(cudaFreeHost(h_total_eps));
+			checkCudaErrors(cudaFreeHost(tt_jmin));
+			checkCudaErrors(cudaFreeHost(v_jmin));
 			lapFree(min_private);
 			lapFree(jmin_private);
 			lapFree(csol_private);
-			cudaFreeHost(host_min_private);
+			checkCudaErrors(cudaFreeHost(host_min_private));
 			lapFree(colactive_private);
 			lapFree(pred_private);
 			lapFree(d_private);
@@ -1794,7 +1787,7 @@ namespace lap
 			lapFree(colactive_tmp);
 #endif
 			// set device back to first one
-			cudaSetDevice(iterator.ws.device[0]);
+			checkCudaErrors(cudaSetDevice(iterator.ws.device[0]));
 		}
 
 		template <class SC, class TC, class CF>
@@ -1804,14 +1797,14 @@ namespace lap
 			TC *row = new TC[dim];
 			int *d_rowsol;
 			TC *d_row;
-			cudaMalloc(&d_rowsol, dim * sizeof(int));
-			cudaMalloc(&d_row, dim * sizeof(TC));
-			cudaMemcpyAsync(d_rowsol, rowsol, dim * sizeof(int), cudaMemcpyHostToDevice, stream);
+			checkCudaErrors(cudaMalloc(&d_rowsol, dim * sizeof(int)));
+			checkCudaErrors(cudaMalloc(&d_row, dim * sizeof(TC)));
+			checkCudaErrors(cudaMemcpyAsync(d_rowsol, rowsol, dim * sizeof(int), cudaMemcpyHostToDevice, stream));
 			costfunc.getCost(d_row, stream, d_rowsol, dim);
-			cudaMemcpyAsync(row, d_row, dim * sizeof(TC), cudaMemcpyDeviceToHost, stream);
+			checkCudaErrors(cudaMemcpyAsync(row, d_row, dim * sizeof(TC), cudaMemcpyDeviceToHost, stream));
 			checkCudaErrors(cudaStreamSynchronize(stream));
-			cudaFree(d_row);
-			cudaFree(d_rowsol);
+			checkCudaErrors(cudaFree(d_row));
+			checkCudaErrors(cudaFree(d_rowsol));
 			for (int i = 0; i < dim; i++) my_cost += row[i];
 			delete[] row;
 			return my_cost;
