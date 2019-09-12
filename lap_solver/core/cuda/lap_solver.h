@@ -1410,14 +1410,10 @@ namespace lap
 							bool fast = unassignedfound;
 							while (!unassignedfound)
 							{
-#pragma omp barrier
 								// update 'distances' between freerow and all unscanned columns, via next scanned column.
 								int i = colsol_old;
 								if (i < dim)
 								{
-									// get row
-									tt[t] = iterator.getRow(t, i);
-									// initialize Search
 									if ((jmin >= start) && (jmin < end))
 									{
 										triggered = t;
@@ -1425,6 +1421,8 @@ namespace lap
 										host_min_private[triggered].data_valid = 0;
 									}
 #pragma omp barrier
+									// get row
+									tt[t] = iterator.getRow(t, i);
 									// continue search
 									if (peerEnabled)
 									{
