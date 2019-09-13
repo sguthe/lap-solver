@@ -146,11 +146,13 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 
 	int devices = (int)ws.device.size();
 	std::vector<TC *>buffer(devices);
+	std::vector<int> off(devices);
 	// 16 should be enough
 #pragma omp parallel num_threads(devices)
 	{
 		int t = omp_get_thread_num();
-		checkCudaErrors(cudaMallocHost(&(buffer[t]), 16 * (ws.part[t].second - ws.part[t].first) * sizeof(TC)));
+		off[t] = ((ws.part[t].second - ws.part[t].first + 255) >> 8) << 8;
+		checkCudaErrors(cudaMallocHost(&(buffer[t]), 16 * off[t] * sizeof(TC)));
 	}
 	std::vector<int> idx(devices);
 	for (int i = 0; i < devices; i++) idx[i] = 0;
@@ -165,11 +167,11 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	}
 
 	// cost function (copy data from table, cudaMemcpy may not be complete prior to next call)
-	auto get_cost_row = [&costMatrix, &buffer, &idx, &N2, &cudaEvent](TC *d_row, int t, cudaStream_t stream, int x, int start, int end, bool async)
+	auto get_cost_row = [&costMatrix, &buffer, &idx, &off, &cudaEvent](TC *d_row, int t, cudaStream_t stream, int x, int start, int end, bool async)
 	{
 		if (async) if (cudaEventQuery(cudaEvent[t * 16 + idx[t]]) != cudaSuccess) checkCudaErrors(cudaEventSynchronize(cudaEvent[t * 16 + idx[t]]));
-		memcpy(buffer[t] + (end - start) * idx[t], costMatrix.getRow(x) + start, (end - start) * sizeof(TC));
-		checkCudaErrors(cudaMemcpyAsync(d_row, buffer[t] + (end - start) * idx[t], (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream));
+		memcpy(buffer[t] + off[t] * idx[t], costMatrix.getRow(x) + start, (end - start) * sizeof(TC));
+		checkCudaErrors(cudaMemcpyAsync(d_row, buffer[t] + off[t] * idx[t], (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream));
 		if (async) checkCudaErrors(cudaEventRecord(cudaEvent[t * 16 + idx[t]], stream));
 		idx[t]++;
 		if (idx[t] >= 16) idx[t] = 0;
