@@ -40,12 +40,15 @@ namespace lap
 						{
 							cudaGetDeviceProperties(&deviceProp, current_device);
 
+
+
 							// If this GPU is not running on Compute Mode prohibited, then we can add it to the list
 							if (deviceProp.computeMode != cudaComputeModeProhibited)
 							{
 								if ((allow_wddm) || (deviceProp.tccDriver))
 								{
 									if (!silent) lapInfo << "Adding device " << current_device << ": " << deviceProp.name << std::endl;
+									if (!silent) lapInfo << "  pciBusID = " << deviceProp.pciBusID << " pciDeviceID = " << deviceProp.pciDeviceID << " pciDomainID = " << deviceProp.pciDomainID << std::endl;
 									device.push_back(current_device);
 									sm_count.push_back(deviceProp.multiProcessorCount);
 									threads_per_sm.push_back(deviceProp.maxThreadsPerMultiProcessor);
