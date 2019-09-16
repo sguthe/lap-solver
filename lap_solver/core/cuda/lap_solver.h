@@ -14,6 +14,46 @@ namespace lap
 {
 	namespace cuda
 	{
+		template <typename T>
+		void allocPinned(T * &ptr, unsigned long long width, const char *file, const int line)
+		{
+			__checkCudaErrors(cudaMallocHost(&ptr, sizeof(T) * width), file, line);
+#ifndef LAP_QUIET
+			allocationLogger.alloc(1, ptr, width, file, line);
+#endif
+		}
+
+		template <typename T>
+		void freePinned(T *&ptr)
+		{
+			if (ptr == (T *)NULL) return;
+#ifndef LAP_QUIET
+			allocationLogger.free(1, ptr);
+#endif
+			checkCudaErrors(cudaFreeHost(ptr));
+			ptr = (T *)NULL;
+		}
+
+		template <typename T>
+		void allocDevice(T * &ptr, unsigned long long width, const char *file, const int line)
+		{
+			__checkCudaErrors(cudaMalloc(&ptr, sizeof(T) * width), file, line);
+#ifndef LAP_QUIET
+			allocationLogger.alloc(2, ptr, width, file, line);
+#endif
+		}
+
+		template <typename T>
+		void freeDevice(T *&ptr)
+		{
+			if (ptr == (T *)NULL) return;
+#ifndef LAP_QUIET
+			allocationLogger.free(2, ptr);
+#endif
+			checkCudaErrors(cudaFree(ptr));
+			ptr = (T *)NULL;
+		}
+
 		template <class SC>
 		class estimateEpsilon_struct
 		{
@@ -93,24 +133,23 @@ namespace lap
 			decltype(iterator.getRow(0, 0, false)) *tt;
 			lapAlloc(tt, devices, __FILE__, __LINE__);
 
-			checkCudaErrors(cudaMallocHost(&mod_v, dim2 * sizeof(SC)));
+			lapAllocPinned(mod_v, dim2, __FILE__, __LINE__);
 			lapAlloc(mod_v_private, devices, __FILE__, __LINE__);
 			lapAlloc(min_cost_private, devices, __FILE__, __LINE__);
 			lapAlloc(max_cost_private, devices, __FILE__, __LINE__);
 			lapAlloc(picked_cost_private, devices, __FILE__, __LINE__);
 			lapAlloc(jmin_private, devices, __FILE__, __LINE__);
-			//lapAlloc(perm, dim, __FILE__, __LINE__);
 			lapAlloc(picked_private, devices, __FILE__, __LINE__);
 			lapAlloc(picked, dim2, __FILE__, __LINE__);
 			lapAlloc(semaphore_private, devices, __FILE__, __LINE__);
 			lapAlloc(start_private, devices, __FILE__, __LINE__);
 			lapAlloc(gpu_struct_private, devices, __FILE__, __LINE__);
-			checkCudaErrors(cudaMallocHost(&host_struct_private, (dim * devices) * sizeof(estimateEpsilon_struct<SC>)));
-			checkCudaErrors(cudaMallocHost(&data_valid, (dim * devices) * sizeof(int)));
+			lapAllocPinned(host_struct_private, dim * devices, __FILE__, __LINE__);
+			lapAllocPinned(data_valid, dim * devices, __FILE__, __LINE__);
 
 			{
 				int *host_start;
-				checkCudaErrors(cudaMallocHost(&host_start, devices * sizeof(int)));
+				lapAllocPinned(host_start, devices, __FILE__, __LINE__);
 				for (int t = 0; t < devices; t++)
 				{
 					host_start[t] = iterator.ws.part[t].first;
@@ -119,15 +158,15 @@ namespace lap
 					int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 					int count = getMinSize(num_items);
 
-					checkCudaErrors(cudaMalloc(&(mod_v_private[t]), num_items * sizeof(SC)));
-					checkCudaErrors(cudaMalloc(&(picked_private[t]), num_items * sizeof(int)));
-					checkCudaErrors(cudaMalloc(&(semaphore_private[t]), 2 * sizeof(unsigned int)));
-					checkCudaErrors(cudaMalloc(&(min_cost_private[t]), count * sizeof(SC)));
-					checkCudaErrors(cudaMalloc(&(max_cost_private[t]), count * sizeof(SC)));
-					checkCudaErrors(cudaMalloc(&(picked_cost_private[t]), count * sizeof(SC)));
-					checkCudaErrors(cudaMalloc(&(jmin_private[t]), count * sizeof(int)));
-					checkCudaErrors(cudaMalloc(&(gpu_struct_private[t]), sizeof(estimateEpsilon_struct<SC>)));
-					checkCudaErrors(cudaMalloc(&(start_private[t]), devices * sizeof(int)));
+					lapAllocDevice(mod_v_private[t], num_items, __FILE__, __LINE__);
+					lapAllocDevice(picked_private[t], num_items, __FILE__, __LINE__);
+					lapAllocDevice(semaphore_private[t], 2, __FILE__, __LINE__);
+					lapAllocDevice(min_cost_private[t], count, __FILE__, __LINE__);
+					lapAllocDevice(max_cost_private[t], count, __FILE__, __LINE__);
+					lapAllocDevice(picked_cost_private[t], count, __FILE__, __LINE__);
+					lapAllocDevice(jmin_private[t], count, __FILE__, __LINE__);
+					lapAllocDevice(gpu_struct_private[t], 1, __FILE__, __LINE__);
+					lapAllocDevice(start_private[t], devices, __FILE__, __LINE__);
 				}
 				for (int t = 0; t < devices; t++)
 				{
@@ -139,7 +178,7 @@ namespace lap
 					checkCudaErrors(cudaMemsetAsync(semaphore_private[t], 0, 2 * sizeof(unsigned int), stream));
 					checkCudaErrors(cudaMemcpyAsync(start_private[t], host_start, devices * sizeof(int), cudaMemcpyHostToDevice, stream));
 				}
-				checkCudaErrors(cudaFreeHost(host_start));
+				lapFreePinned(host_start);
 			}
 
 			SC lower_bound = SC(0);
@@ -699,31 +738,31 @@ namespace lap
 			for (int t = 0; t < devices; t++)
 			{
 				checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
-				checkCudaErrors(cudaFree(mod_v_private[t]));
-				checkCudaErrors(cudaFree(picked_private[t]));
-				checkCudaErrors(cudaFree(semaphore_private[t]));
-				checkCudaErrors(cudaFree(min_cost_private[t]));
-				checkCudaErrors(cudaFree(max_cost_private[t]));
-				checkCudaErrors(cudaFree(picked_cost_private[t]));
-				checkCudaErrors(cudaFree(jmin_private[t]));
-				checkCudaErrors(cudaFree(gpu_struct_private[t]));
-				checkCudaErrors(cudaFree(start_private[t]));
+				lapFreeDevice(mod_v_private[t]);
+				lapFreeDevice(picked_private[t]);
+				lapFreeDevice(semaphore_private[t]);
+				lapFreeDevice(min_cost_private[t]);
+				lapFreeDevice(max_cost_private[t]);
+				lapFreeDevice(picked_cost_private[t]);
+				lapFreeDevice(jmin_private[t]);
+				lapFreeDevice(gpu_struct_private[t]);
+				lapFreeDevice(start_private[t]);
 			}
 
-			checkCudaErrors(cudaFreeHost(mod_v));
+			lapFreePinned(mod_v);
 			lapFree(mod_v_private);
 			lapFree(min_cost_private);
 			lapFree(max_cost_private);
 			lapFree(picked_cost_private);
 			lapFree(jmin_private);
-			//lapFree(perm);
 			lapFree(picked_private);
 			lapFree(picked);
 			lapFree(semaphore_private);
-			checkCudaErrors(cudaFreeHost(host_struct_private));
+			lapFreePinned(host_struct_private);
 			lapFree(tt);
 			lapFree(start_private);
 			lapFree(gpu_struct_private);
+			lapFreePinned(data_valid);
 
 			if (max_threads < devices) omp_set_num_threads(max_threads);
 			return std::pair<SC, SC>((SC)upper, (SC)lower);
@@ -795,13 +834,13 @@ namespace lap
 			min_struct<SC> *host_min_private;
 			min_struct<SC> **gpu_min_private;
 #ifdef LAP_DEBUG
-			checkCudaErrors(cudaMallocHost(&v, dim2 * sizeof(SC)));
+			lapAllocPinned(v, dim2 * sizeof(SC)));
 #endif
-			checkCudaErrors(cudaMallocHost(&h_total_d, dim2 * sizeof(SC)));
-			checkCudaErrors(cudaMallocHost(&h_total_eps, dim2 * sizeof(SC)));
-			checkCudaErrors(cudaMallocHost(&host_min_private, devices * sizeof(min_struct<SC>)));
-			checkCudaErrors(cudaMallocHost(&tt_jmin, sizeof(SC)));
-			checkCudaErrors(cudaMallocHost(&v_jmin, sizeof(SC)));
+			lapAllocPinned(h_total_d, dim2, __FILE__, __LINE__);
+			lapAllocPinned(h_total_eps, dim2, __FILE__, __LINE__);
+			lapAllocPinned(host_min_private, devices, __FILE__, __LINE__);
+			lapAllocPinned(tt_jmin, 1, __FILE__, __LINE__);
+			lapAllocPinned(v_jmin, 1, __FILE__, __LINE__);
 
 			SC **min_private;
 			int **jmin_private;
@@ -833,11 +872,11 @@ namespace lap
 			lapAlloc(perm, dim, __FILE__, __LINE__);
 			lapAlloc(start_private, devices, __FILE__, __LINE__);
 			lapAlloc(gpu_min_private, devices, __FILE__, __LINE__);
-			checkCudaErrors(cudaMallocHost(&colsol, sizeof(int) * dim2));
-			checkCudaErrors(cudaMallocHost(&pred, sizeof(int) * dim2));
+			lapAllocPinned(colsol, dim2, __FILE__, __LINE__);
+			lapAllocPinned(pred, dim2, __FILE__, __LINE__);
 
 			int *host_start;
-			checkCudaErrors(cudaMallocHost(&host_start, devices * sizeof(int)));
+			lapAllocPinned(host_start, devices, __FILE__, __LINE__);
 			for (int t = 0; t < devices; t++)
 			{
 				checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
@@ -845,19 +884,19 @@ namespace lap
 				int count = getMinSize(num_items);
 
 				host_start[t] = iterator.ws.part[t].first;
-				checkCudaErrors(cudaMalloc(&(min_private[t]), sizeof(SC) * count));
-				checkCudaErrors(cudaMalloc(&(jmin_private[t]), sizeof(int) * count));
-				checkCudaErrors(cudaMalloc(&(csol_private[t]), sizeof(int) * count));
-				checkCudaErrors(cudaMalloc(&(colactive_private[t]), sizeof(char) * num_items));
-				checkCudaErrors(cudaMalloc(&(d_private[t]), sizeof(SC) * num_items));
-				checkCudaErrors(cudaMalloc(&(v_private[t]), sizeof(SC) * num_items));
-				checkCudaErrors(cudaMalloc(&(total_d_private[t]), sizeof(SC) * num_items));
-				checkCudaErrors(cudaMalloc(&(total_eps_private[t]), sizeof(SC) * num_items));
-				checkCudaErrors(cudaMalloc(&(colsol_private[t]), sizeof(int) * num_items));
-				checkCudaErrors(cudaMalloc(&(pred_private[t]), sizeof(int) * num_items));
-				checkCudaErrors(cudaMalloc(&(semaphore_private[t]), 2 * sizeof(int)));
-				checkCudaErrors(cudaMalloc(&(start_private[t]), sizeof(int) * devices));
-				checkCudaErrors(cudaMalloc(&(gpu_min_private[t]), sizeof(min_struct<SC>)));
+				lapAllocDevice(min_private[t], count, __FILE__, __LINE__);
+				lapAllocDevice(jmin_private[t], count, __FILE__, __LINE__);
+				lapAllocDevice(csol_private[t], count, __FILE__, __LINE__);
+				lapAllocDevice(colactive_private[t], num_items, __FILE__, __LINE__);
+				lapAllocDevice(d_private[t], num_items, __FILE__, __LINE__);
+				lapAllocDevice(v_private[t], num_items, __FILE__, __LINE__);
+				lapAllocDevice(total_d_private[t], num_items, __FILE__, __LINE__);
+				lapAllocDevice(total_eps_private[t], num_items, __FILE__, __LINE__);
+				lapAllocDevice(colsol_private[t], num_items, __FILE__, __LINE__);
+				lapAllocDevice(pred_private[t], num_items, __FILE__, __LINE__);
+				lapAllocDevice(semaphore_private[t], 2, __FILE__, __LINE__);
+				lapAllocDevice(start_private[t], devices, __FILE__, __LINE__);
+				lapAllocDevice(gpu_min_private[t], 1, __FILE__, __LINE__);
 			}
 			for (int t = 0; t < devices; t++)
 			{
@@ -1743,35 +1782,35 @@ namespace lap
 			for (int t = 0; t < devices; t++)
 			{
 				checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
-				checkCudaErrors(cudaFree(min_private[t]));
-				checkCudaErrors(cudaFree(jmin_private[t]));
-				checkCudaErrors(cudaFree(csol_private[t]));
-				checkCudaErrors(cudaFree(colactive_private[t]));
-				checkCudaErrors(cudaFree(d_private[t]));
-				checkCudaErrors(cudaFree(v_private[t]));
-				checkCudaErrors(cudaFree(total_d_private[t]));
-				checkCudaErrors(cudaFree(total_eps_private[t]));
-				checkCudaErrors(cudaFree(pred_private[t]));
-				checkCudaErrors(cudaFree(colsol_private[t]));
-				checkCudaErrors(cudaFree(semaphore_private[t]));
-				checkCudaErrors(cudaFree(start_private[t]));
-				checkCudaErrors(cudaFree(gpu_min_private[t]));
+				lapFreeDevice(min_private[t]);
+				lapFreeDevice(jmin_private[t]);
+				lapFreeDevice(csol_private[t]);
+				lapFreeDevice(colactive_private[t]);
+				lapFreeDevice(d_private[t]);
+				lapFreeDevice(v_private[t]);
+				lapFreeDevice(total_d_private[t]);
+				lapFreeDevice(total_eps_private[t]);
+				lapFreeDevice(pred_private[t]);
+				lapFreeDevice(colsol_private[t]);
+				lapFreeDevice(semaphore_private[t]);
+				lapFreeDevice(start_private[t]);
+				lapFreeDevice(gpu_min_private[t]);
 			}
 
 			// free reserved memory.
 #ifdef LAP_DEBUG
-			checkCudaErrors(cudaFreeHost(v));
+			lapFreePinned(v);
 #endif
-			checkCudaErrors(cudaFreeHost(colsol));
-			checkCudaErrors(cudaFreeHost(pred));
-			checkCudaErrors(cudaFreeHost(h_total_d));
-			checkCudaErrors(cudaFreeHost(h_total_eps));
-			checkCudaErrors(cudaFreeHost(tt_jmin));
-			checkCudaErrors(cudaFreeHost(v_jmin));
+			lapFreePinned(colsol);
+			lapFreePinned(pred);
+			lapFreePinned(h_total_d);
+			lapFreePinned(h_total_eps);
+			lapFreePinned(tt_jmin);
+			lapFreePinned(v_jmin);
 			lapFree(min_private);
 			lapFree(jmin_private);
 			lapFree(csol_private);
-			checkCudaErrors(cudaFreeHost(host_min_private));
+			lapFreePinned(host_min_private);
 			lapFree(colactive_private);
 			lapFree(pred_private);
 			lapFree(d_private);
@@ -1784,6 +1823,7 @@ namespace lap
 			lapFree(perm);
 			lapFree(start_private);
 			lapFree(gpu_min_private);
+			lapFreePinned(host_start);
 
 #ifdef LAP_CUDA_COMPARE_CPU
 			lapFree(d_tmp);
@@ -1800,14 +1840,14 @@ namespace lap
 			TC *row = new TC[dim];
 			int *d_rowsol;
 			TC *d_row;
-			checkCudaErrors(cudaMalloc(&d_rowsol, dim * sizeof(int)));
-			checkCudaErrors(cudaMalloc(&d_row, dim * sizeof(TC)));
+			lapAllocDevice(d_rowsol, dim, __FILE__, __LINE__);
+			lapAllocDevice(d_row, dim, __FILE__, __LINE__);
 			checkCudaErrors(cudaMemcpyAsync(d_rowsol, rowsol, dim * sizeof(int), cudaMemcpyHostToDevice, stream));
 			costfunc.getCost(d_row, stream, d_rowsol, dim);
 			checkCudaErrors(cudaMemcpyAsync(row, d_row, dim * sizeof(TC), cudaMemcpyDeviceToHost, stream));
 			checkCudaErrors(cudaStreamSynchronize(stream));
-			checkCudaErrors(cudaFree(d_row));
-			checkCudaErrors(cudaFree(d_rowsol));
+			lapFreeDevice(d_row);
+			lapFreeDevice(d_rowsol);
 			for (int i = 0; i < dim; i++) my_cost += row[i];
 			delete[] row;
 			return my_cost;

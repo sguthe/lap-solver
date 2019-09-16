@@ -29,6 +29,24 @@
 #define lapFree lap::free
 #endif
 
+#ifdef LAP_CUDA
+#ifndef lapAllocPinned
+#define lapAllocPinned lap::cuda::allocPinned
+#endif
+
+#ifndef lapFreePinned
+#define lapFreePinned lap::cuda::freePinned
+#endif
+
+#ifndef lapAllocDevice
+#define lapAllocDevice lap::cuda::allocDevice
+#endif
+
+#ifndef lapFreeDevice
+#define lapFreeDevice lap::cuda::freeDevice
+#endif
+#endif
+
 #include <tuple>
 
 namespace lap

@@ -16,12 +16,13 @@ namespace lap
 #ifndef LAP_QUIET
 	class AllocationLogger
 	{
-		std::deque<void *> allocated;
-		std::deque<unsigned long long> size;
-		std::deque<char *> alloc_file;
-		std::deque<int> alloc_line;
-		unsigned long long peak;
-		unsigned long long current;
+		std::vector<std::deque<void *>> allocated;
+		std::vector<std::deque<unsigned long long>> size;
+		std::vector<std::deque<char *>> alloc_file;
+		std::vector<std::deque<int>> alloc_line;
+		std::vector<unsigned long long> peak;
+		std::vector<unsigned long long> current;
+		std::vector<std::string> name;
 		std::mutex lock;
 	private:
 		std::string commify(unsigned long long n)
@@ -42,25 +43,59 @@ namespace lap
 		}
 
 	public:
-		AllocationLogger() { peak = current = (unsigned long long)0; }
+		AllocationLogger()
+		{
+#ifdef LAP_CUDA
+			allocated.resize(3);
+			size.resize(3);
+			alloc_file.resize(3);
+			alloc_line.resize(3);
+			peak.resize(3);
+			current.resize(3);
+			name.resize(3);
+			peak[0] = 0ull; peak[1] = 0ull; peak[2] = 0ull;
+			current[0] = 0ull; current[1] = 0ull; current[2] = 0ull;
+			name[0] = std::string("system memory");
+			name[1] = std::string("pinned memory");
+			name[2] = std::string("device memory");
+#else
+			allocated.resize(1);
+			size.resize(1);
+			alloc_file.resize(1);
+			alloc_line.resize(1);
+			peak.resize(1);
+			current.resize(1);
+			name.resize(1);
+			peak[0] = 0ull;
+			current[0] = 0ull;
+			name[0] = std::string("memory");
+#endif
+		}
+
 		~AllocationLogger() {}
 		void destroy()
 		{
-			lapInfo << "Peak memory usage:" << commify(peak) << " bytes" << std::endl;
-			if (allocated.empty()) return;
-			lapInfo << "Memory leak list:" << std::endl;
-			while (!allocated.empty())
+			for (size_t i = 0; i < peak.size(); i++)
 			{
-				lapInfo << "  leaked " << commify(size.front()) << " bytes at " << std::hex << allocated.front() << std::dec << ": " << alloc_file.front() << ":" << alloc_line.front() << std::endl;
-				size.pop_front();
-				allocated.pop_front();
-				alloc_file.pop_front();
-				alloc_line.pop_front();
+				if (!name[i].empty())
+				{
+					lapInfo << "Peak " << name[i] << " usage:" << commify(peak[i]) << " bytes" << std::endl;
+					if (allocated[i].empty()) continue;
+					lapInfo << (char)toupper(name[i][0]) << name[i].substr(1) << " leak list:" << std::endl;
+					while (!allocated[i].empty())
+					{
+						lapInfo << "  leaked " << commify(size[i].front()) << " bytes at " << std::hex << allocated[i].front() << std::dec << ": " << alloc_file[i].front() << ":" << alloc_line[i].front() << std::endl;
+						size[i].pop_front();
+						allocated[i].pop_front();
+						alloc_file[i].pop_front();
+						alloc_line[i].pop_front();
+					}
+				}
 			}
 		}
 
 		template <class T>
-		void free(T a)
+		void free(int idx, T a)
 		{
 			std::lock_guard<std::mutex> guard(lock);
 #ifdef LAP_DEBUG
@@ -68,26 +103,26 @@ namespace lap
 			lapDebug << "Freeing memory at " << std::hex << (size_t)a << std::dec << std::endl;
 #endif
 #endif
-			for (unsigned long long i = 0; i < allocated.size(); i++)
+			for (unsigned long long i = 0; i < allocated[idx].size(); i++)
 			{
-				if ((void *)a == allocated[i])
+				if ((void *)a == allocated[idx][i])
 				{
-					current -= size[i];
-					allocated[i] = allocated.back();
-					allocated.pop_back();
-					size[i] = size.back();
-					size.pop_back();
-					alloc_line[i] = alloc_line.back();
-					alloc_line.pop_back();
-					alloc_file[i] = alloc_file.back();
-					alloc_file.pop_back();
+					current[idx] -= size[idx][i];
+					allocated[idx][i] = allocated[idx].back();
+					allocated[idx].pop_back();
+					size[idx][i] = size[idx].back();
+					size[idx].pop_back();
+					alloc_line[idx][i] = alloc_line[idx].back();
+					alloc_line[idx].pop_back();
+					alloc_file[idx][i] = alloc_file[idx].back();
+					alloc_file[idx].pop_back();
 					return;
 				}
 			}
 		}
 
 		template <class T>
-		void alloc(T a, unsigned long long s, const char *file, const int line)
+		void alloc(int idx, T a, unsigned long long s, const char *file, const int line)
 		{
 			std::lock_guard<std::mutex> guard(lock);
 #ifdef LAP_DEBUG
@@ -95,12 +130,12 @@ namespace lap
 			lapDebug << "Allocating " << s * sizeof(T) << " bytes at " << std::hex << (size_t)a << std::dec << " \"" << file << ":" << line << std::endl;
 #endif
 #endif
-			current += s * sizeof(T);
-			peak = std::max(peak, current);
-			allocated.push_back((void *)a);
-			size.push_back(s * sizeof(T));
-			alloc_file.push_back((char *)file);
-			alloc_line.push_back(line);
+			current[idx] += s * sizeof(T);
+			peak[idx] = std::max(peak[idx], current[idx]);
+			allocated[idx].push_back((void *)a);
+			size[idx].push_back(s * sizeof(T));
+			alloc_file[idx].push_back((char *)file);
+			alloc_line[idx].push_back(line);
 		}
 	};
 
@@ -112,7 +147,7 @@ namespace lap
 	{
 		ptr = new T[width]; // this one is allowed
 #ifndef LAP_QUIET
-		allocationLogger.alloc(ptr, width, file, line);
+		allocationLogger.alloc(0, ptr, width, file, line);
 #endif
 	}
 
@@ -121,7 +156,7 @@ namespace lap
 	{
 		if (ptr == (T *)NULL) return;
 #ifndef LAP_QUIET
-		allocationLogger.free(ptr);
+		allocationLogger.free(0, ptr);
 #endif
 		delete[] ptr; // this one is allowed
 		ptr = (T *)NULL;

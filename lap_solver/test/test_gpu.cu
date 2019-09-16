@@ -152,7 +152,7 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 	{
 		int t = omp_get_thread_num();
 		off[t] = ((ws.part[t].second - ws.part[t].first + 255) >> 8) << 8;
-		checkCudaErrors(cudaMallocHost(&(buffer[t]), 16 * off[t] * sizeof(TC)));
+		lapAllocPinned(buffer[t], 16 * off[t], __FILE__, __LINE__);
 	}
 	std::vector<int> idx(devices);
 	for (int i = 0; i < devices; i++) idx[i] = 0;
@@ -205,7 +205,7 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 
 	for (int t = 0; t < devices; t++)
 	{
-		checkCudaErrors(cudaFreeHost(buffer[t]));
+		lapFreePinned(buffer[t]);
 		checkCudaErrors(cudaSetDevice(ws.device[t]));
 		for (int i = 0; i < 16; i++)
 		{
@@ -295,8 +295,8 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			for (int i = 0; i < num_enabled; i++)
 			{
 				checkCudaErrors(cudaSetDevice(ws.device[i]));
-				checkCudaErrors(cudaMalloc(&(d_state[i].tab_s), 2 * N * sizeof(C)));
-				checkCudaErrors(cudaMalloc(&(d_state[i].tab_t), 2 * N * sizeof(C)));
+				lapAllocDevice(d_state[i].tab_s, 2 * N, __FILE__, __LINE__);
+				lapAllocDevice(d_state[i].tab_t, 2 * N, __FILE__, __LINE__);
 				checkCudaErrors(cudaMemcpy(d_state[i].tab_s, tab_s, 2 * N * sizeof(C), cudaMemcpyHostToDevice));
 				checkCudaErrors(cudaMemcpy(d_state[i].tab_t, tab_t, 2 * N * sizeof(C), cudaMemcpyHostToDevice));
 			}
@@ -316,8 +316,8 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			for (int i = 0; i < num_enabled; i++)
 			{
 				checkCudaErrors(cudaSetDevice(ws.device[i]));
-				checkCudaErrors(cudaFree(d_state[i].tab_s));
-				checkCudaErrors(cudaFree(d_state[i].tab_t));
+				lapFreeDevice(d_state[i].tab_s);
+				lapFreeDevice(d_state[i].tab_t);
 			}
 
 			delete[] rowsol;
@@ -386,7 +386,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			for (int i = 0; i < num_enabled; i++)
 			{
 				checkCudaErrors(cudaSetDevice(ws.device[i]));
-				checkCudaErrors(cudaMalloc(&(d_state[i].vec), 2 * N * sizeof(C)));
+				lapAllocDevice(d_state[i].vec, 2 * N, __FILE__, __LINE__);
 				checkCudaErrors(cudaMemcpy(d_state[i].vec, vec, 2 * N * sizeof(C), cudaMemcpyHostToDevice));
 			}
 
@@ -419,13 +419,13 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 				// calculate costs directly
 				{
 					C *d_row;
-					checkCudaErrors(cudaMalloc(&d_row, N * sizeof(C)));
+					lapAllocDevice(d_row, N, __FILE__, __LINE__);
 					dim3 block_size, grid_size;
 					block_size.x = 256;
 					grid_size.x = (N + block_size.x - 1) / block_size.x;
 					getGTCost_sanity_kernel<<<grid_size, block_size>>>(d_row, get_cost, d_state[0], N);
 					checkCudaErrors(cudaMemcpy(row, d_row, N * sizeof(C), cudaMemcpyDeviceToHost));
-					checkCudaErrors(cudaFree(d_row));
+					lapFreeDevice(d_row);
 				}
 				for (int i = 0; i < N; i++) my_cost += row[i];
 				delete[] row;
@@ -436,7 +436,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			for (int i = 0; i < num_enabled; i++)
 			{
 				checkCudaErrors(cudaSetDevice(ws.device[i]));
-				checkCudaErrors(cudaFree(d_state[i].vec));
+				lapFreeDevice(d_state[i].vec);
 			}
 
 			delete[] rowsol;
@@ -493,7 +493,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				for (int i = 0; i < num_enabled; i++)
 				{
 					checkCudaErrors(cudaSetDevice(ws.device[i]));
-					checkCudaErrors(cudaMalloc(&(d_state[i].vec), N * rank * sizeof(C)));
+					lapAllocDevice(d_state[i].vec, N * rank, __FILE__, __LINE__);
 					checkCudaErrors(cudaMemcpy(d_state[i].vec, vec, N * rank * sizeof(C), cudaMemcpyHostToDevice));
 				}
 
@@ -517,7 +517,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				for (int i = 0; i < num_enabled; i++)
 				{
 					checkCudaErrors(cudaSetDevice(ws.device[i]));
-					checkCudaErrors(cudaFree(d_state[i].vec));
+					lapFreeDevice(d_state[i].vec);
 				}
 
 				delete[] rowsol;
@@ -888,11 +888,11 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 						img[0][t].width = img_a.width;
 						img[0][t].height = img_a.height;
 						img[0][t].max_val = img_a.max_val;
-						checkCudaErrors(cudaMalloc(&img[0][t].raw, img[0][t].width * img[0][t].height * 3));
+						lapAllocDevice(img[0][t].raw, img[0][t].width * img[0][t].height * 3, __FILE__, __LINE__);
 						img[1][t].width = img_b.width;
 						img[1][t].height = img_b.height;
 						img[1][t].max_val = img_b.max_val;
-						checkCudaErrors(cudaMalloc(&img[1][t].raw, img[1][t].width * img[1][t].height * 3));
+						lapAllocDevice(img[1][t].raw, img[1][t].width * img[1][t].height * 3, __FILE__, __LINE__);
 
 						checkCudaErrors(cudaMemcpyAsync(img[0][t].raw, buf_a, img[0][t].width * img[0][t].height * 3, cudaMemcpyHostToDevice));
 						checkCudaErrors(cudaMemcpyAsync(img[1][t].raw, buf_b, img[1][t].width * img[1][t].height * 3, cudaMemcpyHostToDevice));
@@ -902,11 +902,11 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 						img[0][t].width = img_b.width;
 						img[0][t].height = img_b.height;
 						img[0][t].max_val = img_b.max_val;
-						checkCudaErrors(cudaMalloc(&img[0][t].raw, img[0][t].width * img[0][t].height * 3));
+						lapAllocDevice(img[0][t].raw, img[0][t].width * img[0][t].height * 3, __FILE__, __LINE__);
 						img[1][t].width = img_a.width;
 						img[1][t].height = img_a.height;
 						img[1][t].max_val = img_a.max_val;
-						checkCudaErrors(cudaMalloc(&img[1][t].raw, img[1][t].width * img[1][t].height * 3));
+						lapAllocDevice(img[1][t].raw, img[1][t].width * img[1][t].height * 3, __FILE__, __LINE__);
 
 						checkCudaErrors(cudaMemcpyAsync(img[1][t].raw, buf_a, img[1][t].width * img[1][t].height * 3, cudaMemcpyHostToDevice));
 						checkCudaErrors(cudaMemcpyAsync(img[0][t].raw, buf_b, img[0][t].width * img[0][t].height * 3, cudaMemcpyHostToDevice));
@@ -953,8 +953,8 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				for (int t = 0; t < num_devices; t++)
 				{
-					checkCudaErrors(cudaFree(img[0][t].raw)); img[0][t].raw = 0;
-					checkCudaErrors(cudaFree(img[1][t].raw)); img[1][t].raw = 0;
+					lapFreeDevice(img[0][t].raw);
+					lapFreeDevice(img[1][t].raw);
 				}
 				delete[] rowsol;
 				delete[] img[0];

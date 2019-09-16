@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lap_direct_iterator.h"
+#include "lap_solver.h"
 #include <cuda.h>
 
 namespace lap
@@ -32,7 +33,7 @@ namespace lap
 					// entries potentially vary between GPUs
 					cache[t].setSize((int)std::min((long long) dim2, max_memory / size), dim);
 					cudaSetDevice(ws.device[t]);
-					cudaMalloc(&(rows[t]), (long long)cache[t].getEntries() * (long long)size * sizeof(TC));
+					lapAllocDevice(rows[t], (long long)cache[t].getEntries() * (long long)size, __FILE__, __LINE__);
 				}
 			}
 
@@ -42,7 +43,7 @@ namespace lap
 				for (int t = 0; t < devices; t++)
 				{
 					cudaSetDevice(ws.device[t]);
-					cudaFree(rows[t]);
+					lapFreeDevice(rows[t]);
 				}
 				lapFree(rows);
 				lapFree(cache);
