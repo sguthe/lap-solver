@@ -503,6 +503,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				auto get_cost = [rank, N] __device__(int x, int y, State &state)
 				{
 					C sum(0);
+#pragma unroll(8)
 					for (long long k = 0; k < rank; k++)
 					{
 						sum += state.vec[k * N + x] * state.vec[k * N + y];

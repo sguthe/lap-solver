@@ -401,3 +401,6 @@ namespace lap
 #include "lap_initialize_search.cuh"
 #include "lap_continue_search.cuh"
 #include "lap_update_column.cuh"
+
+// include kernel for cost function
+#include "lap_cost.cuh"

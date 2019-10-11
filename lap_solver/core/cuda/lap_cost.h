@@ -1,6 +1,8 @@
 #pragma once
 #include <iostream>
 
+#include "lap_kernel.cuh"
+
 namespace lap
 {
 	namespace cuda
@@ -27,27 +29,6 @@ namespace lap
 			__forceinline void getCost(TC *row, cudaStream_t stream, int *rowsol, int dim) const { getcost(row, stream, rowsol, dim); }
 		};
 
-		// Kernel for calculating the costs in a row
-		template <class TC, typename GETCOST, typename STATE>
-		__global__ void getCostRow_kernel(TC *cost, GETCOST getcost, STATE state, int x, int start, int end)
-		{
-			int y = start + threadIdx.x + blockIdx.x * blockDim.x;
-			if (y >= end) return;
-
-			cost[threadIdx.x + blockIdx.x * blockDim.x] = getcost(x, y, state);
-		}
-
-		// Kernel for calculating the costs of a rowsol
-		template <class TC, typename GETCOST, typename STATE>
-		__global__ void getCost_kernel(TC *cost, GETCOST getcost, STATE state, int *rowsol, int N)
-		{
-			int x = threadIdx.x + blockIdx.x * blockDim.x;
-			if (x >= N) return;
-			int y = rowsol[x];
-
-			cost[x] = getcost(x, y, state);
-		}
-
 		// Wrapper around simple cost function
 		template <class TC, typename GETCOST, typename STATE>
 		class SimpleCostFunction
@@ -70,7 +51,7 @@ namespace lap
 				dim3 block_size, grid_size;
 				block_size.x = 256;
 				grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
-				getCostRow_kernel<<<grid_size, block_size, 0, stream>>>(row, getcost, state[t], x, start, end);
+				getCostRow_kernel<<<grid_size, block_size, 0, stream>>>(row, getcost, state[t], x, start, end - start);
 			}
 			__forceinline void getCost(TC *row, cudaStream_t stream, int *rowsol, int dim) const
 			{

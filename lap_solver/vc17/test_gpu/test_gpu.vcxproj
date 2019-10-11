@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\core\cuda\lap_continue_search.cuh" />
+    <ClInclude Include="..\..\core\cuda\lap_cost.cuh" />
     <ClInclude Include="..\..\core\cuda\lap_get_final_cost.cuh" />
     <ClInclude Include="..\..\core\cuda\lap_get_minimal_cost.cuh" />
     <ClInclude Include="..\..\core\cuda\lap_get_min_max_best.cuh" />

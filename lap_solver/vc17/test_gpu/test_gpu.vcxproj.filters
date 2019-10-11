@@ -103,5 +103,8 @@
     <ClInclude Include="..\..\core\cuda\lap_update_column.cuh">
       <Filter>core\cuda\kernel</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_cost.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
