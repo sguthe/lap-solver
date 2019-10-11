@@ -825,6 +825,7 @@ namespace lap
 
 #ifdef LAP_CUDA_COMPARE_CPU
 			SC *d_tmp;
+			SC *d_tmp;
 			unsigned char *colactive_tmp;
 			lapAlloc(d_tmp, dim2, __FILE__, __LINE__);
 			lapAlloc(colactive_tmp, dim2, __FILE__, __LINE__);

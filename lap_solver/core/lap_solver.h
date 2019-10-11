@@ -397,6 +397,9 @@ namespace lap
 	template <class SC, class I>
 	std::pair<SC, SC> estimateEpsilon(int dim, int dim2, I& iterator, SC *v, int *perm)
 	{
+#ifdef LAP_DEBUG
+		auto start_time = std::chrono::high_resolution_clock::now();
+#endif
 		SC *mod_v;
 		//int *perm;
 		int *picked;
