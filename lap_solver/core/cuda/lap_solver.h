@@ -834,7 +834,7 @@ namespace lap
 			min_struct<SC> *host_min_private;
 			min_struct<SC> **gpu_min_private;
 #ifdef LAP_DEBUG
-			lapAllocPinned(v, dim2 * sizeof(SC)));
+			lapAllocPinned(v, dim2, __FILE__, __LINE__);
 #endif
 			lapAllocPinned(h_total_d, dim2, __FILE__, __LINE__);
 			lapAllocPinned(h_total_eps, dim2, __FILE__, __LINE__);
