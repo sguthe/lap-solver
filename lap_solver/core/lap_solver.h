@@ -763,12 +763,13 @@ namespace lap
 			memset(v, 0, dim2 * sizeof(SC));
 			epsilon_upper = SC(0);
 			epsilon_lower = SC(0);
-			for (int i = 0; i < dim; i++) perm[i] = i;
+			for (int i = 0; i < dim; i++) perm[i] = dim - 1 - i;
 		}
 		epsilon = epsilon_upper;
 
 		bool first = true;
 		bool second = false;
+		bool reverse = true;
 
 		SC total_d = SC(0);
 		SC total_eps = SC(0);
@@ -815,7 +816,7 @@ namespace lap
 			int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
 			for (int fc = 0; fc < dim_limit; fc++)
 			{
-				int f = (fc < dim) ? perm[fc] : fc;
+				int f = (fc < dim) ? perm[(reverse) ? (dim - 1 - fc) : fc] : fc;
 #ifndef LAP_QUIET
 				if (f < dim) total_rows++; else total_virtual++;
 #else
@@ -1084,6 +1085,7 @@ namespace lap
 #endif
 			second = first;
 			first = false;
+			reverse = !reverse;
 #ifndef LAP_QUIET
 			lapInfo << "  rows evaluated: " << total_rows;
 			if (last_rows > 0LL) lapInfo << " (+" << total_rows - last_rows << ")";

@@ -922,7 +922,7 @@ namespace lap
 			{
 				epsilon_upper = SC(0);
 				epsilon_lower = SC(0);
-				for (int i = 0; i < dim; i++) perm[i] = i;
+				for (int i = 0; i < dim; i++) perm[i] = dim - i - 1;
 			}
 
 
@@ -939,6 +939,7 @@ namespace lap
 
 			bool first = true;
 			bool second = false;
+			bool reverse = true;
 			bool peerEnabled = iterator.ws.peerAccess();
 
 			SC total_d = SC(0);
@@ -1020,7 +1021,7 @@ namespace lap
 
 					for (int fc = 0; fc < dim_limit; fc++)
 					{
-						int f = (fc < dim) ? perm[dim - fc - 1] : fc;
+						int f = (fc < dim) ? perm[(reverse) ? (dim - 1 - fc) : fc] : fc;
 						// start search and find minimum value
 						if (require_colsol_copy)
 						{
@@ -1750,7 +1751,7 @@ namespace lap
 #endif
 				second = first;
 				first = false;
-
+				reverse = !reverse;
 #ifndef LAP_QUIET
 				lapInfo << "  rows evaluated: " << total_rows;
 				if (total_virtual > 0) lapInfo << " virtual rows evaluated: " << total_virtual;
