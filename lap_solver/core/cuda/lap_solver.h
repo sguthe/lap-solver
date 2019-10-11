@@ -1020,7 +1020,7 @@ namespace lap
 
 					for (int fc = 0; fc < dim_limit; fc++)
 					{
-						int f = (fc < dim) ? perm[fc] : fc;
+						int f = (fc < dim) ? perm[dim - fc - 1] : fc;
 						// start search and find minimum value
 						if (require_colsol_copy)
 						{
