@@ -49,6 +49,50 @@ namespace lap
 		}
 
 		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestRead(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin, int i, int j, SC *v, int *picked, SC max, int size, int dim2)
+		{
+			t_min_cost = max;
+			t_second_cost = max;
+			t_picked_cost = max;
+			t_jmin = dim2;
+
+			if (j < size)
+			{
+				SC t_cost = -v[j];
+				t_min_cost = t_cost;
+				if (picked[j] == 0)
+				{
+					t_jmin = j;
+					t_picked_cost = t_cost;
+				}
+			}
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void getMinSecondBestRead(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin, int i, int j, SC *v, int *picked, int last_picked, SC max, int size, int dim2)
+		{
+			t_min_cost = max;
+			t_second_cost = max;
+			t_picked_cost = max;
+			t_jmin = dim2;
+
+			if (j < size)
+			{
+				SC t_cost = -v[j];
+				t_min_cost = t_cost;
+				if (j == last_picked)
+				{
+					picked[j] = 1;
+				}
+				else if (picked[j] == 0)
+				{
+					t_jmin = j;
+					t_picked_cost = t_cost;
+				}
+			}
+		}
+
+		template <class SC>
 		__device__ __forceinline__ void getMinSecondBestCombineSmall(SC &t_min_cost, SC &t_second_cost, SC &t_picked_cost, int &t_jmin)
 		{
 			minWarpIndex(t_picked_cost, t_jmin);
@@ -492,6 +536,294 @@ namespace lap
 			int t_jmin;
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, tt, v, picked, max, size, dim2);
+			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTempLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, 0, v, max, dim2);
+				if (threadIdx.x == 0) picked[t_jmin] = 1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int start, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, max, size, dim2);
+			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreWarp(semaphore))
+			{
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, start, v, max, dim2);
+				if (threadIdx.x == 0)  s2->jmin = -1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int start, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[8], b_max_cost[8], b_picked_cost[8];
+			__shared__ int b_jmin[8];
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, max, size, dim2);
+			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, start, v, max, dim2);
+				if (threadIdx.x == 0)  s2->jmin = -1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int start, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[32], b_max_cost[32], b_picked_cost[32];
+			__shared__ int b_jmin[32];
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, max, size, dim2);
+			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTempLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, start, v, max, dim2);
+				if (threadIdx.x == 0)  s2->jmin = -1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			int last_picked = getLastPickedSmall(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreWarp(semaphore))
+			{
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, start, v, max, dim2);
+				if (threadIdx.x == 0) s2->jmin = -1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[8], b_max_cost[8], b_picked_cost[8];
+			__shared__ int b_jmin[8];
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			int last_picked = getLastPicked(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, start, v, max, dim2);
+				if (threadIdx.x == 0)  s2->jmin = -1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[32], b_max_cost[32], b_picked_cost[32];
+			__shared__ int b_jmin[32];
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			int last_picked = getLastPicked(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTempLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, start, v, max, dim2);
+				if (threadIdx.x == 0)  s2->jmin = -1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestLargeSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			int last_picked = getLastPickedLarge(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreWarp(semaphore))
+			{
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, start, v, max, dim2);
+				if (threadIdx.x == 0)  s2->jmin = -1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestLargeMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[8], b_max_cost[8], b_picked_cost[8];
+			__shared__ int b_jmin[8];
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			int last_picked = getLastPickedLarge(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, start, v, max, dim2);
+				if (threadIdx.x == 0)  s2->jmin = -1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestLargeLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[32], b_max_cost[32], b_picked_cost[32];
+			__shared__ int b_jmin[32];
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			int last_picked = getLastPickedLarge(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, last_picked, max, size, dim2);
+			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTempLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, start, v, max, dim2);
+				if (threadIdx.x == 0)  s2->jmin = -1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestSingleSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, max, size, dim2);
+			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreWarp(semaphore))
+			{
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, 0, v, max, dim2);
+				if (threadIdx.x == 0) picked[t_jmin] = 1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestSingleMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[8], b_max_cost[8], b_picked_cost[8];
+			__shared__ int b_jmin[8];
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, max, size, dim2);
+			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getMinSecondBestReadTemp(t_min_cost, t_second_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, max, dim2);
+				getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
+				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, 0, v, max, dim2);
+				if (threadIdx.x == 0) picked[t_jmin] = 1;
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getMinSecondBestSingleLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int size, int dim2)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[32], b_max_cost[32], b_picked_cost[32];
+			__shared__ int b_jmin[32];
+
+			SC t_min_cost, t_second_cost, t_picked_cost;
+			int t_jmin;
+
+			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, v, picked, max, size, dim2);
 			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 			getMinSecondBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_second_cost, t_picked_cost, t_jmin);
 

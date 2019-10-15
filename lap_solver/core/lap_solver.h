@@ -407,7 +407,6 @@ namespace lap
 
 		lapAlloc(mod_v, dim2, __FILE__, __LINE__);
 		lapAlloc(v2, dim2, __FILE__, __LINE__);
-		//lapAlloc(perm, dim, __FILE__, __LINE__);
 		lapAlloc(picked, dim2, __FILE__, __LINE__);
 
 		SC lower_bound = SC(0);
@@ -460,15 +459,24 @@ namespace lap
 		upper_bound = SC(0);
 
 		// reverse order
-		for (int i = dim - 1; i >= 0; --i)
+		for (int ii = 0; ii < dim2; ii++)
 		{
-			const auto *tt = iterator.getRow(i);
+			int i = (ii < dim) ? (dim - 1 - ii) : ii;
 			SC min_cost_l, second_cost_l, picked_cost_l;
 			int j_min;
-			auto cost = [&tt, &v](int j) -> SC { return (SC)tt[j] - v[j]; };
-			getMinSecondBest(min_cost_l, second_cost_l, picked_cost_l, j_min, cost, picked, dim2);
+			if (i < dim)
+			{
+				const auto *tt = iterator.getRow(i);
+				auto cost = [&tt, &v](int j) -> SC { return (SC)tt[j] - v[j]; };
+				getMinSecondBest(min_cost_l, second_cost_l, picked_cost_l, j_min, cost, picked, dim2);
+				perm[i] = i;
+			}
+			else
+			{
+				auto cost = [&v](int j) -> SC { return -v[j]; };
+				getMinSecondBest(min_cost_l, second_cost_l, picked_cost_l, j_min, cost, picked, dim2);
+			}
 			picked[j_min] = 1;
-			perm[i] = i;
 			mod_v[i] = second_cost_l - min_cost_l;
 			// need to use the same v values in total
 			lower_bound += min_cost_l + v[j_min];
@@ -495,14 +503,22 @@ namespace lap
 			upper_bound = SC(0);
 			// greedy search
 			std::fill(mod_v, mod_v + dim2, SC(-1));
-			for (int i = 0; i < dim; i++)
+			for (int i = 0; i < dim2; i++)
 			{
 				// greedy order
-				const auto *tt = iterator.getRow(perm[i]);
 				int j_min;
 				SC min_cost, min_cost_real;
-				auto cost = [&tt, &v](int j) -> SC { return (SC)tt[j] - v[j]; };
-				getMinimalCost(j_min, min_cost, min_cost_real, cost, mod_v, dim2);
+				if (i < dim)
+				{
+					const auto *tt = iterator.getRow(perm[i]);
+					auto cost = [&tt, &v](int j) -> SC { return (SC)tt[j] - v[j]; };
+					getMinimalCost(j_min, min_cost, min_cost_real, cost, mod_v, dim2);
+				}
+				else
+				{
+					auto cost = [&v](int j) -> SC { return -v[j]; };
+					getMinimalCost(j_min, min_cost, min_cost_real, cost, mod_v, dim2);
+				}
 				upper_bound += min_cost + v[j_min];
 				// need to use the same v values in total
 				lower_bound += min_cost_real + v[j_min];
@@ -541,16 +557,25 @@ namespace lap
 			SC old_lower_bound = lower_bound;
 			upper_bound = SC(0);
 			lower_bound = SC(0);
-			for (int i = 0; i < dim; i++)
+			for (int i = 0; i < dim2; i++)
 			{
-				// reverse greedy order
-				const auto *tt = iterator.getRow(perm[i]);
-				SC min_cost = (SC)tt[picked[i]];
-				SC min_cost_real = std::numeric_limits<SC>::max();
-				for (int j = 0; j < dim2; j++)
+				SC min_cost, min_cost_real;
+				if (i < dim)
 				{
-					SC cost_l = (SC)tt[j] - v[j];
-					min_cost_real = std::min(min_cost_real, cost_l);
+					const auto *tt = iterator.getRow(perm[i]);
+					min_cost = (SC)tt[picked[i]];
+					min_cost_real = std::numeric_limits<SC>::max();
+					for (int j = 0; j < dim2; j++)
+					{
+						SC cost_l = (SC)tt[j] - v[j];
+						min_cost_real = std::min(min_cost_real, cost_l);
+					}
+				}
+				else
+				{
+					min_cost = SC(0);
+					min_cost_real = std::numeric_limits<SC>::max();
+					for (int j = 0; j < dim2; j++) min_cost_real = std::min(min_cost_real, -v[j]);
 				}
 				// need to use all picked v for the lower bound as well
 				upper_bound += min_cost;

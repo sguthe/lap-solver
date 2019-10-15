@@ -24,6 +24,25 @@ namespace lap
 		}
 
 		template <class SC>
+		__device__ __forceinline__ void getFinalCostRead(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v, int j, SC *v, int j_picked, SC max, int size)
+		{
+			t_min_cost = max;
+			t_picked_cost = max;
+			t_picked_v = max;
+
+			if (j < size)
+			{
+				SC t_cost = -v[j];
+				t_min_cost = t_cost;
+				if (j == j_picked)
+				{
+					t_picked_cost = SC(0);
+					t_picked_v = v[j];
+				}
+			}
+		}
+
+		template <class SC>
 		__device__ __forceinline__ void getFinalCostCombineSmall(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v)
 		{
 			minWarp(t_min_cost);
@@ -204,6 +223,67 @@ namespace lap
 			SC t_min_cost, t_picked_cost, t_picked_v;
 
 			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, tt, v, j_picked, max, size);
+			getFinalCostCombineLarge(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
+			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getFinalCostReadTempLarge(t_min_cost, t_picked_cost, t_picked_v, o_min_cost, o_picked_cost, o_picked_v, max);
+				getFinalCostCombineLarge(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
+				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getFinalCostSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC *v, SC max, int j_picked, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			SC t_min_cost, t_picked_cost, t_picked_v;
+
+			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, v, j_picked, max, size);
+			getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
+			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
+
+			if (semaphoreWarp(semaphore))
+			{
+				getFinalCostReadTemp(t_min_cost, t_picked_cost, t_picked_v, o_min_cost, o_picked_cost, o_picked_v, max);
+				getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
+				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getFinalCostMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC *v, SC max, int j_picked, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[8], b_picked_cost[8], b_picked_v[8];
+
+			SC t_min_cost, t_picked_cost, t_picked_v;
+
+			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, v, j_picked, max, size);
+			getFinalCostCombineMedium(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
+			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
+
+			if (semaphoreBlock(semaphore))
+			{
+				getFinalCostReadTemp(t_min_cost, t_picked_cost, t_picked_v, o_min_cost, o_picked_cost, o_picked_v, max);
+				getFinalCostCombineMedium(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
+				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
+			}
+		}
+
+		template <class MS, class SC>
+		__global__ void getFinalCostLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC *v, SC max, int j_picked, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			__shared__ SC b_min_cost[32], b_picked_cost[32], b_picked_v[32];
+
+			SC t_min_cost, t_picked_cost, t_picked_v;
+
+			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, v, j_picked, max, size);
 			getFinalCostCombineLarge(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
 			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
 
