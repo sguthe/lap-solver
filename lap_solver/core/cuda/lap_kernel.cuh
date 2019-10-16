@@ -386,6 +386,16 @@ namespace lap
 
 			v[j] -= max;
 		}
+
+		template <class SC>
+		__global__ void interpolateV_kernel(SC *v, SC *v2, double ratio2, int size)
+		{
+			int i = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (i >= size) return;
+
+			v[i] = (SC)((double)v2[i] * ratio2 + (double)v[i] * (1.0 - ratio2));
+		}
 	}
 }
 

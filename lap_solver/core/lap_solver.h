@@ -401,7 +401,6 @@ namespace lap
 		auto start_time = std::chrono::high_resolution_clock::now();
 #endif
 		SC *mod_v;
-		//int *perm;
 		int *picked;
 		SC *v2;
 
@@ -415,18 +414,30 @@ namespace lap
 
 		memset(picked, 0, sizeof(int) * dim2);
 
-		for (int i = 0; i < dim; i++)
+		for (int i = 0; i < dim2; i++)
 		{
 			SC min_cost_l, max_cost_l, picked_cost_l;
 			int j_min;
-			const auto *tt = iterator.getRow(i);
-			auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
-			getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked, dim2);
-			picked[j_min] = 1;
-			updateEstimatedV(v, mod_v, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, dim2);
-			lower_bound += min_cost_l;
-			upper_bound += (SC)tt[i];
-			greedy_bound += picked_cost_l;
+			if (i < dim)
+			{
+				const auto *tt = iterator.getRow(i);
+				auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
+				getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked, dim2);
+				picked[j_min] = 1;
+				updateEstimatedV(v, mod_v, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, dim2);
+				lower_bound += min_cost_l;
+				upper_bound += (SC)tt[i];
+				greedy_bound += picked_cost_l;
+			}
+			else
+			{
+				auto cost = [](int j) -> SC { return SC(0); };
+				getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked, dim2);
+				picked[j_min] = 1;
+				updateEstimatedV(v, mod_v, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, dim2);
+				lower_bound += min_cost_l;
+				greedy_bound += picked_cost_l;
+			}
 		}
 		// make sure all j are < 0
 		normalizeV(v, dim2);
@@ -445,7 +456,7 @@ namespace lap
 		}
 		{
 			std::stringstream ss;
-			ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+			ss << "upper_bound = " << greedy_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
 			lap::displayTime(start_time, ss.str().c_str(), lapDebug);
 		}
 #endif
@@ -459,9 +470,8 @@ namespace lap
 		upper_bound = SC(0);
 
 		// reverse order
-		for (int ii = 0; ii < dim2; ii++)
+		for (int i = dim2 - 1; i >= 0; --i)
 		{
-			int i = (ii < dim) ? (dim - 1 - ii) : ii;
 			SC min_cost_l, second_cost_l, picked_cost_l;
 			int j_min;
 			if (i < dim)
@@ -469,13 +479,13 @@ namespace lap
 				const auto *tt = iterator.getRow(i);
 				auto cost = [&tt, &v](int j) -> SC { return (SC)tt[j] - v[j]; };
 				getMinSecondBest(min_cost_l, second_cost_l, picked_cost_l, j_min, cost, picked, dim2);
-				perm[i] = i;
 			}
 			else
 			{
 				auto cost = [&v](int j) -> SC { return -v[j]; };
 				getMinSecondBest(min_cost_l, second_cost_l, picked_cost_l, j_min, cost, picked, dim2);
 			}
+			perm[i] = i;
 			picked[j_min] = 1;
 			mod_v[i] = second_cost_l - min_cost_l;
 			// need to use the same v values in total
@@ -496,8 +506,9 @@ namespace lap
 #endif
 		if (initial_gap < SC(4) * greedy_gap)
 		{
+			memcpy(v2, v, dim2 * sizeof(SC));
 			// sort permutation by keys
-			std::sort(perm, perm + dim, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
+			std::sort(perm, perm + dim2, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
 
 			lower_bound = SC(0);
 			upper_bound = SC(0);
@@ -536,17 +547,33 @@ namespace lap
 #endif
 
 			// update v in reverse order
-			for (int i = dim - 1; i >= 0; --i)
+			for (int i = dim2 - 1; i >= 0; --i)
 			{
-				const auto *tt = iterator.getRow(perm[i]);
-				SC min_cost = (SC)tt[picked[i]] - v[picked[i]];
-				mod_v[picked[i]] = SC(-1);
-				for (int j = 0; j < dim2; j++)
+				if (perm[i] < dim)
 				{
-					if (mod_v[j] >= SC(0))
+					const auto *tt = iterator.getRow(perm[i]);
+					SC min_cost = (SC)tt[picked[i]] - v[picked[i]];
+					mod_v[picked[i]] = SC(-1);
+					for (int j = 0; j < dim2; j++)
 					{
-						SC cost_l = (SC)tt[j] - v[j];
-						if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+						if (mod_v[j] >= SC(0))
+						{
+							SC cost_l = (SC)tt[j] - v[j];
+							if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+						}
+					}
+				}
+				else
+				{
+					SC min_cost = -v[picked[i]];
+					mod_v[picked[i]] = SC(-1);
+					for (int j = 0; j < dim2; j++)
+					{
+						if (mod_v[j] >= SC(0))
+						{
+							SC cost_l = -v[j];
+							if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+						}
 					}
 				}
 			}
@@ -560,7 +587,7 @@ namespace lap
 			for (int i = 0; i < dim2; i++)
 			{
 				SC min_cost, min_cost_real;
-				if (i < dim)
+				if (perm[i] < dim)
 				{
 					const auto *tt = iterator.getRow(perm[i]);
 					min_cost = (SC)tt[picked[i]];
@@ -598,7 +625,7 @@ namespace lap
 #endif
 			if (ratio2 > 1.0e-09)
 			{
-				for (int i = 0; i < dim; i++)
+				for (int i = 0; i < dim2; i++)
 				{
 					v[i] = (SC)((double)v2[i] * ratio2 + (double)v[i] * (1.0 - ratio2));
 				}
@@ -608,7 +635,6 @@ namespace lap
 		getUpperLower(upper, lower, greedy_gap, initial_gap, dim2);
 
 		lapFree(mod_v);
-		//lapFree(perm);
 		lapFree(picked);
 		lapFree(v2);
 
@@ -649,10 +675,9 @@ namespace lap
 		{
 			int j1 = colcomplete[i];
 			SC dlt = min - d[j1];
-			total -= dlt;
-			dlt += eps;
-			total_eps -= dlt;
-			v[j1] -= dlt;
+			total += dlt;
+			total_eps += eps;
+			v[j1] -= dlt + eps;
 		}
 	}
 
@@ -672,8 +697,6 @@ namespace lap
 	template <class SC>
 	void getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool second, int dim2)
 	{
-		total_eps = total_d - total_eps;
-		total_d = -total_d;
 		if (epsilon > SC(0))
 		{
 			if (!first)
@@ -764,7 +787,7 @@ namespace lap
 		lapAlloc(pred, dim2, __FILE__, __LINE__);
 		lapAlloc(colsol, dim2, __FILE__, __LINE__);
 		lapAlloc(v, dim2, __FILE__, __LINE__);
-		lapAlloc(perm, dim, __FILE__, __LINE__);
+		lapAlloc(perm, dim2, __FILE__, __LINE__);
 
 #ifdef LAP_ROWS_SCANNED
 		unsigned long long *scancount;
@@ -788,13 +811,18 @@ namespace lap
 			memset(v, 0, dim2 * sizeof(SC));
 			epsilon_upper = SC(0);
 			epsilon_lower = SC(0);
-			for (int i = 0; i < dim; i++) perm[i] = dim - 1 - i;
 		}
 		epsilon = epsilon_upper;
 
 		bool first = true;
 		bool second = false;
 		bool reverse = true;
+
+		if ((!use_epsilon) || (epsilon > SC(0)))
+		{
+			for (int i = 0; i < dim2; i++) perm[i] = i;
+			reverse = false;
+		}
 
 		SC total_d = SC(0);
 		SC total_eps = SC(0);
@@ -841,7 +869,7 @@ namespace lap
 			int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
 			for (int fc = 0; fc < dim_limit; fc++)
 			{
-				int f = (fc < dim) ? perm[(reverse) ? (dim - 1 - fc) : fc] : fc;
+				int f = perm[(reverse) ? (dim2 - 1 - fc) : fc];
 #ifndef LAP_QUIET
 				if (f < dim) total_rows++; else total_virtual++;
 #else
@@ -1009,7 +1037,7 @@ namespace lap
 						for (int j = 0; j < dim2; j++)
 						{
 							// ignore any columns assigned to virtual rows
-							if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min_n))
+							if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min))
 							{
 								colcomplete[completecount++] = j;
 								colactive[j] = 0;
@@ -1062,7 +1090,7 @@ namespace lap
 
 			if (dim_limit < dim2)
 			{
-				total_eps -= SC(dim2 - dim_limit) * epsilon;
+				total_eps += SC(dim2 - dim_limit) * epsilon;
 				// fix v in unassigned columns
 				for (int j = 0; j < dim2; j++)
 				{

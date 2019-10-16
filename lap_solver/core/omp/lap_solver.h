@@ -13,7 +13,6 @@ namespace lap
 			auto start_time = std::chrono::high_resolution_clock::now();
 #endif
 			SC *mod_v;
-			//int *perm;
 			int *picked;
 			SC *merge_cost;
 			int *merge_idx;
@@ -21,7 +20,6 @@ namespace lap
 
 			lapAlloc(mod_v, dim2, __FILE__, __LINE__);
 			lapAlloc(v2, dim2, __FILE__, __LINE__);
-			//lapAlloc(perm, dim, __FILE__, __LINE__);
 			lapAlloc(picked, dim2, __FILE__, __LINE__);
 			lapAlloc(merge_cost, omp_get_max_threads() << 3, __FILE__, __LINE__);
 			lapAlloc(merge_idx, omp_get_max_threads() << 3, __FILE__, __LINE__);
@@ -36,38 +34,70 @@ namespace lap
 			{
 				int t = omp_get_thread_num();
 				int threads = omp_get_num_threads();
-				for (int i = 0; i < dim; i++)
+				for (int i = 0; i < dim2; i++)
 				{
 					SC min_cost_l, max_cost_l, picked_cost_l;
 					int j_min;
-					const auto *tt = iterator.getRow(t, i);
-#pragma omp barrier
-					auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
-					getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
-					j_min += iterator.ws.part[t].first;
-					// a little hacky
-					if ((i >= iterator.ws.part[t].first) && (i < iterator.ws.part[t].second))
+					if (i < dim)
 					{
-						merge_cost[1] = cost(i - iterator.ws.part[t].first);
-					}
-					merge_cost[(t << 3)] = min_cost_l;
-					merge_cost[(t << 3) + 2] = picked_cost_l;
-					merge_idx[(t << 3)] = j_min;
+						const auto *tt = iterator.getRow(t, i);
 #pragma omp barrier
-					min_cost_l = merge_cost[0];
-					max_cost_l = merge_cost[1];
-					picked_cost_l = merge_cost[2];
-					j_min = merge_idx[0];
-					for (int ii = 1; ii < threads; ii++)
-					{
-						min_cost_l = std::min(min_cost_l, merge_cost[(ii << 3)]);
-						if (merge_cost[(ii << 3) + 2] < picked_cost_l)
+						auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
+						getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
+						j_min += iterator.ws.part[t].first;
+						// a little hacky
+						if ((i >= iterator.ws.part[t].first) && (i < iterator.ws.part[t].second))
 						{
-							picked_cost_l = merge_cost[(ii << 3) + 2];
-							j_min = merge_idx[(ii << 3)];
+							merge_cost[1] = cost(i - iterator.ws.part[t].first);
 						}
+						merge_cost[(t << 3)] = min_cost_l;
+						merge_cost[(t << 3) + 2] = picked_cost_l;
+						merge_idx[(t << 3)] = j_min;
+#pragma omp barrier
+						min_cost_l = merge_cost[0];
+						max_cost_l = merge_cost[1];
+						picked_cost_l = merge_cost[2];
+						j_min = merge_idx[0];
+						for (int ii = 1; ii < threads; ii++)
+						{
+							min_cost_l = std::min(min_cost_l, merge_cost[(ii << 3)]);
+							if (merge_cost[(ii << 3) + 2] < picked_cost_l)
+							{
+								picked_cost_l = merge_cost[(ii << 3) + 2];
+								j_min = merge_idx[(ii << 3)];
+							}
+						}
+						updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
-					updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
+					else
+					{
+						auto cost = [](int j) -> SC { return SC(0); };
+						getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
+						j_min += iterator.ws.part[t].first;
+						// a little hacky
+						if ((i >= iterator.ws.part[t].first) && (i < iterator.ws.part[t].second))
+						{
+							merge_cost[1] = cost(i - iterator.ws.part[t].first);
+						}
+						merge_cost[(t << 3)] = min_cost_l;
+						merge_cost[(t << 3) + 2] = picked_cost_l;
+						merge_idx[(t << 3)] = j_min;
+#pragma omp barrier
+						min_cost_l = merge_cost[0];
+						max_cost_l = merge_cost[1];
+						picked_cost_l = merge_cost[2];
+						j_min = merge_idx[0];
+						for (int ii = 1; ii < threads; ii++)
+						{
+							min_cost_l = std::min(min_cost_l, merge_cost[(ii << 3)]);
+							if (merge_cost[(ii << 3) + 2] < picked_cost_l)
+							{
+								picked_cost_l = merge_cost[(ii << 3) + 2];
+								j_min = merge_idx[(ii << 3)];
+							}
+						}
+						updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
+					}
 					if (t == 0)
 					{
 						picked[j_min] = 1;
@@ -94,7 +124,7 @@ namespace lap
 			}
 			{
 				std::stringstream ss;
-				ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+				ss << "upper_bound = " << greedy_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
 				lap::displayTime(start_time, ss.str().c_str(), lapDebug);
 			}
 #endif
@@ -112,9 +142,8 @@ namespace lap
 				int t = omp_get_thread_num();
 				int threads = omp_get_num_threads();
 				// reverse order
-				for (int ii = 0; ii < dim2; ii++)
+				for (int i = dim2 - 1; i >= 0; --i)
 				{
-					int i = (ii < dim) ? (dim - 1 - ii) : ii;
 					SC min_cost_l, second_cost_l, picked_cost_l;
 					int j_min;
 					if (i < dim)
@@ -154,7 +183,7 @@ namespace lap
 								j_min = merge_idx[(ii << 3)];
 							}
 						}
-						if (i < dim) perm[i] = i;
+						perm[i] = i;
 						picked[j_min] = 1;
 						mod_v[i] = second_cost_l - min_cost_l;
 						// need to use the same v values in total
@@ -179,7 +208,7 @@ namespace lap
 			{
 				memcpy(v2, v, dim2 * sizeof(SC));
 				// sort permutation by keys
-				std::sort(perm, perm + dim, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
+				std::sort(perm, perm + dim2, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
 
 				lower_bound = SC(0);
 				upper_bound = SC(0);
@@ -194,7 +223,7 @@ namespace lap
 						// greedy order
 						int j_min;
 						SC min_cost, min_cost_real;
-						if (i < dim)
+						if (perm[i] < dim)
 						{
 							const auto *tt = iterator.getRow(t, perm[i]);
 							auto cost = [&tt, &v, &iterator, &t](int j) -> SC { return (SC)tt[j] - v[j + iterator.ws.part[t].first]; };
@@ -247,23 +276,44 @@ namespace lap
 				{
 					int t = omp_get_thread_num();
 					// update v in reverse order
-					for (int i = dim - 1; i >= 0; --i)
+					for (int i = dim2 - 1; i >= 0; --i)
 					{
 #pragma omp barrier
-						const auto *tt = iterator.getRow(t, perm[i]);
-						if ((picked[i] >= iterator.ws.part[t].first) && (picked[i] < iterator.ws.part[t].second))
+						if (perm[i] < dim)
 						{
-							merge_cost[0] = (SC)tt[picked[i] - iterator.ws.part[t].first] - v[picked[i]];
-							mod_v[picked[i]] = SC(-1);
-						}
-#pragma omp barrier
-						SC min_cost = merge_cost[0];
-						for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
-						{
-							if (mod_v[j] >= SC(0))
+							const auto *tt = iterator.getRow(t, perm[i]);
+							if ((picked[i] >= iterator.ws.part[t].first) && (picked[i] < iterator.ws.part[t].second))
 							{
-								SC cost_l = (SC)tt[j - iterator.ws.part[t].first] - v[j];
-								if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+								merge_cost[0] = (SC)tt[picked[i] - iterator.ws.part[t].first] - v[picked[i]];
+								mod_v[picked[i]] = SC(-1);
+							}
+#pragma omp barrier
+							SC min_cost = merge_cost[0];
+							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
+							{
+								if (mod_v[j] >= SC(0))
+								{
+									SC cost_l = (SC)tt[j - iterator.ws.part[t].first] - v[j];
+									if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+								}
+							}
+						}
+						else
+						{
+							if ((picked[i] >= iterator.ws.part[t].first) && (picked[i] < iterator.ws.part[t].second))
+							{
+								merge_cost[0] = -v[picked[i]];
+								mod_v[picked[i]] = SC(-1);
+							}
+#pragma omp barrier
+							SC min_cost = merge_cost[0];
+							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
+							{
+								if (mod_v[j] >= SC(0))
+								{
+									SC cost_l = -v[j];
+									if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+								}
 							}
 						}
 					}
@@ -282,7 +332,7 @@ namespace lap
 					for (int i = 0; i < dim2; i++)
 					{
 						SC min_cost_real;
-						if (i < dim)
+						if (perm[i] < dim)
 						{
 							const auto *tt = iterator.getRow(t, perm[i]);
 							if ((picked[i] >= iterator.ws.part[t].first) && (picked[i] < iterator.ws.part[t].second))
@@ -327,7 +377,7 @@ namespace lap
 #endif
 				if (ratio2 > 1.0e-09)
 				{
-					for (int i = 0; i < dim; i++)
+					for (int i = 0; i < dim2; i++)
 					{
 						v[i] = (SC)((double)v2[i] * ratio2 + (double)v[i] * (1.0 - ratio2));
 					}
@@ -337,7 +387,6 @@ namespace lap
 			getUpperLower(upper, lower, greedy_gap, initial_gap, dim2);
 
 			lapFree(mod_v);
-			//lapFree(perm);
 			lapFree(picked);
 			lapFree(merge_cost);
 			lapFree(merge_idx);
@@ -407,7 +456,7 @@ namespace lap
 			lapAlloc(pred, dim2, __FILE__, __LINE__);
 			lapAlloc(colsol, dim2, __FILE__, __LINE__);
 			lapAlloc(v, dim2, __FILE__, __LINE__);
-			lapAlloc(perm, dim, __FILE__, __LINE__);
+			lapAlloc(perm, dim2, __FILE__, __LINE__);
 
 			SC *min_private;
 			int *jmin_private;
@@ -439,11 +488,16 @@ namespace lap
 				epsilon_lower = SC(0);
 			}
 			epsilon = epsilon_upper;
-			if (epsilon > SC(0)) for (int i = 0; i < dim; i++) perm[i] = dim - 1 - i;
 
 			bool first = true;
 			bool second = false;
 			bool reverse = true;
+
+			if ((!use_epsilon) || (epsilon > SC(0)))
+			{
+				for (int i = 0; i < dim2; i++) perm[i] = i;
+				reverse = false;
+			}
 
 			SC total_d = SC(0);
 			SC total_eps = SC(0);
@@ -500,7 +554,7 @@ namespace lap
 
 					for (int fc = 0; fc < dim_limit; fc++)
 					{
-						int f = (fc < dim) ? perm[(reverse) ? (dim - 1 - fc) : fc] : fc;
+						int f = perm[(reverse) ? (dim2 - 1 - fc) : fc];
 						int jmin_local = dim2;
 						SC min_local = std::numeric_limits<SC>::max();
 						if (f < dim)
@@ -716,7 +770,7 @@ namespace lap
 									for (int j = 0; j < dim2; j++)
 									{
 										// ignore any columns assigned to virtual rows
-										if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min_n))
+										if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min))
 										{
 											colcomplete[completecount++] = j;
 											colactive[j] = 0;
@@ -781,7 +835,7 @@ namespace lap
 
 				if (dim_limit < dim2)
 				{
-					total_eps -= SC(dim2 - dim_limit) * epsilon;
+					total_eps += SC(dim2 - dim_limit) * epsilon;
 					// fix v in unassigned columns
 					for (int j = 0; j < dim2; j++)
 					{

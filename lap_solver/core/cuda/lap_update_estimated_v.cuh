@@ -49,6 +49,51 @@ namespace lap
 			if (jmin == j) picked[j] = 1;
 		}
 
+		template <class SC>
+		__device__ __forceinline__ void updateEstimatedVFirst(SC *min_v, int *picked, SC min_cost, int jmin, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			min_v[j] = -min_cost;
+			if (jmin == j) picked[j] = 1;
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void updateEstimatedVSecond(SC *v, SC *min_v, int *picked, SC min_cost, int jmin, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			SC tmp = -min_cost;
+			if (tmp < min_v[j])
+			{
+				v[j] = min_v[j];
+				min_v[j] = tmp;
+			}
+			else v[j] = tmp;
+			if (jmin == j) picked[j] = 1;
+		}
+
+		template <class SC>
+		__device__ __forceinline__ void updateEstimatedV(SC *v, SC *min_v, int *picked, SC min_cost, int jmin, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			SC tmp = -min_cost;
+			if (tmp < min_v[j])
+			{
+				v[j] = min_v[j];
+				min_v[j] = tmp;
+			}
+			else if (tmp < v[j]) v[j] = tmp;
+			if (jmin == j) picked[j] = 1;
+		}
+
 		template <class MS, class SC>
 		__device__ __forceinline__ void updateEstimateVGetMin(int &jmin, SC &min_cost, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, volatile MS *s, int start, int dim2, SC max, int devices)
 		{
@@ -243,6 +288,78 @@ namespace lap
 			SC min_cost;
 			updateEstimateVGetMinLarge(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
 			updateEstimatedV(v, min_v, tt, picked, min_cost, jmin, size);
+		}
+
+		template <class SC>
+		__global__ void updateEstimatedVFirst_kernel(SC *min_v, int *picked, SC *min_cost, int *jmin, int size)
+		{
+			updateEstimatedVFirst(min_v, picked, *min_cost, *jmin, size);
+		}
+
+		template <class SC>
+		__global__ void updateEstimatedVSecond_kernel(SC *v, SC *min_v, int *picked, SC *min_cost, int *jmin, int size)
+		{
+			updateEstimatedVSecond(v, min_v, picked, *min_cost, *jmin, size);
+		}
+
+		template <class SC>
+		__global__ void updateEstimatedV_kernel(SC *v, SC *min_v, int *picked, SC *min_cost, int *jmin, int size)
+		{
+			updateEstimatedV(v, min_v, picked, *min_cost, *jmin, size);
+		}
+
+		template <class MS, class SC>
+		__global__ void updateEstimatedVFirst_kernel(SC *min_v, volatile MS *s2, unsigned int *semaphore, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		{
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMin(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
+			updateEstimatedVFirst(min_v, picked, min_cost, jmin, size);
+		}
+
+		template <class MS, class SC>
+		__global__ void updateEstimatedVSecond_kernel(SC *v, SC *min_v, volatile MS *s2, unsigned int *semaphore, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		{
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMin(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
+			updateEstimatedVSecond(v, min_v, picked, min_cost, jmin, size);
+		}
+
+		template <class MS, class SC>
+		__global__ void updateEstimatedV_kernel(SC *v, SC *min_v, volatile MS *s2, unsigned int *semaphore, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		{
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMin(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
+			updateEstimatedV(v, min_v, picked, min_cost, jmin, size);
+		}
+
+		template <class MS, class SC>
+		__global__ void updateEstimatedVFirstLarge_kernel(SC *min_v, volatile MS *s2, unsigned int *semaphore, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		{
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMinLarge(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
+			updateEstimatedVFirst(min_v, picked, min_cost, jmin, size);
+		}
+
+		template <class MS, class SC>
+		__global__ void updateEstimatedVSecondLarge_kernel(SC *v, SC *min_v, volatile MS *s2, unsigned int *semaphore, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		{
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMinLarge(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
+			updateEstimatedVSecond(v, min_v, picked, min_cost, jmin, size);
+		}
+
+		template <class MS, class SC>
+		__global__ void updateEstimatedVLarge_kernel(SC *v, SC *min_v, volatile MS *s2, unsigned int *semaphore, int *picked, volatile int *data_valid, MS *s, int start, int size, int dim2, SC max, int devices)
+		{
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMinLarge(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
+			updateEstimatedV(v, min_v, picked, min_cost, jmin, size);
 		}
 	}
 }

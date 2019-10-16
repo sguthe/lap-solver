@@ -47,7 +47,7 @@ namespace lap
 				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
-					SC v2 = (v[j] - v_jmin) + min;
+					SC v2 = -(v[j] - v_jmin) + min;
 
 					bool is_smaller = (v2 < h);
 					if (is_smaller)
@@ -105,7 +105,7 @@ namespace lap
 				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
-					SC v2 = (v[j] - v_jmin) + min;
+					SC v2 = -(v[j] - v_jmin) + min;
 
 					bool is_smaller = (v2 < h);
 					if (is_smaller)

@@ -46,10 +46,9 @@ namespace lap
 			if (colactive[j] == 0)
 			{
 				SC dlt = min - d[j];
-				total_d[j] -= dlt;
-				dlt += eps;
-				v[j] -= dlt;
-				total_eps[j] -= dlt;
+				total_d[j] += dlt;
+				v[j] -= dlt + eps;
+				total_eps[j] += eps;
 			}
 		}
 
@@ -77,10 +76,9 @@ namespace lap
 			if (colactive[j] == 0)
 			{
 				SC dlt = min - d[j];
-				total_d[j] -= dlt;
-				dlt += eps;
-				v[j] -= dlt;
-				total_eps[j] -= dlt;
+				total_d[j] += dlt;
+				v[j] -= dlt + eps;
+				total_eps[j] += eps;
 			}
 		}
 
@@ -108,10 +106,9 @@ namespace lap
 			if (colactive[j] == 0)
 			{
 				SC dlt = min - d[j];
-				total_d[j] -= dlt;
-				dlt += eps;
-				v[j] -= dlt;
-				total_eps[j] -= dlt;
+				total_d[j] += dlt;
+				v[j] -= dlt + eps;
+				total_eps[j] += eps;
 			}
 		}
 
@@ -124,31 +121,31 @@ namespace lap
 			if (colsol[j] < 0)
 			{
 				v[j] -= eps;
-				total_eps[j] -= eps;
+				total_eps[j] += eps;
 			}
 		}
 
 		template <class SC>
-		__global__ void markedSkippedColumns_kernel(char *colactive, SC min_n, int jmin, int *colsol, SC *d, int dim, int size)
+		__global__ void markedSkippedColumns_kernel(char *colactive, SC min, int jmin, int *colsol, SC *d, int f, int dim, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
 
 			// ignore any columns assigned to virtual rows
-			if ((j == jmin) || ((colsol[j] >= dim) && (d[j] <= min_n)))
+			if ((j == jmin) || ((f >= dim) && (colsol[j] >= dim) && (d[j] <= min)))
 			{
 				colactive[j] = 0;
 			}
 		}
 
 		template <class SC>
-		__global__ void markedSkippedColumnsUpdate_kernel(char *colactive, SC min_n, int jmin, int *colsol, SC *d, int dim, int size)
+		__global__ void markedSkippedColumnsUpdate_kernel(char *colactive, SC min, int jmin, int *colsol, SC *d, int i, int dim, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
 
 			// ignore any columns assigned to virtual rows
-			if ((j == jmin) || ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min_n)))
+			if ((j == jmin) || ((i >= dim) && (colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min)))
 			{
 				colactive[j] = 0;
 			}
