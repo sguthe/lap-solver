@@ -901,7 +901,7 @@ namespace lap
 				}
 			}
 
-			getUpperLower(upper, lower, greedy_gap, initial_gap, dim2);
+			getUpperLower(upper, lower, greedy_gap, initial_gap, dim, dim2);
 
 			for (int t = 0; t < devices; t++)
 			{

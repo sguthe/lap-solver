@@ -385,11 +385,11 @@ namespace lap
 	}
 
 	template <class SC>
-	void getUpperLower(SC &upper, SC &lower, SC greedy_gap, SC initial_gap, int dim2)
+	void getUpperLower(SC &upper, SC &lower, SC greedy_gap, SC initial_gap, int dim, int dim2)
 	{
 		if (SC(4) * greedy_gap > initial_gap) greedy_gap = initial_gap / SC(4);
 		if ((double)greedy_gap < 1.0e-6 * (double)initial_gap) upper = SC(0);
-		else upper = (SC)((double)greedy_gap * sqrt((double)greedy_gap / (double)initial_gap) / (double)dim2);
+		else upper = (SC)((double)dim * (double)greedy_gap * sqrt((double)greedy_gap / (double)initial_gap) / ((double)dim2 * (double)dim2));
 		lower = (SC)((double)initial_gap / (16.0 * (double)dim2 * (double)dim2));
 		if (upper < lower) upper = lower = SC(0);
 	}
@@ -632,7 +632,7 @@ namespace lap
 			}
 		}
 
-		getUpperLower(upper, lower, greedy_gap, initial_gap, dim2);
+		getUpperLower(upper, lower, greedy_gap, initial_gap, dim, dim2);
 
 		lapFree(mod_v);
 		lapFree(picked);
