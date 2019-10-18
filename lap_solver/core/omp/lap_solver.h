@@ -544,7 +544,6 @@ namespace lap
 				jmin = dim2;
 				min = std::numeric_limits<SC>::max();
 				SC tt_jmin_global;
-				int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
 
 #pragma omp parallel
 				{
@@ -552,7 +551,7 @@ namespace lap
 					int start = iterator.ws.part[t].first;
 					int end = iterator.ws.part[t].second;
 
-					for (int fc = 0; fc < dim_limit; fc++)
+					for (int fc = 0; fc < dim2; fc++)
 					{
 						int f = perm[(reverse) ? (dim2 - 1 - fc) : fc];
 						int jmin_local = dim2;
@@ -812,7 +811,7 @@ namespace lap
 							min = std::numeric_limits<SC>::max();
 #ifndef LAP_QUIET
 							int level;
-							if ((level = displayProgress(start_time, elapsed, fc + 1, dim_limit, " rows")) != 0)
+							if ((level = displayProgress(start_time, elapsed, fc + 1, dim2, " rows")) != 0)
 							{
 								long long hit, miss;
 								iterator.getHitMiss(hit, miss);
@@ -830,16 +829,6 @@ namespace lap
 #endif
 						}
 #pragma omp barrier
-					}
-				}
-
-				if (dim_limit < dim2)
-				{
-					total_eps += SC(dim2 - dim_limit) * epsilon;
-					// fix v in unassigned columns
-					for (int j = 0; j < dim2; j++)
-					{
-						if (colsol[j] < 0) v[j] -= epsilon;
 					}
 				}
 

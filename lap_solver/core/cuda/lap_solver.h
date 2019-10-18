@@ -1179,8 +1179,6 @@ namespace lap
 #endif
 				long long count = 0ll;
 
-				int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
-
 				bool require_colsol_copy = false;
 
 				if (devices == 1)
@@ -1192,7 +1190,7 @@ namespace lap
 					int num_items = end - start;
 					cudaStream_t stream = iterator.ws.stream[t];
 
-					for (int fc = 0; fc < dim_limit; fc++)
+					for (int fc = 0; fc < dim2; fc++)
 					{
 						int f = perm[(reverse) ? (dim2 - 1 - fc) : fc];
 						// start search and find minimum value
@@ -1415,7 +1413,7 @@ namespace lap
 #ifndef LAP_QUIET
 						{
 							int level;
-							if ((level = displayProgress(start_time, elapsed, fc + 1, dim_limit, " rows")) != 0)
+							if ((level = displayProgress(start_time, elapsed, fc + 1, dim2, " rows")) != 0)
 							{
 								long long hit, miss;
 								iterator.getHitMiss(hit, miss);
@@ -1431,8 +1429,6 @@ namespace lap
 						}
 #endif
 					}
-
-					if (dim2 != dim_limit) updateUnassignedColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colsol_private[t], v_private[t], total_eps_private[t], epsilon, num_items);
 
 					// download updated v
 					checkCudaErrors(cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
@@ -1455,7 +1451,7 @@ namespace lap
 						int num_items = end - start;
 						cudaStream_t stream = iterator.ws.stream[t];
 
-						for (int fc = 0; fc < dim_limit; fc++)
+						for (int fc = 0; fc < dim2; fc++)
 						{
 							int f = perm[(reverse) ? (dim2 - 1 - fc) : fc];
 #pragma omp barrier
@@ -1812,7 +1808,7 @@ namespace lap
 							if (t == 0)
 							{
 								int level;
-								if ((level = displayProgress(start_time, elapsed, fc + 1, dim_limit, " rows")) != 0)
+								if ((level = displayProgress(start_time, elapsed, fc + 1, dim2, " rows")) != 0)
 								{
 									long long hit, miss;
 									iterator.getHitMiss(hit, miss);
@@ -1830,7 +1826,6 @@ namespace lap
 						}
 
 						// download updated v
-						if (dim2 != dim_limit) updateUnassignedColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colsol_private[t], v_private[t], total_eps_private[t], epsilon, num_items);
 						checkCudaErrors(cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
 						checkCudaErrors(cudaMemcpyAsync(&(h_total_eps[start]), total_eps_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
 #ifdef LAP_DEBUG
@@ -1877,7 +1872,7 @@ namespace lap
 					}
 				}
 #endif
-				// get total_d and total_eps (total_eps was already fixed for the dim2 != dim_limit case
+				// get total_d and total_eps
 				for (int i = 0; i < dim2; i++)
 				{
 					total_d += h_total_d[i];

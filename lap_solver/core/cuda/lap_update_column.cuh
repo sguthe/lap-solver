@@ -113,19 +113,6 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__ void updateUnassignedColumnPrices_kernel(int *colsol, SC *v, SC *total_eps, SC eps, int size)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-			if (j >= size) return;
-
-			if (colsol[j] < 0)
-			{
-				v[j] -= eps;
-				total_eps[j] += eps;
-			}
-		}
-
-		template <class SC>
 		__global__ void markedSkippedColumns_kernel(char *colactive, SC min, int jmin, int *colsol, SC *d, int f, int dim, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;

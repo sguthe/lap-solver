@@ -866,8 +866,7 @@ namespace lap
 #ifndef LAP_QUIET
 			displayProgress(start_time, elapsed, 0, dim2, " rows");
 #endif
-			int dim_limit = ((epsilon > SC(0)) && (first)) ? dim : dim2;
-			for (int fc = 0; fc < dim_limit; fc++)
+			for (int fc = 0; fc < dim2; fc++)
 			{
 				int f = perm[(reverse) ? (dim2 - 1 - fc) : fc];
 #ifndef LAP_QUIET
@@ -1086,16 +1085,6 @@ namespace lap
 					old_complete = f + 1;
 				}
 #endif
-			}
-
-			if (dim_limit < dim2)
-			{
-				total_eps += SC(dim2 - dim_limit) * epsilon;
-				// fix v in unassigned columns
-				for (int j = 0; j < dim2; j++)
-				{
-					if (colsol[j] < 0) v[j] -= epsilon;
-				}
 			}
 
 #ifdef LAP_MINIMIZE_V
