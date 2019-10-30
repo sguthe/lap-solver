@@ -385,7 +385,6 @@ namespace lap
 									}
 									for (int j = start; j < end; j++)
 									{
-										int j_local = j - start;
 										if (colactive[j] != 0)
 										{
 											SC h = d[j];

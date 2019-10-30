@@ -401,10 +401,6 @@ namespace lap
 						jmin = jmin_n;
 						dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
 
-						if (jmin >= dim2)
-						{
-							int xxx = 0;
-						}
 						// marked skipped columns that were cheaper
 						if (i >= dim)
 						{
