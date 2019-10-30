@@ -243,7 +243,7 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 #ifdef LAP_SPARSE
 #ifdef LAP_OPENMP
 template <class SC, class TC, class RL, class CF, class TP>
-void solveSparseCachingOMP(TP &start_time, int N1, int N2, int max_entries, RL &row_length, CF &get_cost, int *rowsol, int entries, bool epsilon)
+void solveSparseCachingOMP(TP &start_time, int N1, int N2, RL &row_length, CF &get_cost, int *rowsol, int entries, bool epsilon)
 {
 	lap::sparse::omp::SimpleCostFunction<TC, RL, CF> costFunction(row_length, get_cost);
 	lap::sparse::omp::Worksharing ws(N2, costFunction.getMultiple());
@@ -399,7 +399,7 @@ void solveSparseAdaptiveOMP(TP &start_time, int N1, int N2, CF &get_cost, int *r
 	else
 	{
 		std::cout << "using sparse caching with " << entries << "/" << N1 << " entries." << std::endl;
-		solveSparseCachingOMP<SC, TC>(start_time, N1, N2, N1, get_row_length, get_sparse_cost, rowsol, entries, epsilon);
+		solveSparseCachingOMP<SC, TC>(start_time, N1, N2, get_row_length, get_sparse_cost, rowsol, entries, epsilon);
 	}
 	delete[] active;
 }
