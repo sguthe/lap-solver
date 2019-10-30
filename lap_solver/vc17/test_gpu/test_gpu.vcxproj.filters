@@ -46,9 +46,6 @@
     <ClInclude Include="..\..\core\lap_cache.h">
       <Filter>core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\core\cuda\lap_cache.h">
-      <Filter>core\cuda</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\core\cuda\lap_caching_iterator.h">
       <Filter>core\cuda</Filter>
     </ClInclude>

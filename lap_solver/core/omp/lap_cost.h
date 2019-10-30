@@ -1,13 +1,13 @@
 #pragma once
 
-#include "../omp/lap_worksharing.h"
+#include "lap_worksharing.h"
 #include "../lap_cost.h"
 
 namespace lap
 {
 	namespace omp
 	{
-		// Wrapper around simple cost function, scheduling granularity is assumed to be 1 for load balancing
+		// Wrapper around simple cost function, scheduling granularity is assumed to be 8 for load balancing
 		template <class TC, typename GETCOST>
 		class SimpleCostFunction : public lap::SimpleCostFunction<TC, GETCOST>
 		{

@@ -86,6 +86,15 @@ namespace lap
 		}
 
 		template <class SC, class MS>
+		void findMaximum(SC *v_private, int *colsol_private, MS *max_struct, cudaStream_t &stream, int min_count)
+		{
+			// normalize v
+			if (min_count <= 32) findMaxSmall_kernel<<<1, 32, 0, stream>>>(max_struct, v_private, colsol_private, std::numeric_limits<SC>::lowest(), min_count);
+			else if (min_count <= 256) findMaxMedium_kernel<<<1, 256, 0, stream>>>(max_struct, v_private, colsol_private, std::numeric_limits<SC>::lowest(), min_count);
+			else findMaxLarge_kernel<<<1, 1024, 0, stream>>>(max_struct, v_private, colsol_private, std::numeric_limits<SC>::lowest(), min_count);
+		}
+
+		template <class SC, class MS>
 		SC mergeMaximum(MS *max_struct, int devices)
 		{
 			SC max_cost = max_struct[0].max;
@@ -523,7 +532,7 @@ namespace lap
 			if (initial_gap < SC(4) * greedy_gap)
 			{
 				// sort permutation by keys
-				std::sort(perm, perm + dim2, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
+				std::sort(perm, perm + dim, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
 
 				lower_bound = SC(0);
 				upper_bound = SC(0);
@@ -1173,9 +1182,15 @@ namespace lap
 				int old_complete = 0;
 #endif
 
+#ifdef LAP_MINIMIZE_V
+				int dim_limit = ((reverse) || (epsilon < SC(0))) ? dim2 : dim;
+#else
+				int dim_limit = dim2;
+#endif
+
 				// AUGMENT SOLUTION for each free row.
 #ifndef LAP_QUIET
-				displayProgress(start_time, elapsed, 0, dim2, " rows");
+				displayProgress(start_time, elapsed, 0, dim_limit, " rows");
 #endif
 				long long count = 0ll;
 
@@ -1190,9 +1205,9 @@ namespace lap
 					int num_items = end - start;
 					cudaStream_t stream = iterator.ws.stream[t];
 
-					for (int fc = 0; fc < dim2; fc++)
+					for (int fc = 0; fc < dim_limit; fc++)
 					{
-						int f = perm[(reverse) ? (dim2 - 1 - fc) : fc];
+						int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
 						// start search and find minimum value
 						if (require_colsol_copy)
 						{
@@ -1413,7 +1428,7 @@ namespace lap
 #ifndef LAP_QUIET
 						{
 							int level;
-							if ((level = displayProgress(start_time, elapsed, fc + 1, dim2, " rows")) != 0)
+							if ((level = displayProgress(start_time, elapsed, fc + 1, dim_limit, " rows")) != 0)
 							{
 								long long hit, miss;
 								iterator.getHitMiss(hit, miss);
@@ -1451,9 +1466,9 @@ namespace lap
 						int num_items = end - start;
 						cudaStream_t stream = iterator.ws.stream[t];
 
-						for (int fc = 0; fc < dim2; fc++)
+						for (int fc = 0; fc < dim_limit; fc++)
 						{
-							int f = perm[(reverse) ? (dim2 - 1 - fc) : fc];
+							int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
 #pragma omp barrier
 							// start search and find minimum value
 							if (require_colsol_copy)
@@ -1808,7 +1823,7 @@ namespace lap
 							if (t == 0)
 							{
 								int level;
-								if ((level = displayProgress(start_time, elapsed, fc + 1, dim2, " rows")) != 0)
+								if ((level = displayProgress(start_time, elapsed, fc + 1, dim_limit, " rows")) != 0)
 								{
 									long long hit, miss;
 									iterator.getHitMiss(hit, miss);
@@ -1845,8 +1860,16 @@ namespace lap
 						int num_items = end - start;
 						cudaStream_t stream = iterator.ws.stream[0];
 
-						findMaximum(v_private[0], &(host_min_private[0]), stream, dim2);
-						subtractMaximum_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[0], &(host_min_private[0]), dim2);
+						if (dim_limit < dim2)
+						{
+							findMaximum(v_private[0], colsol_private[0], &(host_min_private[0]), stream, dim2);
+							subtractMaximumLimited_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[0], &(host_min_private[0]), dim2);
+						}
+						else
+						{
+							findMaximum(v_private[0], &(host_min_private[0]), stream, dim2);
+							subtractMaximum_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[0], &(host_min_private[0]), dim2);
+						}
 					}
 					else
 					{
@@ -1857,7 +1880,14 @@ namespace lap
 							int end = iterator.ws.part[t].second;
 							int num_items = end - start;
 							cudaStream_t stream = iterator.ws.stream[t];
-							findMaximum(v_private[t], &(host_min_private[t]), stream, num_items);
+							if (dim_limit < dim2)
+							{
+								findMaximum(v_private[t], colsol_private[t], &(host_min_private[t]), stream, num_items);
+							}
+							else
+							{
+								findMaximum(v_private[t], &(host_min_private[t]), stream, num_items);
+							}
 						}
 						for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 						SC max_v = mergeMaximum<SC>(host_min_private, devices);
@@ -1867,7 +1897,14 @@ namespace lap
 							int num_items = iterator.ws.part[t].second - iterator.ws.part[t].first;
 							cudaStream_t stream = iterator.ws.stream[t];
 
-							subtractMaximum_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], max_v, num_items);
+							if (dim_limit < dim2)
+							{
+								subtractMaximumLimited_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], max_v, num_items);
+							}
+							else
+							{
+								subtractMaximum_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(v_private[t], max_v, num_items);
+							}
 						}
 					}
 				}

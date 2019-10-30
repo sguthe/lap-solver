@@ -19,7 +19,6 @@
     <ClInclude Include="..\..\core\cuda\lap_get_final_cost.cuh" />
     <ClInclude Include="..\..\core\cuda\lap_get_minimal_cost.cuh" />
     <ClInclude Include="..\..\core\cuda\lap_get_min_max_best.cuh" />
-    <ClInclude Include="..\..\core\cuda\lap_cache.h" />
     <ClInclude Include="..\..\core\cuda\lap_caching_iterator.h" />
     <ClInclude Include="..\..\core\cuda\lap_cost.h" />
     <ClInclude Include="..\..\core\cuda\lap_cuda_helper.h" />

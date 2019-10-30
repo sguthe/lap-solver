@@ -367,6 +367,82 @@ namespace lap
 			if (threadIdx.x == 0) s->max = v_max;
 		}
 
+		template <class MS, class SC>
+		__global__ void findMaxSmall_kernel(MS *s, SC *max, int *active, SC min, int size)
+		{
+			int j = threadIdx.x;
+
+			SC v_max = min;
+
+			while (j < size)
+			{
+				if (active[j] >= 0)
+				{
+					SC c_max = max[j];
+					if (c_max > v_max) v_max = c_max;
+					j += blockDim.x;
+				}
+			}
+			maxWarp(v_max);
+			if (threadIdx.x == 0) s->max = v_max;
+		}
+
+		template <class MS, class SC>
+		__global__ void findMaxMedium_kernel(MS *s, SC *max, int *active, SC min, int size)
+		{
+			// 256 threads in 8 warps
+			__shared__ SC b_max[8];
+
+			int j = threadIdx.x;
+
+			SC v_max = min;
+
+			while (j < size)
+			{
+				if (active[j] >= 0)
+				{
+					SC c_max = max[j];
+					if (c_max > v_max) v_max = c_max;
+					j += blockDim.x;
+				}
+			}
+			maxWarp(v_max);
+			if ((threadIdx.x & 0x1f) == 0) b_max[threadIdx.x >> 5] = v_max;
+			__syncthreads();
+			if (threadIdx.x >= 8) return;
+			v_max = b_max[threadIdx.x];
+			maxWarp8(v_max);
+			if (threadIdx.x == 0) s->max = v_max;
+		}
+
+		template <class MS, class SC>
+		__global__ void findMaxLarge_kernel(MS *s, SC *max, int *active, SC min, int size)
+		{
+			// 1024 threads in 32 warps
+			__shared__ SC b_max[8];
+
+			int j = threadIdx.x;
+
+			SC v_max = min;
+
+			while (j < size)
+			{
+				if (active[j] >= 0)
+				{
+					SC c_max = max[j];
+					if (c_max > v_max) v_max = c_max;
+					j += blockDim.x;
+				}
+			}
+			maxWarp(v_max);
+			if ((threadIdx.x & 0x1f) == 0) b_max[threadIdx.x >> 5] = v_max;
+			__syncthreads();
+			if (threadIdx.x >= 32) return;
+			v_max = b_max[threadIdx.x];
+			maxWarp(v_max);
+			if (threadIdx.x == 0) s->max = v_max;
+		}
+
 		template <class SC, class MS>
 		__global__ void subtractMaximum_kernel(SC *v, MS *max_struct, int size)
 		{
@@ -385,6 +461,30 @@ namespace lap
 			if (j >= size) return;
 
 			v[j] -= max;
+		}
+
+		template <class SC, class MS>
+		__global__ void subtractMaximumLimited_kernel(SC *v, MS *max_struct, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			SC tmp = v[j] - max_struct->max;
+			if (tmp < SC(0)) tmp = SC(0);
+			v[j] = tmp;
+		}
+
+		template <class SC>
+		__global__ void subtractMaximumLimited_kernel(SC *v, SC max, int size)
+		{
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			SC tmp = v[j] - max;
+			if (tmp < SC(0)) tmp = SC(0);
+			v[j] = tmp;
 		}
 
 		template <class SC>

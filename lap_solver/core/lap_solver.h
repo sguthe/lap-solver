@@ -356,6 +356,14 @@ namespace lap
 	}
 
 	template <class SC>
+	void normalizeV(SC *v, int count, int *colsol)
+	{
+		SC max_v = std::numeric_limits<SC>::lowest();
+		for (int j = 0; j < count; j++) if (colsol[j] >= 0) max_v = std::max(max_v, v[j]);
+		for (int j = 0; j < count; j++) v[j] = std::min(SC(0), v[j] - max_v);
+	}
+
+	template <class SC>
 	void normalizeV(SC *v, int count)
 	{
 		SC max_v = v[0];
@@ -508,7 +516,7 @@ namespace lap
 		{
 			memcpy(v2, v, dim2 * sizeof(SC));
 			// sort permutation by keys
-			std::sort(perm, perm + dim2, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
+			std::sort(perm, perm + dim, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
 
 			lower_bound = SC(0);
 			upper_bound = SC(0);
@@ -862,13 +870,19 @@ namespace lap
 			int old_complete = 0;
 #endif
 
+#ifdef LAP_MINIMIZE_V
+			int dim_limit = ((reverse) || (epsilon < SC(0))) ? dim2 : dim;
+#else
+			int dim_limit = dim2;
+#endif
+
 			// AUGMENT SOLUTION for each free row.
 #ifndef LAP_QUIET
-			displayProgress(start_time, elapsed, 0, dim2, " rows");
+			displayProgress(start_time, elapsed, 0, dim_limit, " rows");
 #endif
-			for (int fc = 0; fc < dim2; fc++)
+			for (int fc = 0; fc < dim_limit; fc++)
 			{
-				int f = perm[(reverse) ? (dim2 - 1 - fc) : fc];
+				int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
 #ifndef LAP_QUIET
 				if (f < dim) total_rows++; else total_virtual++;
 #else
@@ -1071,7 +1085,7 @@ namespace lap
 				resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 #ifndef LAP_QUIET
 				int level;
-				if ((level = displayProgress(start_time, elapsed, fc + 1, dim2, " rows")) != 0)
+				if ((level = displayProgress(start_time, elapsed, fc + 1, dim_limit, " rows")) != 0)
 				{
 					long long hit, miss;
 					iterator.getHitMiss(hit, miss);
@@ -1090,7 +1104,8 @@ namespace lap
 #ifdef LAP_MINIMIZE_V
 			if (epsilon > SC(0))
 			{
-				normalizeV(v, dim2);
+				if (dim_limit < dim2) normalizeV(v, dim2, colsol);
+				else normalizeV(v, dim2);
 			}
 #endif
 
