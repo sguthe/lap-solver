@@ -394,7 +394,7 @@ namespace lap
 												jmin_local = j;
 												min_local = h;
 											}
-											else if (h == min_local)
+											else if ((h == min_local) && (h < std::numeric_limits<SC>::max()))
 											{
 												// same, do only update if old was used and new is free
 												if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;

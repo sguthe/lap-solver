@@ -337,12 +337,12 @@ void solveAdaptiveOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol,
 {
 	if (N1 <= entries)
 	{
-		std::cout << "using table with " << N1 << " rows." << std::endl;
+		std::cout << "using multithreaded table with " << N1 << " rows." << std::endl;
 		solveTableOMP<SC, TC>(start_time, N1, N2, get_cost, rowsol, epsilon);
 	}
 	else
 	{
-		std::cout << "using caching with " << entries << "/" << N1 << " entries." << std::endl;
+		std::cout << "using multithreaded caching with " << entries << "/" << N1 << " entries." << std::endl;
 		solveCachingOMP<SC, TC>(start_time, N1, N2, get_cost, rowsol, entries, epsilon);
 	}
 }
@@ -393,12 +393,12 @@ void solveSparseAdaptiveOMP(TP &start_time, int N1, int N2, CF &get_cost, int *r
 	};
 	if (N1 * N1 <= entries * N2)
 	{
-		std::cout << "using sparse table with " << N1 << " rows." << std::endl;
+		std::cout << "using sparse multithreaded table with " << N1 << " rows." << std::endl;
 		solveSparseTableOMP<SC, TC>(start_time, N1, N2, get_row_length, get_sparse_cost, rowsol, epsilon);
 	}
 	else
 	{
-		std::cout << "using sparse caching with " << entries << "/" << N1 << " entries." << std::endl;
+		std::cout << "using sparse multithreaded caching with " << entries << "/" << N1 << " entries." << std::endl;
 		solveSparseCachingOMP<SC, TC>(start_time, N1, N2, get_row_length, get_sparse_cost, rowsol, entries, epsilon);
 	}
 	delete[] active;
