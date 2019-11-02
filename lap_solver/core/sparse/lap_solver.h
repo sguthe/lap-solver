@@ -60,10 +60,17 @@ namespace lap
 				auto cost = [&tt](int j) -> SC { return (SC)std::get<2>(tt)[j]; };
 				getMinSecondBest(min_cost_l, second_cost_l, cost, index, std::get<0>(tt), dim2);
 
-				mod_v[i] = second_cost_l - min_cost_l;
-				// need to use the same v values in total
-				lower_bound = std::min(lower_bound, second_cost_l - min_cost_l);
-				upper_bound = std::max(upper_bound, second_cost_l - min_cost_l);
+				if (isnan(second_cost_l))
+				{
+					mod_v[i] = SC(-1);
+				}
+				else
+				{
+					mod_v[i] = second_cost_l - min_cost_l;
+					// need to use the same v values in total
+					lower_bound = std::min(lower_bound, second_cost_l - min_cost_l);
+					upper_bound = std::max(upper_bound, second_cost_l - min_cost_l);
+				}
 			}
 
 			upper_bound = (SC)(0.25 * (double)upper_bound * (double)dim / (double)dim2);

@@ -59,10 +59,17 @@ namespace lap
 									second_cost_l = std::min(second_cost_l, merge_cost[(ii << 3)]);
 								}
 							}
-							mod_v[i] = second_cost_l - min_cost_l;
-							// need to use the same v values in total
-							lower_bound = std::min(lower_bound, second_cost_l - min_cost_l);
-							upper_bound = std::max(upper_bound, second_cost_l - min_cost_l);
+							if (isnan(second_cost_l))
+							{
+								mod_v[i] = SC(-1);
+							}
+							else
+							{
+								mod_v[i] = second_cost_l - min_cost_l;
+								// need to use the same v values in total
+								lower_bound = std::min(lower_bound, second_cost_l - min_cost_l);
+								upper_bound = std::max(upper_bound, second_cost_l - min_cost_l);
+							}
 						}
 					}
 				}
