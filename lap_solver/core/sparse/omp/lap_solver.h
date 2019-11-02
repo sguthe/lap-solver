@@ -264,7 +264,7 @@ namespace lap
 										jmin_local = j;
 										min_local = h;
 									}
-									else if (h == min_local)
+									else if ((h == min_local) && (h < std::numeric_limits<SC>::max()))
 									{
 										// same, do only update if old was used and new is free
 										if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
@@ -288,7 +288,7 @@ namespace lap
 											jmin_local = j;
 											min_local = h;
 										}
-										else if (h == min_local)
+										else if ((h == min_local) && (h < std::numeric_limits<SC>::max()))
 										{
 											// same, do only update if old was used and new is free
 											if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
@@ -321,7 +321,7 @@ namespace lap
 										min = min_private[tt << 3];
 										jmin = jmin_private[tt << 3];
 									}
-									else if (min_private[tt << 3] == min)
+									else if ((min_private[tt << 3] == min) && (min_private[tt << 3] < std::numeric_limits<SC>::max()))
 									{
 										if ((colsol[jmin] >= 0) && (colsol[jmin_private[tt << 3]] < 0)) jmin = jmin_private[tt << 3];
 									}
@@ -426,7 +426,7 @@ namespace lap
 													jmin_local = j;
 													min_local = h;
 												}
-												else if (h == min_local)
+												else if ((h == min_local) && (h < std::numeric_limits<SC>::max()))
 												{
 													// same, do only update if old was used and new is free
 													if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
@@ -460,7 +460,7 @@ namespace lap
 											min_n = min_private[tt << 3];
 											jmin = jmin_private[tt << 3];
 										}
-										else if (min_private[tt << 3] == min_n)
+										else if ((min_private[tt << 3] == min) && (min_private[tt << 3] < std::numeric_limits<SC>::max()))
 										{
 											if ((colsol[jmin] >= 0) && (colsol[jmin_private[tt << 3]] < 0)) jmin = jmin_private[tt << 3];
 										}

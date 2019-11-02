@@ -260,7 +260,7 @@ namespace lap
 								jmin = j;
 								min = h;
 							}
-							else if (h == min)
+							else if ((h == min) && (h < std::numeric_limits<SC>::max()))
 							{
 								// same, do only update if old was used and new is free
 								if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
@@ -282,7 +282,7 @@ namespace lap
 									jmin = j;
 									min = h;
 								}
-								else if (h == min)
+								else if ((h == min) && (h < std::numeric_limits<SC>::max()))
 								{
 									// same, do only update if old was used and new is free
 									if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
@@ -387,7 +387,7 @@ namespace lap
 											jmin_n = j;
 											min_n = h;
 										}
-										else if (h == min_n)
+										else if ((h == min_n) && (h < std::numeric_limits<SC>::max()))
 										{
 											// same, do only update if old was used and new is free
 											if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
