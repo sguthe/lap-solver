@@ -59,7 +59,7 @@ namespace lap
 									second_cost_l = std::min(second_cost_l, merge_cost[(ii << 3)]);
 								}
 							}
-							if (isnan(second_cost_l))
+							if (second_cost_l == std::numeric_limits<SC>::max())
 							{
 								mod_v[i] = SC(-1);
 							}

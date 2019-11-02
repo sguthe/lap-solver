@@ -60,7 +60,7 @@ namespace lap
 				auto cost = [&tt](int j) -> SC { return (SC)std::get<2>(tt)[j]; };
 				getMinSecondBest(min_cost_l, second_cost_l, cost, index, std::get<0>(tt), dim2);
 
-				if (isnan(second_cost_l))
+				if (second_cost_l == std::numeric_limits<SC>::max())
 				{
 					mod_v[i] = SC(-1);
 				}
