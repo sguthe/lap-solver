@@ -249,12 +249,12 @@ namespace lap
 							{
 								memset(pred + start, -1, (end - start) * sizeof(int));
 								std::fill(d + start, d + end, std::numeric_limits<SC>::max());
+								std::fill(colactive + start, colactive + end, 1);
 
 								auto tt = iterator.getRow(t, f);
 								for (int jj = 0; jj < std::get<0>(tt); jj++)
 								{
 									int j = std::get<1>(tt)[jj];
-									colactive[j] = 1;
 									pred[j] = f;
 									SC h;
 									d[j] = h = std::get<2>(tt)[jj] - v[j];

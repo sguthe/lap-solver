@@ -247,11 +247,11 @@ namespace lap
 					{
 						memset(pred, -1, dim2 * sizeof(int));
 						std::fill(d, d + dim2, std::numeric_limits<SC>::max());
+						std::fill(colactive, colactive + dim2, 1);
 						auto tt = iterator.getRow(f);
 						for (int jj = 0; jj < std::get<0>(tt); jj++)
 						{
 							int j = std::get<1>(tt)[jj];
-							colactive[j] = 1;
 							pred[j] = f;
 							SC h = d[j] = std::get<2>(tt)[jj] - v[j];
 							if (h < min)
