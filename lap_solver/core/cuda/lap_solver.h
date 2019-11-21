@@ -1183,7 +1183,8 @@ namespace lap
 #endif
 
 #ifdef LAP_MINIMIZE_V
-				int dim_limit = ((reverse) || (epsilon < SC(0))) ? dim2 : dim;
+//				int dim_limit = ((reverse) || (epsilon < SC(0))) ? dim2 : dim;
+				int dim_limit = dim2;
 #else
 				int dim_limit = dim2;
 #endif

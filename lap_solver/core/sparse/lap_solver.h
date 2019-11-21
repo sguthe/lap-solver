@@ -73,8 +73,8 @@ namespace lap
 				}
 			}
 
-			upper_bound = (SC)(0.25 * (double)upper_bound * (double)dim / (double)dim2);
-			lower_bound = (SC)(0.25 * (double)lower_bound * (double)dim / (double)dim2);
+			upper_bound = (SC)((double)upper_bound * (double)dim / (double)dim2);
+			lower_bound = (SC)(8.0 * (double)lower_bound * (double)dim / (double)dim2);
 
 			// sort permutation by keys
 			std::sort(perm, perm + dim, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
@@ -221,7 +221,8 @@ namespace lap
 #endif
 
 #ifdef LAP_MINIMIZE_V
-				int dim_limit = ((reverse) || (epsilon < SC(0))) ? dim2 : dim;
+//				int dim_limit = ((reverse) || (epsilon < SC(0))) ? dim2 : dim;
+				int dim_limit = dim2;
 #else
 				int dim_limit = dim2;
 #endif
@@ -468,8 +469,13 @@ namespace lap
 #ifdef LAP_MINIMIZE_V
 				if (epsilon > SC(0))
 				{
+#if 0
 					if (dim_limit < dim2) lap::normalizeV(v, dim2, colsol);
 					else lap::normalizeV(v, dim2);
+#else
+					if (dim_limit < dim2) for (int i = 0; i < dim2; i++) if (colsol[i] < 0) v[i] -= SC(2) * epsilon;
+					lap::normalizeV(v, dim2);
+#endif
 				}
 #endif
 

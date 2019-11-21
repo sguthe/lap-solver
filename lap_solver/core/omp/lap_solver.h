@@ -538,7 +538,8 @@ namespace lap
 #endif
 
 #ifdef LAP_MINIMIZE_V
-				int dim_limit = ((reverse) || (epsilon < SC(0))) ? dim2 : dim;
+				//int dim_limit = ((reverse) || (epsilon < SC(0))) ? dim2 : dim;
+				int dim_limit = dim2;
 #else
 				int dim_limit = dim2;
 #endif
@@ -841,8 +842,13 @@ namespace lap
 #ifdef LAP_MINIMIZE_V
 				if (epsilon > SC(0))
 				{
+#if 0
 					if (dim_limit < dim2) normalizeV(v, dim2, colsol);
 					else lap::normalizeV(v, dim2);
+#else
+					if (dim_limit < dim2) for (int i = 0; i < dim2; i++) if (colsol[i] < 0) v[i] -= SC(2) * epsilon;
+					lap::normalizeV(v, dim2);
+#endif
 				}
 #endif
 
