@@ -654,10 +654,9 @@ namespace lap
         __inline__ __attribute__((always_inline))
 #endif
 
-	__forceinline void dijkstraCheck(int &endofpath, bool &unassignedfound, int jmin, int *colsol, char *colactive, int *colcomplete, int &completecount)
+	__forceinline void dijkstraCheck(int& endofpath, bool& unassignedfound, int jmin, int* colsol, char* colactive)
 	{
 		colactive[jmin] = 0;
-		colcomplete[completecount++] = jmin;
 		if (colsol[jmin] < 0)
 		{
 			endofpath = jmin;
@@ -666,26 +665,30 @@ namespace lap
 	}
 
 	template <class SC>
-	__forceinline void updateColumnPrices(int *colcomplete, int completecount, SC min, SC *v, SC *d)
+	__forceinline void updateColumnPrices(char* colactive, int start, int end, SC min, SC* v, SC* d)
 	{
-		for (int i = 0; i < completecount; i++)
+		for (int j1 = start; j1 < end; j1++)
 		{
-			int j1 = colcomplete[i];
-			SC dlt = min - d[j1];
-			v[j1] -= dlt;
+			if (colactive[j1] == 0)
+			{
+				SC dlt = min - d[j1];
+				v[j1] -= dlt;
+			}
 		}
 	}
 
 	template <class SC>
-	__forceinline void updateColumnPrices(int *colcomplete, int completecount, SC min, SC *v, SC *d, SC eps, SC &total, SC &total_eps)
+	__forceinline void updateColumnPrices(char* colactive, int start, int end, SC min, SC* v, SC* d, SC eps, SC& total, SC& total_eps)
 	{
-		for (int i = 0; i < completecount; i++)
+		for (int j1 = start; j1 < end; j1++)
 		{
-			int j1 = colcomplete[i];
-			SC dlt = min - d[j1];
-			total += dlt;
-			total_eps += eps;
-			v[j1] -= dlt + eps;
+			if (colactive[j1] == 0)
+			{
+				SC dlt = min - d[j1];
+				total += dlt;
+				total_eps += eps;
+				v[j1] -= dlt + eps;
+			}
 		}
 	}
 
@@ -775,8 +778,6 @@ namespace lap
 		int  *pred;
 		int  endofpath;
 		char *colactive;
-		int *colcomplete;
-		int completecount;
 		SC *d;
 		int *colsol;
 		SC epsilon_upper;
@@ -790,7 +791,6 @@ namespace lap
 #endif
 
 		lapAlloc(colactive, dim2, __FILE__, __LINE__);
-		lapAlloc(colcomplete, dim2, __FILE__, __LINE__);
 		lapAlloc(d, dim2, __FILE__, __LINE__);
 		lapAlloc(pred, dim2, __FILE__, __LINE__);
 		lapAlloc(colsol, dim2, __FILE__, __LINE__);
@@ -896,7 +896,6 @@ namespace lap
 #endif
 
 				unassignedfound = false;
-				completecount = 0;
 
 				// Dijkstra search
 				min = std::numeric_limits<SC>::max();
@@ -946,7 +945,7 @@ namespace lap
 					}
 				}
 
-				dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
+				dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive);
 				// marked skipped columns that were cheaper
 				if (f >= dim)
 				{
@@ -955,7 +954,6 @@ namespace lap
 						// ignore any columns assigned to virtual rows
 						if ((colsol[j] >= dim) && (d[j] <= min))
 						{
-							colcomplete[completecount++] = j;
 							colactive[j] = 0;
 						}
 					}
@@ -1044,7 +1042,7 @@ namespace lap
 
 					min = std::max(min, min_n);
 					jmin = jmin_n;
-					dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
+					dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive);
 					// marked skipped columns that were cheaper
 					if (i >= dim)
 					{
@@ -1053,7 +1051,6 @@ namespace lap
 							// ignore any columns assigned to virtual rows
 							if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min))
 							{
-								colcomplete[completecount++] = j;
 								colactive[j] = 0;
 							}
 						}
@@ -1063,11 +1060,11 @@ namespace lap
 				// update column prices. can increase or decrease
 				if (epsilon > SC(0))
 				{
-					updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
+					updateColumnPrices(colactive, 0, dim2, min, v, d, epsilon, total_d, total_eps);
 				}
 				else
 				{
-					updateColumnPrices(colcomplete, completecount, min, v, d);
+					updateColumnPrices(colactive, 0, dim2, min, v, d);
 				}
 #ifdef LAP_ROWS_SCANNED
 				{
@@ -1220,7 +1217,6 @@ namespace lap
 		// free reserved memory.
 		lapFree(pred);
 		lapFree(colactive);
-		lapFree(colcomplete);
 		lapFree(d);
 		lapFree(v);
 		lapFree(colsol);

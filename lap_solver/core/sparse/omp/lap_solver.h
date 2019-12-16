@@ -74,8 +74,8 @@ namespace lap
 					}
 				}
 
-				upper_bound = (SC)((double)upper_bound * (double)dim / (double)dim2);
-				lower_bound = (SC)(16.0 * (double)lower_bound * (double)dim / (double)dim2);
+				upper_bound = (SC)(0.125 * (double)upper_bound * (double)dim / (double)dim2);
+				lower_bound = (SC)(8.0 * (double)upper_bound / (double)dim);
 
 				// sort permutation by keys
 				std::sort(perm, perm + dim, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
@@ -126,8 +126,6 @@ namespace lap
 				int  *pred;
 				int  endofpath;
 				char *colactive;
-				int *colcomplete;
-				int completecount;
 				SC *d;
 				int *colsol;
 				SC epsilon_upper;
@@ -141,7 +139,6 @@ namespace lap
 #endif
 
 				lapAlloc(colactive, dim2, __FILE__, __LINE__);
-				lapAlloc(colcomplete, dim2, __FILE__, __LINE__);
 				lapAlloc(d, dim2, __FILE__, __LINE__);
 				lapAlloc(pred, dim2, __FILE__, __LINE__);
 				lapAlloc(colsol, dim2, __FILE__, __LINE__);
@@ -335,19 +332,17 @@ namespace lap
 									}
 								}
 								unassignedfound = false;
-								completecount = 0;
-								dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
-								// marked skipped columns that were cheaper
-								if (f >= dim)
+								dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive);
+							}
+							// marked skipped columns that were cheaper
+							if (f >= dim)
+							{
+								for (int j = start; j < end; j++)
 								{
-									for (int j = 0; j < dim2; j++)
+									// ignore any columns assigned to virtual rows
+									if ((colsol[j] >= dim) && (d[j] <= min))
 									{
-										// ignore any columns assigned to virtual rows
-										if ((colsol[j] >= dim) && (d[j] <= min))
-										{
-											colcomplete[completecount++] = j;
-											colactive[j] = 0;
-										}
+										colactive[j] = 0;
 									}
 								}
 							}
@@ -474,33 +469,40 @@ namespace lap
 										}
 									}
 									min = std::max(min, min_n);
-									dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
-									// marked skipped columns that were cheaper
-									if (i >= dim)
+									dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive);
+								}
+								// marked skipped columns that were cheaper
+								if (i >= dim)
+								{
+									for (int j = start; j < end; j++)
 									{
-										for (int j = 0; j < dim2; j++)
+										// ignore any columns assigned to virtual rows
+										if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min))
 										{
-											// ignore any columns assigned to virtual rows
-											if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min))
-											{
-												colcomplete[completecount++] = j;
-												colactive[j] = 0;
-											}
+											colactive[j] = 0;
 										}
 									}
 								}
 #pragma omp barrier
 							}
+							// update column prices. can increase or decrease
+							if (epsilon > SC(0))
+							{
+								min_private[t << 3] = SC(0);
+								min_private[(t << 3) + 1] = SC(0);
+								updateColumnPrices(colactive, start, end, min, v, d, epsilon, min_private[t << 3], min_private[(t << 3) + 1]);
+							}
+							else
+							{
+								updateColumnPrices(colactive, start, end, min, v, d);
+							}
+#pragma omp barrier
 							if (t == 0)
 							{
-								// update column prices. can increase or decrease
-								if (epsilon > SC(0))
+								if (epsilon > SC(0)) for (int tt = 0; tt < omp_get_num_threads(); tt++)
 								{
-									updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
-								}
-								else
-								{
-									updateColumnPrices(colcomplete, completecount, min, v, d);
+									total_d += min_private[tt << 3];
+									total_eps += min_private[(tt << 3) + 1];
 								}
 #ifdef LAP_ROWS_SCANNED
 								{
@@ -627,7 +629,6 @@ namespace lap
 				// free reserved memory.
 				lapFree(pred);
 				lapFree(colactive);
-				lapFree(colcomplete);
 				lapFree(d);
 				lapFree(v);
 				lapFree(colsol);

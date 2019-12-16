@@ -73,8 +73,8 @@ namespace lap
 				}
 			}
 
-			upper_bound = (SC)((double)upper_bound * (double)dim / (double)dim2);
-			lower_bound = (SC)(8.0 * (double)lower_bound * (double)dim / (double)dim2);
+			upper_bound = (SC)(0.125 * (double)upper_bound * (double)dim / (double)dim2);
+			lower_bound = (SC)(8.0 * (double)upper_bound / (double)dim);
 
 			// sort permutation by keys
 			std::sort(perm, perm + dim, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
@@ -124,8 +124,6 @@ namespace lap
 			int  *pred;
 			int  endofpath;
 			char *colactive;
-			int *colcomplete;
-			int completecount;
 			SC *d;
 			int *colsol;
 			SC epsilon_upper;
@@ -139,7 +137,6 @@ namespace lap
 #endif
 
 			lapAlloc(colactive, dim2, __FILE__, __LINE__);
-			lapAlloc(colcomplete, dim2, __FILE__, __LINE__);
 			lapAlloc(d, dim2, __FILE__, __LINE__);
 			lapAlloc(pred, dim2, __FILE__, __LINE__);
 			lapAlloc(colsol, dim2, __FILE__, __LINE__);
@@ -246,7 +243,6 @@ namespace lap
 #endif
 
 					unassignedfound = false;
-					completecount = 0;
 
 					// Dijkstra search
 					min = std::numeric_limits<SC>::max();
@@ -299,7 +295,7 @@ namespace lap
 						}
 					}
 
-					dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
+					dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive);
 					// marked skipped columns that were cheaper
 					if (f >= dim)
 					{
@@ -308,7 +304,6 @@ namespace lap
 							// ignore any columns assigned to virtual rows
 							if ((colsol[j] >= dim) && (d[j] <= min))
 							{
-								colcomplete[completecount++] = j;
 								colactive[j] = 0;
 							}
 						}
@@ -407,7 +402,7 @@ namespace lap
 
 						min = std::max(min, min_n);
 						jmin = jmin_n;
-						dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, colcomplete, completecount);
+						dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive);
 
 						// marked skipped columns that were cheaper
 						if (i >= dim)
@@ -417,7 +412,6 @@ namespace lap
 								// ignore any columns assigned to virtual rows
 								if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min))
 								{
-									colcomplete[completecount++] = j;
 									colactive[j] = 0;
 								}
 							}
@@ -427,11 +421,11 @@ namespace lap
 					// update column prices. can increase or decrease
 					if (epsilon > SC(0))
 					{
-						updateColumnPrices(colcomplete, completecount, min, v, d, epsilon, total_d, total_eps);
+						updateColumnPrices(colactive, 0, dim2, min, v, d, epsilon, total_d, total_eps);
 					}
 					else
 					{
-						updateColumnPrices(colcomplete, completecount, min, v, d);
+						updateColumnPrices(colactive, 0, dim2, min, v, d);
 					}
 #ifdef LAP_ROWS_SCANNED
 					{
@@ -584,7 +578,6 @@ namespace lap
 			// free reserved memory.
 			lapFree(pred);
 			lapFree(colactive);
-			lapFree(colcomplete);
 			lapFree(d);
 			lapFree(v);
 			lapFree(colsol);
