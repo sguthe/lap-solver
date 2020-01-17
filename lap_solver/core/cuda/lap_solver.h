@@ -79,7 +79,6 @@ namespace lap
 		template <class SC, class MS>
 		void findMaximum(SC *v_private, MS *max_struct, cudaStream_t &stream, int min_count)
 		{
-			// normalize v
 			if (min_count <= 32) findMaxSmall_kernel<<<1, 32, 0, stream>>>(max_struct, v_private, std::numeric_limits<SC>::lowest(), min_count);
 			else if (min_count <= 256) findMaxMedium_kernel<<<1, 256, 0, stream>>>(max_struct, v_private, std::numeric_limits<SC>::lowest(), min_count);
 			else findMaxLarge_kernel<<<1, 1024, 0, stream>>>(max_struct, v_private, std::numeric_limits<SC>::lowest(), min_count);
@@ -88,7 +87,6 @@ namespace lap
 		template <class SC, class MS>
 		void findMaximum(SC *v_private, int *colsol_private, MS *max_struct, cudaStream_t &stream, int min_count)
 		{
-			// normalize v
 			if (min_count <= 32) findMaxSmall_kernel<<<1, 32, 0, stream>>>(max_struct, v_private, colsol_private, std::numeric_limits<SC>::lowest(), min_count);
 			else if (min_count <= 256) findMaxMedium_kernel<<<1, 256, 0, stream>>>(max_struct, v_private, colsol_private, std::numeric_limits<SC>::lowest(), min_count);
 			else findMaxLarge_kernel<<<1, 1024, 0, stream>>>(max_struct, v_private, colsol_private, std::numeric_limits<SC>::lowest(), min_count);
@@ -237,6 +235,7 @@ namespace lap
 					else updateEstimatedV_kernel<<<gs, bs, 0, stream>>>(v_private[0], mod_v_private[0], picked_private[0], min_cost_private[0], jmin_private[0], dim2);
 				}
 
+				// no perf issue here
 				checkCudaErrors(cudaStreamSynchronize(stream));
 				for (int i = 0; i < dim2; i++)
 				{
@@ -314,6 +313,7 @@ namespace lap
 							else updateEstimatedV_kernel<<<gs, bs, 0, stream>>>(v_private[t], mod_v_private[t], gpu_struct_private[t], semaphore_private[t], picked_private[t], &(data_valid[i * devices]), &(host_struct_private[i * devices]), start, num_items, dim2, std::numeric_limits<SC>::max(), devices);
 						}
 					}
+					// no perf issue here
 					checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 					if (t == 0)
@@ -348,6 +348,7 @@ namespace lap
 					}
 #pragma omp barrier
 					findMaximum(v_private[t], &(host_struct_private[t]), stream, num_items);
+					// no perf issue here
 					checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 					max_v = mergeMaximum<SC>(host_struct_private, devices);
@@ -402,6 +403,7 @@ namespace lap
 					else if (num_items <= 65536) getMinSecondBestSingleMedium_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], max_cost_private[0], picked_cost_private[0], jmin_private[0], tt, v_private[0], picked_private[0], std::numeric_limits<SC>::max(), i, num_items, dim2);
 					else getMinSecondBestSingleLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], max_cost_private[0], picked_cost_private[0], jmin_private[0], tt, v_private[0], picked_private[0], std::numeric_limits<SC>::max(), i, num_items, dim2);
 				}
+				// no perf issue here
 				checkCudaErrors(cudaStreamSynchronize(stream));
 
 				for (int i = 0; i < dim2; i++)
@@ -477,6 +479,7 @@ namespace lap
 							else getMinSecondBestLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[i * devices + t]), gpu_struct_private[t], semaphore_private[t], min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt, v_private[t], picked_private[t], &(host_struct_private[(i + 1) * devices]), std::numeric_limits<SC>::max(), i, start, num_items, dim2, devices);
 						}
 					}
+					// no perf issue here
 					checkCudaErrors(cudaStreamSynchronize(stream));
 				}
 				for (int i = 0; i < dim2; i++)
@@ -510,7 +513,7 @@ namespace lap
 						}
 					}
 
-					if (i < dim) perm[i] = i;
+					perm[i] = i;
 					mod_v[i] = second_cost - min_cost;
 					// need to use the same v values in total
 					lower_bound += min_cost + v_jmin;
@@ -564,6 +567,7 @@ namespace lap
 						}
 					}
 
+					// no perf issue here
 					checkCudaErrors(cudaStreamSynchronize(stream));
 
 					for (int i = 0; i < dim2; i++)
@@ -644,6 +648,7 @@ namespace lap
 								}
 							}
 						}
+						// no perf issue here
 						checkCudaErrors(cudaStreamSynchronize(stream));
 					}
 
@@ -745,9 +750,11 @@ namespace lap
 							}
 #pragma omp barrier
 						}
+						// no perf issue here
 						checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 						findMaximum(v_private[t], &(host_struct_private[t]), stream, num_items);
+						// no perf issue here
 						checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
 						SC max_v = mergeMaximum<SC>(host_struct_private, devices);
@@ -783,6 +790,7 @@ namespace lap
 						}
 					}
 
+					// no perf issue here
 					checkCudaErrors(cudaStreamSynchronize(stream));
 
 					for (int i = 0; i < dim2; i++)
@@ -825,6 +833,7 @@ namespace lap
 								else getFinalCostLarge_kernel<<<(num_items + 1023) >> 10, 1024, 0, stream>>>(&(host_struct_private[t + i * devices]), semaphore_private[t], min_cost_private[t], picked_cost_private[t], max_cost_private[t], v_private[t], std::numeric_limits<SC>::max(), picked[i] - iterator.ws.part[t].first, num_items);
 							}
 						}
+						// no perf issue here
 						checkCudaErrors(cudaStreamSynchronize(stream));
 					}
 
@@ -1000,13 +1009,6 @@ namespace lap
 			std::vector<SC> eps_list;
 #endif
 
-#ifdef LAP_CUDA_COMPARE_CPU
-			SC *d_tmp;
-			SC *d_tmp;
-			unsigned char *colactive_tmp;
-			lapAlloc(d_tmp, dim2, __FILE__, __LINE__);
-			lapAlloc(colactive_tmp, dim2, __FILE__, __LINE__);
-#endif
 
 			// used for copying
 			min_struct<SC> *host_min_private;
@@ -1208,6 +1210,8 @@ namespace lap
 
 					for (int fc = 0; fc < dim_limit; fc++)
 					{
+						// mark as incomplete
+						host_min_private[t].min = std::numeric_limits<SC>::infinity();
 						int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
 						// start search and find minimum value
 						if (require_colsol_copy)
@@ -1275,32 +1279,6 @@ namespace lap
 							unassignedfound = false;
 						}
 
-#ifdef LAP_CUDA_COMPARE_CPU
-						{
-							checkCudaErrors(cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream));
-							checkCudaErrors(cudaMemcpyAsync(colactive_tmp, colactive_private[t], dim2 * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
-							checkCudaErrors(cudaStreamSynchronize(stream));
-							SC min_tmp = std::numeric_limits<SC>::max();
-							int jmin_tmp = dim2;
-							int colsol_old_tmp = 0;
-							for (int j = 0; j < dim2; j++)
-							{
-								if (colactive_tmp[j] != 0)
-								{
-									if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol[j] < 0) && (colsol_old_tmp >= 0)))
-									{
-										min_tmp = d_tmp[j];
-										jmin_tmp = j;
-										colsol_old_tmp = colsol[j];
-									}
-								}
-							}
-							if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
-							{
-								std::cout << "initializeSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
-							}
-						}
-#endif
 
 						markedSkippedColumns_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], f, dim, num_items);
 
@@ -1356,32 +1334,6 @@ namespace lap
 								unassignedfound = false;
 							}
 
-#ifdef LAP_CUDA_COMPARE_CPU
-							{
-								checkCudaErrors(cudaMemcpyAsync(d_tmp, d_private[t], dim2 * sizeof(SC), cudaMemcpyDeviceToHost, stream));
-								checkCudaErrors(cudaMemcpyAsync(colactive_tmp, colactive_private[t], dim2 * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
-								checkCudaErrors(cudaStreamSynchronize(stream));
-								SC min_tmp = std::numeric_limits<SC>::max();
-								int jmin_tmp = dim2;
-								int colsol_old_tmp = 0;
-								for (int j = 0; j < dim2; j++)
-								{
-									if (colactive_tmp[j] != 0)
-									{
-										if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol[j] < 0) && (colsol_old_tmp >= 0)))
-										{
-											min_tmp = d_tmp[j];
-											jmin_tmp = j;
-											colsol_old_tmp = colsol[j];
-										}
-									}
-								}
-								if ((min_tmp != min_n) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
-								{
-									std::cout << "continueSearch: " << min_n << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
-								}
-							}
-#endif
 							markedSkippedColumnsUpdate_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], i, dim, num_items);
 						}
 
@@ -1592,36 +1544,6 @@ namespace lap
 #pragma omp barrier
 							markedSkippedColumns_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], f, dim, num_items);
 
-#ifdef LAP_CUDA_COMPARE_CPU
-							{
-								checkCudaErrors(cudaMemcpyAsync(&(d_tmp[start]), d_private[t], num_items * sizeof(SC), cudaMemcpyDeviceToHost, stream));
-								checkCudaErrors(cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], num_items * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
-								checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
-#pragma omp barrier
-								if (t == 0)
-								{
-									SC min_tmp = std::numeric_limits<SC>::max();
-									int jmin_tmp = dim2;
-									int colsol_old_tmp = 0;
-									for (int j = 0; j < dim2; j++)
-									{
-										if (colactive_tmp[j] != 0)
-										{
-											if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol[j] < 0) && (colsol_old_tmp >= 0)))
-											{
-												min_tmp = d_tmp[j];
-												jmin_tmp = j;
-												colsol_old_tmp = colsol[j];
-											}
-										}
-									}
-									if ((min_tmp != min) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
-									{
-										std::cout << "initializeSearch: " << min << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
-									}
-								}
-							}
-#endif
 							bool fast = unassignedfound;
 							while (!unassignedfound)
 							{
@@ -1729,36 +1651,6 @@ namespace lap
 								// mark last column scanned
 								markedSkippedColumnsUpdate_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], i, dim, num_items);
 
-#ifdef LAP_CUDA_COMPARE_CPU
-								{
-									checkCudaErrors(cudaMemcpyAsync(&(d_tmp[start]), d_private[t], num_items * sizeof(SC), cudaMemcpyDeviceToHost, stream));
-									checkCudaErrors(cudaMemcpyAsync(&(colactive_tmp[start]), colactive_private[t], num_items * sizeof(unsigned char), cudaMemcpyDeviceToHost, stream));
-									checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
-#pragma omp barrier
-									if (t == 0)
-									{
-										SC min_tmp = std::numeric_limits<SC>::max();
-										int jmin_tmp = dim2;
-										int colsol_old_tmp = 0;
-										for (int j = 0; j < dim2; j++)
-										{
-											if (colactive_tmp[j] != 0)
-											{
-												if ((d_tmp[j] < min_tmp) || ((d_tmp[j] == min_tmp) && (colsol[j] < 0) && (colsol_old_tmp >= 0)))
-												{
-													min_tmp = d_tmp[j];
-													jmin_tmp = j;
-													colsol_old_tmp = colsol[j];
-												}
-											}
-										}
-										if ((min_tmp != min_n) || (jmin_tmp != jmin) || (colsol_old_tmp != colsol_old))
-										{
-											std::cout << "continueSearch: " << min_n << " " << jmin << " " << colsol_old << " vs. " << min_tmp << " " << jmin_tmp << " " << colsol_old_tmp << std::endl;
-										}
-									}
-								}
-#endif
 							}
 
 							// update column prices. can increase or decrease
@@ -2026,10 +1918,6 @@ namespace lap
 			lapFree(gpu_min_private);
 			lapFreePinned(host_start);
 
-#ifdef LAP_CUDA_COMPARE_CPU
-			lapFree(d_tmp);
-			lapFree(colactive_tmp);
-#endif
 			// set device back to first one
 			checkCudaErrors(cudaSetDevice(iterator.ws.device[0]));
 		}
