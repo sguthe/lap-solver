@@ -37,8 +37,8 @@ namespace lap
 			}
 		}
 
-		template <class SC>
-		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, SC eps, int size)
+		template <class SC, class TC>
+		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, TC eps, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -66,8 +66,8 @@ namespace lap
 			}
 		}
 
-		template <class SC>
-		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, SC eps, int *dst, int *src, int size)
+		template <class SC, class TC>
+		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, TC eps, int *dst, int *src, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -96,8 +96,8 @@ namespace lap
 			}
 		}
 
-		template <class SC>
-		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, SC eps, int size, int *colsol, int csol)
+		template <class SC, class TC>
+		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, TC eps, int size, int *colsol, int csol)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;

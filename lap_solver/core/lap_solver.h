@@ -705,10 +705,10 @@ namespace lap
 		} while (i != f);
 	}
 
-	template <class SC>
-	void getNextEpsilon(SC &epsilon, SC &epsilon_lower, SC total_d, SC total_eps, bool first, bool second, int dim2)
+	template <class SC, class TC>
+	void getNextEpsilon(TC &epsilon, TC &epsilon_lower, SC total_d, SC total_eps, bool first, bool second, int dim2)
 	{
-		if (epsilon > SC(0))
+		if (epsilon > TC(0))
 		{
 			if (!first)
 			{
@@ -717,18 +717,18 @@ namespace lap
 #endif
 				if ((!second) && (total_d > total_eps))
 				{
-					epsilon = SC(0);
+					epsilon = TC(0);
 				}
 				else
 				{
-					epsilon = std::min(epsilon / SC(4), total_eps / SC(8 * dim2));
+					epsilon = std::min(epsilon / TC(4), (TC)(total_eps / SC(8 * dim2)));
 				}
 #ifdef LAP_DEBUG
 				lapDebug << " -> " << epsilon;
 #endif
 				if (epsilon < epsilon_lower)
 				{
-					epsilon = SC(0);
+					epsilon = TC(0);
 				}
 #ifdef LAP_DEBUG
 				lapDebug << " -> " << epsilon << std::endl;

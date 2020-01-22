@@ -1006,7 +1006,7 @@ namespace lap
 
 #ifdef LAP_DEBUG
 			std::vector<SC *> v_list;
-			std::vector<SC> eps_list;
+			std::vector<TC> eps_list;
 #endif
 
 
@@ -1089,18 +1089,18 @@ namespace lap
 				checkCudaErrors(cudaMemcpyAsync(start_private[t], host_start, devices * sizeof(int), cudaMemcpyHostToDevice, stream));
 			}
 
-			SC epsilon_upper, epsilon_lower;
+			TC epsilon_upper, epsilon_lower;
 
 			if (use_epsilon)
 			{
-				std::pair<SC, SC> eps = estimateEpsilon(dim, dim2, iterator, v_private, perm);
+				std::pair<TC, TC> eps = estimateEpsilon(dim, dim2, iterator, v_private, perm);
 				epsilon_upper = eps.first;
 				epsilon_lower = eps.second;
 			}
 			else
 			{
-				epsilon_upper = SC(0);
-				epsilon_lower = SC(0);
+				epsilon_upper = TC(0);
+				epsilon_lower = TC(0);
 			}
 
 
@@ -1113,7 +1113,7 @@ namespace lap
 			memset(pathlength, 0, dim2 * sizeof(unsigned long long));
 #endif
 
-			SC epsilon = epsilon_upper;
+			TC epsilon = epsilon_upper;
 
 			bool first = true;
 			bool second = false;
@@ -1128,7 +1128,7 @@ namespace lap
 
 			SC total_d = SC(0);
 			SC total_eps = SC(0);
-			while (epsilon >= SC(0))
+			while (epsilon >= TC(0))
 			{
 #ifdef LAP_DEBUG
 				if (first)
@@ -1162,7 +1162,7 @@ namespace lap
 				}
 #endif
 				// this is to ensure termination of the while statement
-				if (epsilon == SC(0)) epsilon = SC(-1.0);
+				if (epsilon == TC(0)) epsilon = TC(-1.0);
 				memset(colsol, -1, dim2 * sizeof(int));
 
 				for (int t = 0; t < devices; t++)
@@ -1185,7 +1185,7 @@ namespace lap
 #endif
 
 #ifdef LAP_MINIMIZE_V
-//				int dim_limit = ((reverse) || (epsilon < SC(0))) ? dim2 : dim;
+//				int dim_limit = ((reverse) || (epsilon < TC(0))) ? dim2 : dim;
 				int dim_limit = dim2;
 #else
 				int dim_limit = dim2;
@@ -1341,7 +1341,7 @@ namespace lap
 						{
 							colsol[endofpath] = f;
 							rowsol[f] = endofpath;
-							if (epsilon > SC(0))
+							if (epsilon > TC(0))
 							{
 								updateColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, num_items, &(colsol_private[t][endofpath]), colsol[endofpath]);
 							}
@@ -1353,7 +1353,7 @@ namespace lap
 						else
 						{
 							// update column prices. can increase or decrease
-							if (epsilon > SC(0))
+							if (epsilon > TC(0))
 							{
 								updateColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, pred, pred_private[t], num_items);
 							}
@@ -1660,7 +1660,7 @@ namespace lap
 								{
 									colsol[endofpath] = f;
 									rowsol[f] = endofpath;
-									if (epsilon > SC(0))
+									if (epsilon > TC(0))
 									{
 										updateColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, num_items, &(colsol_private[t][endofpath - start]), f);
 									}
@@ -1671,7 +1671,7 @@ namespace lap
 								}
 								else
 								{
-									if (epsilon > SC(0))
+									if (epsilon > TC(0))
 									{
 										updateColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, num_items);
 									}
@@ -1683,7 +1683,7 @@ namespace lap
 							}
 							else
 							{
-								if (epsilon > SC(0))
+								if (epsilon > TC(0))
 								{
 									updateColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, pred + start, pred_private[t], num_items);
 								}
@@ -1743,7 +1743,7 @@ namespace lap
 					}
 				}
 #ifdef LAP_MINIMIZE_V
-				if (epsilon > SC(0))
+				if (epsilon > TC(0))
 				{
 					if (devices == 1)
 					{
@@ -1810,7 +1810,7 @@ namespace lap
 				}
 
 #ifdef LAP_DEBUG
-				if (epsilon > SC(0))
+				if (epsilon > TC(0))
 				{
 					SC *vv;
 					lapAlloc(vv, dim2, __FILE__, __LINE__);
