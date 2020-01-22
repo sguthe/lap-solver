@@ -110,8 +110,16 @@ int main(int argc, char* argv[])
 			if (opt.use_single) testInteger<float>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, false, std::string("float"), opt.devices, opt.silent);
 			if (opt.use_epsilon) testInteger<float>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, true, std::string("float"), opt.devices, opt.silent);
 		}
-		if (opt.use_single) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, false, std::string("long long"), opt.devices, opt.silent);
-		if (opt.use_epsilon) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, true, std::string("long long"), opt.devices, opt.silent);
+		if (opt.use_int)
+		{
+			if (opt.use_single) testInteger<int>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, false, std::string("int"), opt.devices, opt.silent);
+			if (opt.use_epsilon) testInteger<int>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, true, std::string("int"), opt.devices, opt.silent);
+		}
+		if (opt.use_long)
+		{
+			if (opt.use_single) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, false, std::string("long long"), opt.devices, opt.silent);
+			if (opt.use_epsilon) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.lap_max_memory, opt.runs, true, std::string("long long"), opt.devices, opt.silent);
+		}
 	}
 
 #ifndef LAP_QUIET

@@ -18,6 +18,8 @@ public:
 
 	bool use_double;
 	bool use_float;
+	bool use_int;
+	bool use_long;
 	bool use_single;
 	bool use_epsilon;
 	bool use_omp;
@@ -124,6 +126,14 @@ public:
 			else if (!strcmp(argv[i], "-float"))
 			{
 				use_float = true;
+			}
+			else if (!strcmp(argv[i], "-long"))
+			{
+				use_long = true;
+			}
+			else if (!strcmp(argv[i], "-int"))
+			{
+				use_int = true;
 			}
 			else if (!strcmp(argv[i], "-single"))
 			{
