@@ -44,7 +44,7 @@ public:
 	Options()
 	{
 		lap_min_tab = lap_max_tab = lap_min_cached = lap_max_cached = lap_min_rank = lap_max_rank = lap_max_memory = 0ll;
-		use_double = use_float = use_single = use_epsilon = use_omp = false;
+		use_double = use_float = use_int = use_long = use_single = use_epsilon = use_omp = false;
 		run_sanity = run_random = run_geometric = run_geometric_disjoint = run_random_low_rank = run_integer = false;
 		run_sanity_cached = run_geometric_cached = run_geometric_disjoint_cached = run_random_low_rank_cached = false;
 		use_sparse = false;
