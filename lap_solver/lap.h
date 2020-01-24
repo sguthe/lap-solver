@@ -181,8 +181,8 @@ namespace lap
 
 #ifdef LAP_CUDA
 #include "core/cuda/lap_cuda_helper.h"
+#include "core/cuda/lap_solver.h"
 #include "core/cuda/lap_cost.h"
 #include "core/cuda/lap_direct_iterator.h"
 #include "core/cuda/lap_caching_iterator.h"
-#include "core/cuda/lap_solver.h"
 #endif

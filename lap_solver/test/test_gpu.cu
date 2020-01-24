@@ -1,4 +1,5 @@
 #define LAP_CUDA
+#define LAP_OPENMP
 #define LAP_QUIET
 //#define LAP_DISPLAY_EVALUATED
 //#define LAP_DEBUG
@@ -8,6 +9,7 @@
 //#define LAP_CUDA_ALLOW_WDDM
 //#define LAP_CUDA_COMPARE_CPU
 #define LAP_MINIMIZE_V
+#define TEST_MATRIX_PINNED
 
 //#define RANDOM_SEED 1234
 
@@ -147,12 +149,13 @@ void solveCachingCUDA(TP &start_time, int N1, int N2, CF &get_cost, STATE *state
 }
 
 template <class SC, class TC, class CF, class TP>
-void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon)
+void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon, bool sequential)
 {
-	lap::SimpleCostFunction<TC, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu);
-	lap::TableCost<TC> costMatrix(N1, N2, cpuCostFunction);
+	lap::omp::SimpleCostFunction<TC, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu, sequential);
+	lap::cuda::PinnedTableCost<TC> costMatrix(N1, N2, cpuCostFunction, ws);
 
 	int devices = (int)ws.device.size();
+#ifndef TEST_MATRIX_PINNED
 	std::vector<TC *>buffer(devices);
 	std::vector<int> off(devices);
 	// 16 should be enough
@@ -162,8 +165,10 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 		off[t] = ((ws.part[t].second - ws.part[t].first + 255) >> 8) << 8;
 		lapAllocPinned(buffer[t], 16 * off[t], __FILE__, __LINE__);
 	}
+
 	std::vector<int> idx(devices);
 	for (int i = 0; i < devices; i++) idx[i] = 0;
+
 	std::vector<cudaEvent_t> cudaEvent(16 * devices);
 	for (int t = 0; t < devices; t++)
 	{
@@ -173,8 +178,10 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 			checkCudaErrors(cudaEventCreateWithFlags(&cudaEvent[t * 16 + i], cudaEventDisableTiming));
 		}
 	}
+#endif
 
 	// cost function (copy data from table, cudaMemcpy may not be complete prior to next call)
+#ifndef TEST_MATRIX_PINNED
 	auto get_cost_row = [&costMatrix, &buffer, &idx, &off, &cudaEvent](TC *d_row, int t, cudaStream_t stream, int x, int start, int end, bool async)
 	{
 		if (async)
@@ -196,6 +203,12 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 			cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
 		}
 	};
+#else
+	auto get_cost_row = [&costMatrix](TC* d_row, int t, cudaStream_t stream, int x, int start, int end, bool async)
+	{
+		cudaMemcpyAsync(d_row, costMatrix.getRow(t, x), (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
+	};
+#endif
 
 	// cost function
 	auto get_cost = [](TC *d_row, cudaStream_t stream, int *d_rowsol, int N)
@@ -211,6 +224,7 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 
 	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 
+#ifndef TEST_MATRIX_PINNED
 	for (int t = 0; t < devices; t++)
 	{
 		lapFreePinned(buffer[t]);
@@ -220,6 +234,7 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 			checkCudaErrors(cudaEventDestroy(cudaEvent[t * 16 + i]));
 		}
 	}
+#endif
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costMatrix, rowsol);
@@ -581,7 +596,7 @@ void testInteger(long long min_tab, long long max_tab, long long max_memory, int
 
 				int *rowsol = new int[N];
 
-				solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
+				solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true);
 
 				delete[] rowsol;
 			}
@@ -622,7 +637,7 @@ template <class C> void testRandom(long long min_tab, long long max_tab, long lo
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true);
 
 			delete[] rowsol;
 		}
@@ -670,7 +685,7 @@ template <class C> void testSanity(long long min_tab, long long max_tab, long lo
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false);
 
 			bool passed = true;
 			for (long long i = 0; (passed) && (i < N); i++)
@@ -756,7 +771,7 @@ template <class C> void testGeometric(long long min_tab, long long max_tab, long
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false);
 
 			delete[] tab_s;
 			delete[] tab_t;
@@ -818,7 +833,7 @@ template <class C> void testRandomLowRank(long long min_tab, long long max_tab, 
 
 				lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-				solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon);
+				solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false);
 
 				delete[] vec;
 				delete[] rowsol;

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../lap_solver.h"
 #include <algorithm>
 #include <cuda.h>
 #include <cuda_runtime.h>
