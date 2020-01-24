@@ -91,13 +91,14 @@ namespace lap
 			template <class DirectCost>
 			void initTable(DirectCost& cost)
 			{
+				int devices = ws.device.size();
 				free_in_destructor = true;
-				lapAlloc(cc, omp_get_max_threads(), __FILE__, __LINE__);
-				lapAlloc(stride, omp_get_max_threads(), __FILE__, __LINE__);
+				lapAlloc(cc, devices, __FILE__, __LINE__);
+				lapAlloc(stride, devices, __FILE__, __LINE__);
 				if (cost.isSequential())
 				{
 					// cost table needs to be initialized sequentially
-#pragma omp parallel
+#pragma omp parallel num_threads(devices)
 					{
 						const int t = omp_get_thread_num();
 						stride[t] = ws.part[t].second - ws.part[t].first;
@@ -107,7 +108,7 @@ namespace lap
 					}
 					for (int x = 0; x < x_size; x++)
 					{
-						for (int t = 0; t < omp_get_max_threads(); t++)
+						for (int t = 0; t < devices; t++)
 						{
 							cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
 						}
@@ -116,7 +117,7 @@ namespace lap
 				else
 				{
 					// create and initialize in parallel
-#pragma omp parallel
+#pragma omp parallel num_threads(devices)
 					{
 						const int t = omp_get_thread_num();
 						stride[t] = ws.part[t].second - ws.part[t].first;
@@ -133,10 +134,11 @@ namespace lap
 
 			void createTable()
 			{
+				int devices = ws.device.size();
 				free_in_destructor = true;
-				lapAlloc(cc, omp_get_max_threads(), __FILE__, __LINE__);
-				lapAlloc(stride, omp_get_max_threads(), __FILE__, __LINE__);
-#pragma omp parallel
+				lapAlloc(cc, devices, __FILE__, __LINE__);
+				lapAlloc(stride, devices, __FILE__, __LINE__);
+#pragma omp parallel num_threads(devices)
 				{
 					const int t = omp_get_thread_num();
 					stride[t] = ws.part[t].second - ws.part[t].first;
@@ -160,9 +162,10 @@ namespace lap
 			PinnedTableCost(int size, TC* tab, Worksharing& ws) : x_size(size), y_size(size), ws(ws) { referenceTable(tab); }
 			~PinnedTableCost()
 			{
+				int devices = ws.device.size();
 				if (free_in_destructor)
 				{
-#pragma omp parallel
+#pragma omp parallel num_threads(devices)
 					lapFreePinned(cc[omp_get_thread_num()]);
 				}
 				lapFree(cc);
@@ -181,7 +184,8 @@ namespace lap
 			}
 			__forceinline void setRow(int x, TC* v)
 			{
-				for (int t = 0; t < omp_get_max_threads(); t++)
+				int devices = ws.device.size();
+				for (int t = 0; t < devices; t++)
 				{
 					long long off_x = x;
 					off_x *= stride[t];
