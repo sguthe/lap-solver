@@ -49,6 +49,9 @@ namespace lap
 				lapFree(cache);
 			}
 
+			__forceinline CACHE& getCache(int i) { return cache[i]; }
+			__forceinline TC* getCacheRows(int i) { return rows[i]; }
+
 			__forceinline void getHitMiss(long long &hit, long long &miss) { cache[0].getHitMiss(hit, miss); }
 
 			__forceinline const TC *getRow(int t, int i, bool async)
@@ -58,9 +61,14 @@ namespace lap
 				bool found = cache[t].find(idx, i);
 				if (!found)
 				{
-					costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, t, ws.stream[t], i, ws.part[t].first, ws.part[t].second, async);
+					costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, t, ws.stream[t], i, ws.part[t].first, ws.part[t].second, 1, async);
 				}
 				return rows[t] + (long long)size * (long long)idx;
+			}
+
+			__forceinline void fillRows(int t, int row_count, bool async)
+			{
+				costfunc.getCostRow(rows[t], t, ws.stream[t], 0, ws.part[t].first, ws.part[t].second, row_count, async);
 			}
 
 			__forceinline bool checkRow(int t, int i)

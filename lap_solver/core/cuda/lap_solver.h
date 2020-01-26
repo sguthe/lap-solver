@@ -1092,9 +1092,9 @@ namespace lap
 
 			if (use_epsilon)
 			{
-				std::pair<TC, TC> eps = estimateEpsilon(dim, dim2, iterator, v_private, perm);
-				epsilon_upper = eps.first;
-				epsilon_lower = eps.second;
+				std::pair<SC, SC> eps = estimateEpsilon(dim, dim2, iterator, v_private, perm);
+				epsilon_upper = (TC)eps.first;
+				epsilon_lower = (TC)eps.second;
 			}
 			else
 			{

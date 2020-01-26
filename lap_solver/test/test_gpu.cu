@@ -135,10 +135,31 @@ int main(int argc, char* argv[])
 template <class SC, class TC, class CF, class STATE, class TP>
 void solveCachingCUDA(TP &start_time, int N1, int N2, CF &get_cost, STATE *state, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon)
 {
+	int devices = (int)ws.device.size();
+
 	lap::cuda::SimpleCostFunction<TC, CF, STATE> costFunction(get_cost, state);
 
 	// different cache size, so always use SLRU
 	lap::cuda::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costFunction, ws);
+
+	// pre-load cache
+	for (int t = 0; t < devices; t++)
+	{
+		int rows = std::min(N1, iterator.getCache(t).getEntries());
+		for (int i = 0; i < rows; i++)
+		{
+			int idx;
+			iterator.getCache(t).find(idx, i);
+		}
+		checkCudaErrors(cudaSetDevice(ws.device[t]));
+		iterator.fillRows(t, rows, true);
+	}
+	for (int t = 0; t < devices; t++)
+	{
+		checkCudaErrors(cudaSetDevice(ws.device[t]));
+		checkCudaErrors(cudaDeviceSynchronize());
+	}
+
 	lap::displayTime(start_time, "setup complete", std::cout);
 
 	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol, epsilon);
@@ -204,9 +225,9 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 		}
 	};
 #else
-	auto get_cost_row = [&costMatrix](TC* d_row, int t, cudaStream_t stream, int x, int start, int end, bool async)
+	auto get_cost_row = [&costMatrix](TC* d_row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async)
 	{
-		cudaMemcpyAsync(d_row, costMatrix.getRow(t, x), (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
+		cudaMemcpyAsync(d_row, costMatrix.getRow(t, x), (end - start) * sizeof(TC) * rows, cudaMemcpyHostToDevice, stream);
 	};
 #endif
 
@@ -220,6 +241,25 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 
 	// different cache size, so always use SLRU
 	lap::cuda::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costFunction, ws);
+
+	// pre-load cache
+	for (int t = 0; t < devices; t++)
+	{
+		int rows = std::min(N1, iterator.getCache(t).getEntries());
+		for (int i = 0; i < rows; i++)
+		{
+			int idx;
+			iterator.getCache(t).find(idx, i);
+		}
+		checkCudaErrors(cudaSetDevice(ws.device[t]));
+		iterator.fillRows(t, rows, true);
+	}
+	for (int t = 0; t < devices; t++)
+	{
+		checkCudaErrors(cudaSetDevice(ws.device[t]));
+		checkCudaErrors(cudaDeviceSynchronize());
+	}
+
 	lap::displayTime(start_time, "setup complete", std::cout);
 
 	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol, epsilon);

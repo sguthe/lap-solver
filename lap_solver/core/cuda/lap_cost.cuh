@@ -6,10 +6,12 @@ namespace lap
 	{
 		// Kernel for calculating the costs in a row
 		template <class TC, typename GETCOST, typename STATE>
-		__global__ void getCostRow_kernel(TC *cost, GETCOST getcost, STATE state, int x, int start, int count)
+		__global__ void getCostRow_kernel(TC *cost, GETCOST getcost, STATE state, int x0, int start, int count)
 		{
 			int y = threadIdx.x + blockIdx.x * blockDim.x;
-			if (y < count) cost[y] = getcost(x, y + start, state);
+			int x = x0 + blockIdx.y;
+			int off = count * blockIdx.y;
+			if (y < count) cost[y + off] = getcost(x, y + start, state);
 		}
 
 		// Kernel for calculating the costs of a rowsol

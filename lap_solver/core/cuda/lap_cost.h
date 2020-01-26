@@ -26,7 +26,7 @@ namespace lap
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
 			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
 			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
-			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, bool async) const { getcostrow(row, t, stream, x, start, end, async); }
+			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async) const { getcostrow(row, t, stream, x, start, end, rows, async); }
 			__forceinline void getCost(TC *row, cudaStream_t stream, int *rowsol, int dim) const { getcost(row, stream, rowsol, dim); }
 		};
 
@@ -47,11 +47,12 @@ namespace lap
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
 			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
 			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
-			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, bool async) const
+			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async) const
 			{
 				dim3 block_size, grid_size;
 				block_size.x = 256;
 				grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
+				grid_size.y = rows;
 				getCostRow_kernel<<<grid_size, block_size, 0, stream>>>(row, getcost, state[t], x, start, end - start);
 			}
 			__forceinline void getCost(TC *row, cudaStream_t stream, int *rowsol, int dim) const
@@ -91,7 +92,7 @@ namespace lap
 			template <class DirectCost>
 			void initTable(DirectCost& cost)
 			{
-				int devices = ws.device.size();
+				int devices = (int)ws.device.size();
 				free_in_destructor = true;
 				lapAlloc(cc, devices, __FILE__, __LINE__);
 				lapAlloc(stride, devices, __FILE__, __LINE__);
@@ -162,7 +163,7 @@ namespace lap
 			PinnedTableCost(int size, TC* tab, Worksharing& ws) : x_size(size), y_size(size), ws(ws) { referenceTable(tab); }
 			~PinnedTableCost()
 			{
-				int devices = ws.device.size();
+				int devices = (int)ws.device.size();
 				if (free_in_destructor)
 				{
 #pragma omp parallel num_threads(devices)
@@ -184,7 +185,7 @@ namespace lap
 			}
 			__forceinline void setRow(int x, TC* v)
 			{
-				int devices = ws.device.size();
+				int devices = (int)ws.device.size();
 				for (int t = 0; t < devices; t++)
 				{
 					long long off_x = x;
