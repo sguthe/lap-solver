@@ -12,7 +12,7 @@
 //#define RANDOM_SEED 1234
 
 // use a sparse solver for problems that have many (>20%) virtual rows
-#define LAP_SPARSE
+//#define LAP_SPARSE
 
 #include "../lap.h"
 

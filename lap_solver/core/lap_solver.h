@@ -908,16 +908,19 @@ namespace lap
 						colactive[j] = 1;
 						pred[j] = f;
 						SC h = d[j] = tt[j] - v[j];
-						if (h < min)
+						if (h <= min)
 						{
-							// better
-							jmin = j;
-							min = h;
-						}
-						else if (h == min)
-						{
-							// same, do only update if old was used and new is free
-							if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
+							if (h < min)
+							{
+								// better
+								jmin = j;
+								min = h;
+							}
+							else //if (h == min)
+							{
+								// same, do only update if old was used and new is free
+								if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
+							}
 						}
 					}
 				}
@@ -930,16 +933,19 @@ namespace lap
 						SC h = d[j] = -v[j];
 						if (colsol[j] < dim)
 						{
-							if (h < min)
+							if (h <= min)
 							{
-								// better
-								jmin = j;
-								min = h;
-							}
-							else if (h == min)
-							{
-								// same, do only update if old was used and new is free
-								if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
+								if (h < min)
+								{
+									// better
+									jmin = j;
+									min = h;
+								}
+								else //if (h == min)
+								{
+									// same, do only update if old was used and new is free
+									if ((colsol[jmin] >= 0) && (colsol[j] < 0)) jmin = j;
+								}
 							}
 						}
 					}
@@ -993,16 +999,19 @@ namespace lap
 									d[j] = v2;
 									h = v2;
 								}
-								if (h < min_n)
+								if (h <= min_n)
 								{
-									// better
-									jmin_n = j;
-									min_n = h;
-								}
-								else if (h == min_n)
-								{
-									// same, do only update if old was used and new is free
-									if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
+									if (h < min_n)
+									{
+										// better
+										jmin_n = j;
+										min_n = h;
+									}
+									else //if (h == min_n)
+									{
+										// same, do only update if old was used and new is free
+										if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
+									}
 								}
 							}
 						}
@@ -1022,18 +1031,21 @@ namespace lap
 									d[j] = v2;
 									h = v2;
 								}
-								if (colsol[j] < dim)
+								if (h <= min_n)
 								{
-									if (h < min_n)
+									if (colsol[j] < dim)
 									{
-										// better
-										jmin_n = j;
-										min_n = h;
-									}
-									else if (h == min_n)
-									{
-										// same, do only update if old was used and new is free
-										if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
+										if (h < min_n)
+										{
+											// better
+											jmin_n = j;
+											min_n = h;
+										}
+										else //if (h == min_n)
+										{
+											// same, do only update if old was used and new is free
+											if ((colsol[jmin_n] >= 0) && (colsol[j] < 0)) jmin_n = j;
+										}
 									}
 								}
 							}
