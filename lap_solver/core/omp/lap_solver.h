@@ -560,6 +560,7 @@ namespace lap
 						int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
 						int jmin_local = dim2;
 						SC min_local = std::numeric_limits<SC>::max();
+						int last_jmin_local = 0;
 						if (f < dim)
 						{
 							auto tt = iterator.getRow(t, f);
@@ -574,13 +575,27 @@ namespace lap
 									if (h < min_local)
 									{
 										// better
-										jmin_local = j;
+										jmin_local = last_jmin_local = j;
 										min_local = h;
 									}
 									else //if (h == min_local)
 									{
 										// same, do only update if old was used and new is free
-										if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+										last_jmin_local = j;
+										//if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+									}
+								}
+							}
+							if ((jmin_local != last_jmin_local) && (colsol[jmin_local] >= 0))
+							{
+								for (int j = jmin_local + 1; j <= last_jmin_local; j++)
+								{
+									if (d[j] == min_local)
+									{
+										if (colsol[j] < 0)
+										{
+											jmin_local = last_jmin_local = j;
+										}
 									}
 								}
 							}
@@ -697,13 +712,27 @@ namespace lap
 											if (h < min_local)
 											{
 												// better
-												jmin_local = j;
+												jmin_local = last_jmin_local = j;
 												min_local = h;
 											}
 											else //if (h == min_local)
 											{
 												// same, do only update if old was used and new is free
-												if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+												//if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+												last_jmin_local = j;
+											}
+										}
+									}
+								}
+								if ((jmin_local != last_jmin_local) && (colsol[jmin_local] >= 0))
+								{
+									for (int j = jmin_local + 1; j <= last_jmin_local; j++)
+									{
+										if (d[j] == min_local)
+										{
+											if (colsol[j] < 0)
+											{
+												jmin_local = last_jmin_local = j;
 											}
 										}
 									}
