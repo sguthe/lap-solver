@@ -560,6 +560,7 @@ namespace lap
 						int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
 						int jmin_local = dim2;
 						SC min_local = std::numeric_limits<SC>::max();
+						bool taken_local = true;
 						if (f < dim)
 						{
 							auto tt = iterator.getRow(t, f);
@@ -576,18 +577,23 @@ namespace lap
 										// better
 										jmin_local = j;
 										min_local = h;
+										taken_local = (colsol[j] >= 0);
 									}
-									else //if (h == min_local)
+									else if (taken_local) //if (h == min_local)
 									{
 										// same, do only update if old was used and new is free
-										if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+										//if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+										if (colsol[j] < 0)
+										{
+											jmin_local = j;
+											taken_local = false;
+										}
 									}
 								}
 							}
 						}
 						else
 						{
-							min_local = std::numeric_limits<SC>::max();
 							for (int j = start; j < end; j++)
 							{
 								colactive[j] = 1;
@@ -603,11 +609,17 @@ namespace lap
 											// better
 											jmin_local = j;
 											min_local = h;
+											taken_local = (colsol[j] >= 0);
 										}
-										else //if (h == min_local)
+										else if (taken_local) //if (h == min_local)
 										{
 											// same, do only update if old was used and new is free
-											if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+											//if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+											if (colsol[j] < 0)
+											{
+												jmin_local = j;
+												taken_local = false;
+											}
 										}
 									}
 								}
@@ -665,6 +677,7 @@ namespace lap
 							int i = colsol[jmin];
 							jmin_local = dim2;
 							min_local = std::numeric_limits<SC>::max();
+							taken_local = true;
 							if (i < dim)
 							{
 								SC tt_jmin;
@@ -699,11 +712,17 @@ namespace lap
 												// better
 												jmin_local = j;
 												min_local = h;
+												taken_local = (colsol[j] >= 0);
 											}
-											else //if (h == min_local)
+											else if (taken_local) //if (h == min_local)
 											{
 												// same, do only update if old was used and new is free
-												if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+												//if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+												if (colsol[j] < 0)
+												{
+													jmin_local = j;
+													taken_local = false;
+												}
 											}
 										}
 									}
@@ -734,11 +753,17 @@ namespace lap
 													// better
 													jmin_local = j;
 													min_local = h;
+													taken_local = (colsol[j] >= 0);
 												}
-												else if (h == min_local)
+												else if (taken_local) //if (h == min_local)
 												{
 													// same, do only update if old was used and new is free
-													if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+													//if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+													if (colsol[j] < 0)
+													{
+														jmin_local = j;
+														taken_local = false;
+													}
 												}
 											}
 										}
