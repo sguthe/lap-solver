@@ -392,10 +392,6 @@ namespace lap
 		}
 	}
 
-	template <class SC> SC getMinUpper() { return SC(0); }
-	template <> int getMinUpper() { return 1; }
-	template <> long long getMinUpper() { return 1; }
-
 	template <class SC>
 	void getUpperLower(SC &upper, SC &lower, SC greedy_gap, SC initial_gap, int dim, int dim2)
 	{
@@ -403,7 +399,6 @@ namespace lap
 		if ((double)greedy_gap < 1.0e-6 * (double)initial_gap) upper = SC(0);
 		else upper = (SC)((double)dim * (double)greedy_gap * sqrt((double)greedy_gap / (double)initial_gap) / ((double)dim2 * (double)dim2));
 		lower = (SC)((double)initial_gap / (16.0 * (double)dim2 * (double)dim2));
-		upper = std::max(upper, getMinUpper<SC>());
 		if (upper < lower) upper = lower = SC(0);
 	}
 
