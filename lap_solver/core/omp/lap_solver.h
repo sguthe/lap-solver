@@ -569,7 +569,7 @@ namespace lap
 								colactive[j] = 1;
 								pred[j] = f;
 								SC h = d[j] = tt[j_local] - v[j];
-								//if (h <= min_local)
+								if (h <= min_local)
 								{
 									if (h < min_local)
 									{
@@ -577,11 +577,11 @@ namespace lap
 										jmin_local = j;
 										min_local = h;
 									}
-									//else //if (h == min_local)
-									//{
+									else //if (h == min_local)
+									{
 										// same, do only update if old was used and new is free
-									//	if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
-									//}
+										if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+									}
 								}
 							}
 						}
@@ -593,23 +593,22 @@ namespace lap
 								colactive[j] = 1;
 								pred[j] = f;
 								SC h = d[j] = -v[j];
-								if (h < min_local)
-								//if (h <= min_local)
+								if (h <= min_local)
 								{
 									// ignore any columns assigned to virtual rows
 									if (colsol[j] < dim)
 									{
-										//if (h < min_local)
+										if (h < min_local)
 										{
 											// better
 											jmin_local = j;
 											min_local = h;
 										}
-										//else //if (h == min_local)
-										//{
+										else //if (h == min_local)
+										{
 											// same, do only update if old was used and new is free
-										//	if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
-										//}
+											if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+										}
 									}
 								}
 							}
@@ -693,7 +692,7 @@ namespace lap
 											d[j] = v2;
 											h = v2;
 										}
-										//if (h <= min_local)
+										if (h <= min_local)
 										{
 											if (h < min_local)
 											{
@@ -701,11 +700,11 @@ namespace lap
 												jmin_local = j;
 												min_local = h;
 											}
-											//else //if (h == min_local)
-											//{
+											else //if (h == min_local)
+											{
 												// same, do only update if old was used and new is free
-											//	if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
-											//}
+												if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+											}
 										}
 									}
 								}
@@ -725,23 +724,22 @@ namespace lap
 											d[j] = v2;
 											h = v2;
 										}
-										if (h < min_local)
-										//if (h <= min_local)
+										if (h <= min_local)
 										{
 											// ignore any columns assigned to virtual rows
 											if (colsol[j] < dim)
 											{
-												//if (h < min_local)
+												if (h < min_local)
 												{
 													// better
 													jmin_local = j;
 													min_local = h;
 												}
-												//else if (h == min_local)
-												//{
+												else //if (h == min_local)
+												{
 													// same, do only update if old was used and new is free
-												//	if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
-												//}
+													if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
+												}
 											}
 										}
 									}
