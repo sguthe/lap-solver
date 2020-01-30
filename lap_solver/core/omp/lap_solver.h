@@ -688,7 +688,7 @@ namespace lap
 #endif
 							min = min_private[0];
 							jmin = jmin_private[0];
-							bool taken = true;
+							bool taken = false;
 							for (int tt = 1; tt < omp_get_num_threads(); tt++)
 							{
 								int start = iterator.ws.part[tt].first;
@@ -814,7 +814,7 @@ namespace lap
 #endif
 								min_n = min_private[0];
 								jmin = jmin_private[0];
-								bool taken = true;
+								bool taken = false;
 								for (int tt = 1; tt < omp_get_num_threads(); tt++)
 								{
 									int start = iterator.ws.part[tt].first;
@@ -1013,6 +1013,14 @@ namespace lap
 #endif
 
 			// free reserved memory.
+			for (int t = 0; t < omp_get_max_threads(); t++)
+			{
+				lapFree(colactive[t]);
+				lapFree(d[t]);
+				lapFree(pred[t]);
+				lapFree(colsol[t]);
+				lapFree(v[t]);
+			}
 			lapFree(pred);
 			lapFree(colactive);
 			lapFree(d);
