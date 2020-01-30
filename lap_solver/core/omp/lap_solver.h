@@ -395,6 +395,33 @@ namespace lap
 			return std::pair<SC, SC>((SC)upper, (SC)lower);
 		}
 
+		__forceinline void dijkstraCheck(int& endofpath, bool& unassignedfound, int jmin, int** colsol, char** colactive, std::pair<int, int>* part)
+		{
+			int t = 0;
+			while (jmin >= part[t].second) t++;
+			int jmin_local = jmin - part[t].first;
+			colactive[t][jmin_local] = 0;
+			if (colsol[t][jmin_local] < 0)
+			{
+				endofpath = jmin;
+				unassignedfound = true;
+			}
+		}
+
+		__forceinline void resetRowColumnAssignment(int& endofpath, int f, int** pred, int* rowsol, int** colsol, std::pair<int, int>* part)
+		{
+			int i;
+			do
+			{
+				int t = 0;
+				while (endofpath >= part[t].second) t++;
+				int endofpath_local = endofpath - part[t].first;
+				i = pred[t][endofpath_local];
+				colsol[t][endofpath_local] = i;
+				std::swap(endofpath, rowsol[i]);
+			} while (i != f);
+		}
+
 		template <class SC, class CF, class I>
 		void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon)
 
@@ -433,14 +460,14 @@ namespace lap
 #endif
 #endif
 
-			int  *pred;
+			int  **pred;
 			int  endofpath;
-			char *colactive;
-			SC *d;
-			int *colsol;
+			char **colactive;
+			SC **d;
+			int **colsol;
 			SC epsilon_upper;
 			SC epsilon_lower;
-			SC *v;
+			SC **v;
 			int *perm;
 
 #ifdef LAP_DEBUG
@@ -448,12 +475,31 @@ namespace lap
 			std::vector<SC> eps_list;
 #endif
 
-			lapAlloc(colactive, dim2, __FILE__, __LINE__);
-			lapAlloc(d, dim2, __FILE__, __LINE__);
-			lapAlloc(pred, dim2, __FILE__, __LINE__);
-			lapAlloc(colsol, dim2, __FILE__, __LINE__);
-			lapAlloc(v, dim2, __FILE__, __LINE__);
+//			lapAlloc(colactive, dim2, __FILE__, __LINE__);
+//			lapAlloc(d, dim2, __FILE__, __LINE__);
+//			lapAlloc(pred, dim2, __FILE__, __LINE__);
+//			lapAlloc(colsol, dim2, __FILE__, __LINE__);
+//			lapAlloc(v, dim2, __FILE__, __LINE__);
+			lapAlloc(colactive, omp_get_max_threads(), __FILE__, __LINE__);
+			lapAlloc(d, omp_get_max_threads(), __FILE__, __LINE__);
+			lapAlloc(pred, omp_get_max_threads(), __FILE__, __LINE__);
+			lapAlloc(colsol, omp_get_max_threads(), __FILE__, __LINE__);
+			lapAlloc(v, omp_get_max_threads(), __FILE__, __LINE__);
 			lapAlloc(perm, dim2, __FILE__, __LINE__);
+
+#pragma omp parallel
+			{
+				int t = omp_get_thread_num();
+				int start = iterator.ws.part[t].first;
+				int end = iterator.ws.part[t].second;
+				int count = end - start;
+
+				lapAlloc(colactive[t], count, __FILE__, __LINE__);
+				lapAlloc(d[t], count, __FILE__, __LINE__);
+				lapAlloc(pred[t], count, __FILE__, __LINE__);
+				lapAlloc(colsol[t], count, __FILE__, __LINE__);
+				lapAlloc(v[t], count, __FILE__, __LINE__);
+			}
 
 			SC *min_private;
 			int *jmin_private;
@@ -474,13 +520,31 @@ namespace lap
 
 			if (use_epsilon)
 			{
-				std::pair<SC, SC> eps = lap::omp::estimateEpsilon(dim, dim2, iterator, v, perm);
+				SC* tmp_v;
+				lapAlloc(tmp_v, dim2, __FILE__, __LINE__);
+				std::pair<SC, SC> eps = lap::omp::estimateEpsilon(dim, dim2, iterator, tmp_v, perm);
+#pragma omp parallel
+				{
+					int t = omp_get_thread_num();
+					int start = iterator.ws.part[t].first;
+					int end = iterator.ws.part[t].second;
+					int count = end - start;
+					memcpy(v[t], &(tmp_v[start]), count * sizeof(SC));
+				}
+				lapFree(tmp_v);
 				epsilon_upper = eps.first;
 				epsilon_lower = eps.second;
 			}
 			else
 			{
-				memset(v, 0, dim2 * sizeof(SC));
+#pragma omp parallel
+				{
+					int t = omp_get_thread_num();
+					int start = iterator.ws.part[t].first;
+					int end = iterator.ws.part[t].second;
+					int count = end - start;
+					memset(v[t], 0, count * sizeof(SC));
+				}
 				epsilon_upper = SC(0);
 				epsilon_lower = SC(0);
 			}
@@ -524,7 +588,7 @@ namespace lap
 				// this is to ensure termination of the while statement
 				if (epsilon == SC(0)) epsilon = SC(-1.0);
 				memset(rowsol, -1, dim2 * sizeof(int));
-				memset(colsol, -1, dim2 * sizeof(int));
+				//memset(colsol, -1, dim2 * sizeof(int));
 
 				int jmin;
 				SC min, min_n;
@@ -554,78 +618,57 @@ namespace lap
 					int t = omp_get_thread_num();
 					int start = iterator.ws.part[t].first;
 					int end = iterator.ws.part[t].second;
+					int count = end - start;
+
+					char* colactive_private = colactive[t];
+					SC* d_private = d[t];
+					int* pred_private = pred[t];
+					SC* v_private = v[t];
+					int* colsol_private = colsol[t];
 
 					for (int fc = 0; fc < dim_limit; fc++)
 					{
 						int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
 						int jmin_local = dim2;
 						SC min_local = std::numeric_limits<SC>::max();
-						int last_jmin_local = 0;
 						if (f < dim)
 						{
 							auto tt = iterator.getRow(t, f);
-							for (int j = start; j < end; j++)
+							for (int j = 0; j < count; j++)
 							{
-								int j_local = j - start;
-								colactive[j] = 1;
-								pred[j] = f;
-								SC h = d[j] = tt[j_local] - v[j];
-								if (h <= min_local)
+								colactive_private[j] = 1;
+								pred_private[j] = f;
+								SC h = d_private[j] = tt[j] - v_private[j];
+								if (h < min_local)
 								{
-									if (h < min_local)
-									{
-										// better
-										jmin_local = last_jmin_local = j;
-										min_local = h;
-									}
-									else //if (h == min_local)
-									{
-										// same, do only update if old was used and new is free
-										last_jmin_local = j;
-										//if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
-									}
+									// better
+									jmin_local = j;
+									min_local = h;
 								}
-							}
-							if ((jmin_local != last_jmin_local) && (colsol[jmin_local] >= 0))
-							{
-								for (int j = jmin_local + 1; j <= last_jmin_local; j++)
-								{
-									if (d[j] == min_local)
-									{
-										if (colsol[j] < 0)
-										{
-											jmin_local = last_jmin_local = j;
-										}
-									}
-								}
+								// same, do only update if old was used and new is free
+								else if ((h == min_local) && (colsol_private[jmin_local] >= 0) && (colsol_private[j] < 0)) jmin_local = j;
 							}
 						}
 						else
 						{
 							min_local = std::numeric_limits<SC>::max();
-							for (int j = start; j < end; j++)
+							for (int j = 0; j < count; j++)
 							{
-								colactive[j] = 1;
-								pred[j] = f;
-								SC h = d[j] = -v[j];
-								if (h <= min_local)
+								colactive_private[j] = 1;
+								pred_private[j] = f;
+								SC h = d_private[j] = -v_private[j];
+								if (h < min_local)
 								{
 									// ignore any columns assigned to virtual rows
-									if (colsol[j] < dim)
+									if (colsol_private[j] < dim)
 									{
-										if (h < min_local)
-										{
-											// better
-											jmin_local = j;
-											min_local = h;
-										}
-										else //if (h == min_local)
-										{
-											// same, do only update if old was used and new is free
-											if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
-										}
+										// better
+										jmin_local = j;
+										min_local = h;
 									}
 								}
+								// same, do only update if old was used and new is free
+								else if ((h == min_local) && (colsol_private[jmin_local] >= 0) && (colsol_private[j] < 0)) jmin_local = j;
 							}
 						}
 						min_private[t << 3] = min_local;
@@ -645,31 +688,35 @@ namespace lap
 #endif
 							min = min_private[0];
 							jmin = jmin_private[0];
+							bool taken = true;
 							for (int tt = 1; tt < omp_get_num_threads(); tt++)
 							{
+								int start = iterator.ws.part[tt].first;
 								if (min_private[tt << 3] < min)
 								{
 									// better than previous
 									min = min_private[tt << 3];
-									jmin = jmin_private[tt << 3];
+									jmin = jmin_private[tt << 3] + start;
+									taken = (colsol[tt][jmin_private[tt << 3]] >= 0);
 								}
-								else if (min_private[tt << 3] == min)
+								else if ((min_private[tt << 3] == min) && (taken) && (colsol[tt][jmin_private[tt << 3]] < 0))
 								{
-									if ((colsol[jmin] >= 0) && (colsol[jmin_private[tt << 3]] < 0)) jmin = jmin_private[tt << 3];
+									jmin = jmin_private[tt << 3] + start;
+									taken = false;
 								}
 							}
 							unassignedfound = false;
-							dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive);
+							dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, iterator.ws.part);
 						}
 						// marked skipped columns that were cheaper
 						if (f >= dim)
 						{
-							for (int j = start; j < end; j++)
+							for (int j = 0; j < count; j++)
 							{
 								// ignore any columns assigned to virtual rows
-								if ((colsol[j] >= dim) && (d[j] <= min))
+								if ((colsol_private[j] >= dim) && (d_private[j] <= min))
 								{
-									colactive[j] = 0;
+									colactive_private[j] = 0;
 								}
 							}
 						}
@@ -677,100 +724,76 @@ namespace lap
 						while (!unassignedfound)
 						{
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
-							int i = colsol[jmin];
+							int t_jmin = 0;
+							while (jmin >= iterator.ws.part[t_jmin].second) t_jmin++;
+							int idx_jmin = jmin - iterator.ws.part[t_jmin].first;
+							int i = colsol[t_jmin][idx_jmin];
 							jmin_local = dim2;
 							min_local = std::numeric_limits<SC>::max();
 							if (i < dim)
 							{
 								SC tt_jmin;
-								SC v_jmin = v[jmin];
+								SC v_jmin = v[t_jmin][idx_jmin];
 								auto tt = iterator.getRow(t, i);
-								if ((jmin >= start) && (jmin < end))
+								if (t_jmin == t)
 								{
 									tt_jmin_global = tt_jmin = (SC)tt[jmin - start];
 								}
 #pragma omp barrier
-								if ((jmin < start) || (jmin >= end))
+								if (t_jmin != t)
 								{
 									tt_jmin = tt_jmin_global;
 								}
-								for (int j = start; j < end; j++)
+								for (int j = 0; j < count; j++)
 								{
-									int j_local = j - start;
-									if (colactive[j] != 0)
+									if (colactive_private[j] != 0)
 									{
-										SC v2 = (tt[j_local] - tt_jmin) - (v[j] - v_jmin) + min;
-										SC h = d[j];
+										SC v2 = (tt[j] - tt_jmin) - (v_private[j] - v_jmin) + min;
+										SC h = d_private[j];
 										if (v2 < h)
 										{
-											pred[j] = i;
-											d[j] = v2;
+											pred_private[j] = i;
+											d_private[j] = v2;
 											h = v2;
 										}
-										if (h <= min_local)
+										if (h < min_local)
 										{
-											if (h < min_local)
-											{
-												// better
-												jmin_local = last_jmin_local = j;
-												min_local = h;
-											}
-											else //if (h == min_local)
-											{
-												// same, do only update if old was used and new is free
-												//if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
-												last_jmin_local = j;
-											}
+											// better
+											jmin_local = j;
+											min_local = h;
 										}
-									}
-								}
-								if ((jmin_local != last_jmin_local) && (colsol[jmin_local] >= 0))
-								{
-									for (int j = jmin_local + 1; j <= last_jmin_local; j++)
-									{
-										if (d[j] == min_local)
-										{
-											if (colsol[j] < 0)
-											{
-												jmin_local = last_jmin_local = j;
-											}
-										}
+										// same, do only update if old was used and new is free
+										else if ((h == min_local) && (colsol_private[jmin_local] >= 0) && (colsol_private[j] < 0)) jmin_local = j;
 									}
 								}
 							}
 							else
 							{
-								SC v_jmin = v[jmin];
-								for (int j = start; j < end; j++)
+								SC v_jmin = v[t_jmin][idx_jmin];
+								for (int j = 0; j < count; j++)
 								{
-									if (colactive[j] != 0)
+									if (colactive_private[j] != 0)
 									{
-										SC v2 = -(v[j] - v_jmin) + min;
-										SC h = d[j];
+										SC v2 = -(v_private[j] - v_jmin) + min;
+										SC h = d_private[j];
 										if (v2 < h)
 										{
-											pred[j] = i;
-											d[j] = v2;
+											pred_private[j] = i;
+											d_private[j] = v2;
 											h = v2;
 										}
-										if (h <= min_local)
+										if (h < min_local)
 										{
 											// ignore any columns assigned to virtual rows
-											if (colsol[j] < dim)
+											if (colsol_private[j] < dim)
 											{
-												if (h < min_local)
-												{
-													// better
-													jmin_local = j;
-													min_local = h;
-												}
-												else //if (h == min_local)
-												{
-													// same, do only update if old was used and new is free
-													if ((colsol[jmin_local] >= 0) && (colsol[j] < 0)) jmin_local = j;
-												}
+												// better
+												jmin_local = j;
+												min_local = h;
 											}
 										}
+										// same, do only update if old was used and new is free
+										else if ((h == min_local) && (colsol_private[jmin_local] >= 0) && (colsol_private[j] < 0)) jmin_local = j;
 									}
 								}
 							}
@@ -791,31 +814,35 @@ namespace lap
 #endif
 								min_n = min_private[0];
 								jmin = jmin_private[0];
+								bool taken = true;
 								for (int tt = 1; tt < omp_get_num_threads(); tt++)
 								{
+									int start = iterator.ws.part[tt].first;
 									if (min_private[tt << 3] < min_n)
 									{
 										// better than previous
 										min_n = min_private[tt << 3];
-										jmin = jmin_private[tt << 3];
+										jmin = jmin_private[tt << 3] + start;
+										taken = (colsol[tt][jmin_private[tt << 3]] >= 0);
 									}
-									else if (min_private[tt << 3] == min_n)
+									else if ((min_private[tt << 3] == min_n) && (taken) && (colsol[tt][jmin_private[tt << 3]] < 0))
 									{
-										if ((colsol[jmin] >= 0) && (colsol[jmin_private[tt << 3]] < 0)) jmin = jmin_private[tt << 3];
+										jmin = jmin_private[tt << 3] + start;
+										taken = false;
 									}
 								}
 								min = std::max(min, min_n);
-								dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive);
+								dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, iterator.ws.part);
 							}
 							// marked skipped columns that were cheaper
 							if (i >= dim)
 							{
-								for (int j = start; j < end; j++)
+								for (int j = 0; j < count; j++)
 								{
 									// ignore any columns assigned to virtual rows
-									if ((colactive[j] == 1) && (colsol[j] >= dim) && (d[j] <= min))
+									if ((colactive_private[j] == 1) && (colsol_private[j] >= dim) && (d_private[j] <= min))
 									{
-										colactive[j] = 0;
+										colactive_private[j] = 0;
 									}
 								}
 							}
@@ -826,11 +853,11 @@ namespace lap
 						{
 							min_private[t << 3] = SC(0);
 							min_private[(t << 3) + 1] = SC(0);
-							updateColumnPrices(colactive, start, end, min, v, d, epsilon, min_private[t << 3], min_private[(t << 3) + 1]);
+							updateColumnPrices(colactive_private, 0, count, min, v_private, d_private, epsilon, min_private[t << 3], min_private[(t << 3) + 1]);
 						}
 						else
 						{
-							updateColumnPrices(colactive, start, end, min, v, d);
+							updateColumnPrices(colactive_private, 0, count, min, v_private, d_private);
 						}
 #pragma omp barrier
 						if (t == 0)
@@ -854,7 +881,7 @@ namespace lap
 #endif
 
 							// reset row and column assignments along the alternating path.
-							resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
+							resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol, iterator.ws.part);
 							// for next iteration
 							jmin = dim2;
 							min = std::numeric_limits<SC>::max();
@@ -888,8 +915,31 @@ namespace lap
 					if (dim_limit < dim2) normalizeV(v, dim2, colsol);
 					else lap::normalizeV(v, dim2);
 #else
-					if (dim_limit < dim2) for (int i = 0; i < dim2; i++) if (colsol[i] < 0) v[i] -= SC(2) * epsilon;
-					lap::normalizeV(v, dim2);
+					if (dim_limit < dim2)
+					{
+						for (int j = 0; j < omp_get_max_threads(); j++)
+						{
+							for (int i = 0; i < iterator.ws.part[j].second - iterator.ws.part[j].first; i++)
+							{
+								if (colsol[j][i] < 0) v[j][i] -= SC(2) * epsilon;
+							}
+						}
+					}
+					SC max_v = v[0][0];
+					for (int j = 0; j < omp_get_max_threads(); j++)
+					{
+						for (int i = 0; i < iterator.ws.part[j].second - iterator.ws.part[j].first; i++)
+						{
+							max_v = std::max(max_v, v[j][i]);
+						}
+					}
+					for (int j = 0; j < omp_get_max_threads(); j++)
+					{
+						for (int i = 0; i < iterator.ws.part[j].second - iterator.ws.part[j].first; i++)
+						{
+							v[j][i] = v[j][i] - max_v;
+						}
+					}
 #endif
 				}
 #endif

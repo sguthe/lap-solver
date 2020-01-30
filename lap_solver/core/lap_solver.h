@@ -699,9 +699,7 @@ namespace lap
 		{
 			i = pred[endofpath];
 			colsol[endofpath] = i;
-			int j1 = endofpath;
-			endofpath = rowsol[i];
-			rowsol[i] = j1;
+			std::swap(endofpath, rowsol[i]);
 		} while (i != f);
 	}
 
