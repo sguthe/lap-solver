@@ -626,6 +626,8 @@ namespace lap
 					SC* v_private = v[t];
 					int* colsol_private = colsol[t];
 
+					memset(colsol_private, -1, count * sizeof(int));
+
 					for (int fc = 0; fc < dim_limit; fc++)
 					{
 						int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
