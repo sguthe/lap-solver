@@ -1432,7 +1432,7 @@ namespace lap
 #endif
 #endif
 
-			int  endofpath;
+			int  endofpath = -1;
 #ifdef LAP_DEBUG
 			SC *v;
 #endif
