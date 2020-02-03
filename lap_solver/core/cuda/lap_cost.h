@@ -8,6 +8,19 @@ namespace lap
 {
 	namespace cuda
 	{
+		// Wrapper around simple CPU tiles cost function
+		template <class TC, typename GETCOST>
+		class CpuCostFunction : public lap::SimpleCostFunction<TC, GETCOST>
+		{
+		protected:
+			bool sequential;
+		public:
+			CpuCostFunction(GETCOST& getcost, bool sequential = false) : lap::SimpleCostFunction<TC, GETCOST>(getcost), sequential(sequential) {}
+			~CpuCostFunction() {}
+		public:
+			__forceinline bool isSequential() const { return sequential; }
+		};
+
 		// Wrapper around per-row cost funtion, e.g. CUDA, OpenCL or OpenMPI
 		// Requires separate kernel to calculate costs for a given rowsol
 		template <class TC, typename GETCOSTROW, typename GETCOST>
@@ -80,9 +93,10 @@ namespace lap
 			void referenceTable(TC* tab)
 			{
 				free_in_destructor = false;
-				lapAlloc(cc, omp_get_max_threads(), __FILE__, __LINE__);
-				lapAlloc(stride, omp_get_max_threads(), __FILE__, __LINE__);
-				for (int t = 0; t < omp_get_max_threads(); t++)
+				int devices = (int)ws.device.size();
+				lapAlloc(cc, devices, __FILE__, __LINE__);
+				lapAlloc(stride, devices, __FILE__, __LINE__);
+				for (int t = 0; t < devices; t++)
 				{
 					stride[t] = y_size;
 					cc[t] = &(tab[ws.part[t].first]);
@@ -96,6 +110,7 @@ namespace lap
 				free_in_destructor = true;
 				lapAlloc(cc, devices, __FILE__, __LINE__);
 				lapAlloc(stride, devices, __FILE__, __LINE__);
+#ifdef LAP_OPENMP
 				if (cost.isSequential())
 				{
 					// cost table needs to be initialized sequentially
@@ -131,6 +146,17 @@ namespace lap
 						}
 					}
 				}
+#else
+				for (int t = 0; t < devices; t++)
+				{
+					stride[t] = ws.part[t].second - ws.part[t].first;
+					lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+					for (int x = 0; x < x_size; x++)
+					{
+						cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
+					}
+				}
+#endif
 			}
 
 			void createTable()
@@ -139,9 +165,14 @@ namespace lap
 				free_in_destructor = true;
 				lapAlloc(cc, devices, __FILE__, __LINE__);
 				lapAlloc(stride, devices, __FILE__, __LINE__);
+#ifdef LAP_OPENMP
 #pragma omp parallel num_threads(devices)
 				{
 					const int t = omp_get_thread_num();
+#else
+				for (int t = 0; t < devices; t++)
+				{
+#endif
 					stride[t] = ws.part[t].second - ws.part[t].first;
 					lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
 					// first touch
@@ -166,8 +197,12 @@ namespace lap
 				int devices = (int)ws.device.size();
 				if (free_in_destructor)
 				{
+#ifdef LAP_OPENMP
 #pragma omp parallel num_threads(devices)
 					lapFreePinned(cc[omp_get_thread_num()]);
+#else
+					for (int t = 0; t < devices; t++) lapFreePinned(cc[t]);
+#endif
 				}
 				lapFree(cc);
 				lapFree(stride);

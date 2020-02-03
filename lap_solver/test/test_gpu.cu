@@ -1,5 +1,5 @@
 #define LAP_CUDA
-//#define LAP_OPENMP
+//#define LAP_CUDA_OPENMP
 #define LAP_QUIET
 //#define LAP_DISPLAY_EVALUATED
 //#define LAP_DEBUG
@@ -172,7 +172,7 @@ void solveCachingCUDA(TP &start_time, int N1, int N2, CF &get_cost, STATE *state
 template <class SC, class TC, class CF, class TP>
 void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon, bool sequential)
 {
-	lap::omp::SimpleCostFunction<TC, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu, sequential);
+	lap::cuda::CpuCostFunction<TC, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu, sequential);
 	lap::cuda::PinnedTableCost<TC> costMatrix(N1, N2, cpuCostFunction, ws);
 
 	int devices = (int)ws.device.size();
