@@ -595,7 +595,7 @@ namespace lap
 						if (i == dim2 - 1)
 						{
 							if (bs == 32) getMinSecondBestSmall_kernel<<<gs, bs, 0, stream>>>(&(host_struct_private[i * devices + t]), gpu_struct_private[t], semaphore_private[t], min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], v_private[t], picked_private[t], std::numeric_limits<SC>::max(), i, start, num_items, dim2);
-							else if (bs == 256) getMinSecondBestMedium_kernel<<<gs, bs, 0, stream>>>(&(host_struct_private[i * devices + t]), gpu_struct_private[t], semaphore_private[t], min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t]t, v_private[t], picked_private[t], std::numeric_limits<SC>::max(), i, start, num_items, dim2);
+							else if (bs == 256) getMinSecondBestMedium_kernel<<<gs, bs, 0, stream>>>(&(host_struct_private[i * devices + t]), gpu_struct_private[t], semaphore_private[t], min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], v_private[t], picked_private[t], std::numeric_limits<SC>::max(), i, start, num_items, dim2);
 							else getMinSecondBestLarge_kernel<<<gs, bs, 0, stream>>>(&(host_struct_private[i * devices + t]), gpu_struct_private[t], semaphore_private[t], min_cost_private[t], max_cost_private[t], picked_cost_private[t], jmin_private[t], tt[t], v_private[t], picked_private[t], std::numeric_limits<SC>::max(), i, start, num_items, dim2);
 						}
 						else if (devices > 32)
@@ -1860,11 +1860,9 @@ namespace lap
 #pragma omp parallel num_threads(devices) shared(triggered, start_t, unassignedfound, require_colsol_copy, min, jmin, colsol_old)
 					{
 						int t = omp_get_thread_num();
-						checkCudaErrors(cudaSetDevice(iterator.ws.device[t]));
-						int start = iterator.ws.part[t].first;
-						int end = iterator.ws.part[t].second;
-						int num_items = end - start;
-						cudaStream_t stream = iterator.ws.stream[t];
+						int start, num_items, bs, gs;
+						cudaStream_t stream;
+						selectDevice(start, num_items, stream, bs, gs, t, iterator);
 
 						for (int fc = 0; fc < dim_limit; fc++)
 						{
@@ -1996,14 +1994,16 @@ namespace lap
 							{
 								// update 'distances' between freerow and all unscanned columns, via next scanned column.
 								int i = colsol_old;
+
+								if ((jmin >= start) && (jmin < start + num_items))
+								{
+									triggered = t;
+									start_t = start;
+									host_min_private[triggered].data_valid = 0;
+								}
+
 								if (i < dim)
 								{
-									if ((jmin >= start) && (jmin < end))
-									{
-										triggered = t;
-										start_t = start;
-										host_min_private[triggered].data_valid = 0;
-									}
 									// continue search
 									if (peerEnabled)
 									{
@@ -2026,12 +2026,6 @@ namespace lap
 								}
 								else
 								{
-									if ((jmin >= start) && (jmin < end))
-									{
-										triggered = t;
-										start_t = start;
-										host_min_private[triggered].data_valid = 0;
-									}
 #pragma omp barrier
 									// continue search
 									if (peerEnabled)
@@ -2103,7 +2097,7 @@ namespace lap
 							// update column prices. can increase or decrease
 							if (fast)
 							{
-								if ((endofpath >= start) && (endofpath < end))
+								if ((endofpath >= start) && (endofpath < start + num_items))
 								{
 									colsol[endofpath] = f;
 									rowsol[f] = endofpath;
