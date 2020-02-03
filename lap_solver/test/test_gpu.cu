@@ -1,5 +1,5 @@
 #define LAP_CUDA
-#define LAP_OPENMP
+//#define LAP_OPENMP
 #define LAP_QUIET
 //#define LAP_DISPLAY_EVALUATED
 //#define LAP_DEBUG

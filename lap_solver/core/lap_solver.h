@@ -719,7 +719,7 @@ namespace lap
 				}
 				else
 				{
-					epsilon = std::min(epsilon / TC(4), (TC)(total_eps / SC(8 * dim2)));
+					epsilon = std::min(epsilon / TC(4), (TC)(total_eps / SC(8 * (size_t)dim2)));
 				}
 #ifdef LAP_DEBUG
 				lapDebug << " -> " << epsilon;

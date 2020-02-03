@@ -21,8 +21,8 @@ namespace lap
 			lapAlloc(mod_v, dim2, __FILE__, __LINE__);
 			lapAlloc(v2, dim2, __FILE__, __LINE__);
 			lapAlloc(picked, dim2, __FILE__, __LINE__);
-			lapAlloc(merge_cost, omp_get_max_threads() << 3, __FILE__, __LINE__);
-			lapAlloc(merge_idx, omp_get_max_threads() << 3, __FILE__, __LINE__);
+			lapAlloc(merge_cost, (long long)omp_get_max_threads() << 3, __FILE__, __LINE__);
+			lapAlloc(merge_idx, (long long)omp_get_max_threads() << 3, __FILE__, __LINE__);
 
 			SC lower_bound = SC(0);
 			SC upper_bound = SC(0);

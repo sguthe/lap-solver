@@ -128,7 +128,7 @@ namespace lap
 			{
 				int t = 0;
 				while (y >= ws.part[t].second) t++;
-				long long off_y = y - ws.part[t].first;
+				long long off_y = y - (long long)ws.part[t].first;
 				long long off_x = x;
 				off_x *= stride[t];
 				return cc[t][off_x + off_y];

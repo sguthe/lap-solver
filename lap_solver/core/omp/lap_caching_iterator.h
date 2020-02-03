@@ -35,7 +35,7 @@ namespace lap
 					int t = omp_get_thread_num();
 					int size = ws.part[t].second - ws.part[t].first;
 					cache[t].setSize(entries, dim);
-					lapAlloc(rows[t], entries * size, __FILE__, __LINE__);
+					lapAlloc(rows[t], (size_t)entries * (size_t)size, __FILE__, __LINE__);
 					// first touch
 					rows[t][0] = TC(0);
 				}

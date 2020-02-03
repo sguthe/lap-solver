@@ -1000,6 +1000,9 @@ namespace lap
 
 			int devices = (int)iterator.ws.device.size();
 
+			int old_max_threads = omp_get_max_threads();
+			omp_set_num_threads(devices);
+
 			const TC **tt;
 			lapAlloc(tt, devices, __FILE__, __LINE__);
 
@@ -1919,6 +1922,8 @@ namespace lap
 
 			// set device back to first one
 			checkCudaErrors(cudaSetDevice(iterator.ws.device[0]));
+
+			omp_set_num_threads(old_max_threads);
 		}
 
 		template <class SC, class TC, class CF>
