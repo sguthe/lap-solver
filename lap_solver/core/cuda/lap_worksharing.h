@@ -106,6 +106,11 @@ namespace lap
 					exit(-1);
 				}
 
+#ifndef LAP_CUDA_OPENMP
+				// single threaded code supports only a single device (TODO: select the fastest device)
+				while (device.size() > 1) device.pop_back();
+#endif
+
 				int devices = (int)device.size();
 				lapAlloc(part, devices, __FILE__, __LINE__);
 				for (int p = 0; p < devices; p++)
@@ -127,7 +132,7 @@ namespace lap
 				for (int t = 0; t < devices; t++)
 				{
 					cudaSetDevice(device[t]);
-					cudaStreamCreate(&stream[t]);
+					checkCudaErrors(cudaStreamCreateWithFlags(&stream[t], cudaStreamNonBlocking));
 				}
 			}
 			~Worksharing()

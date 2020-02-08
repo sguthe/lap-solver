@@ -351,7 +351,7 @@ namespace lap
 
 		// 32 threads per block, up to 32 blocks, requires no shared memory and no thread synchronization
 		template <class MS, class SC>
-		__global__ void getMinMaxBestSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int start, int size, int dim2)
+		__global__ void getMinMaxBestSmallVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -373,7 +373,7 @@ namespace lap
 
 		// 256 threads per block, up to 256 blocks
 		template <class MS, class SC>
-		__global__ void getMinMaxBestMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int start, int size, int dim2)
+		__global__ void getMinMaxBestMediumVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -398,7 +398,7 @@ namespace lap
 
 		// 1024 threads per block, can be more than 1024 blocks
 		template <class MS, class SC>
-		__global__ void getMinMaxBestLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int start, int size, int dim2)
+		__global__ void getMinMaxBestLargeVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, int * data_valid, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -423,7 +423,7 @@ namespace lap
 
 		// 32 threads per block, up to 32 blocks, requires no shared memory and no thread synchronization
 		template <class MS, class SC>
-		__global__ void getMinMaxBestSingleSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int size, int dim2)
+		__global__ void getMinMaxBestSingleSmallVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -444,7 +444,7 @@ namespace lap
 
 		// 256 threads per block, up to 256 blocks
 		template <class MS, class SC>
-		__global__ void getMinMaxBestSingleMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int size, int dim2)
+		__global__ void getMinMaxBestSingleMediumVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -468,7 +468,7 @@ namespace lap
 
 		// 1024 threads per block, can be more than 1024 blocks
 		template <class MS, class SC>
-		__global__ void getMinMaxBestSingleLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int size, int dim2)
+		__global__ void getMinMaxBestSingleLargeVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, int *picked, SC min, SC max, int i, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 

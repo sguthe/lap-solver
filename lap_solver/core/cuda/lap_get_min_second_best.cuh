@@ -330,7 +330,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void getMinSecondBestSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		__global__ void getMinSecondBestSmallSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -353,7 +353,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void getMinSecondBestMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		__global__ void getMinSecondBestSmallMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -379,7 +379,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void getMinSecondBestLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		__global__ void getMinSecondBestSmallLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -549,7 +549,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int start, int size, int dim2)
+		__global__ void getMinSecondBestSmallVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -570,7 +570,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int start, int size, int dim2)
+		__global__ void getMinSecondBestMediumVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -594,7 +594,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int start, int size, int dim2)
+		__global__ void getMinSecondBestLargeVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -618,7 +618,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		__global__ void getMinSecondBestSmallSmallVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -641,7 +641,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		__global__ void getMinSecondBestSmallMediumVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -667,7 +667,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		__global__ void getMinSecondBestSmallLargeVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -693,7 +693,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestLargeSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		__global__ void getMinSecondBestLargeSmallVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -716,7 +716,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestLargeMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		__global__ void getMinSecondBestLargeMediumVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -742,7 +742,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestLargeLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
+		__global__ void getMinSecondBestLargeLargeVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, volatile MS *s_old, SC max, int i, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -768,7 +768,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestSingleSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int size, int dim2)
+		__global__ void getMinSecondBestSingleSmallVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -789,7 +789,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestSingleMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int size, int dim2)
+		__global__ void getMinSecondBestSingleMediumVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -813,7 +813,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinSecondBestSingleLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int size, int dim2)
+		__global__ void getMinSecondBestSingleLargeVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_max_cost, volatile SC *o_picked_cost, volatile int *o_jmin, SC *v, int *picked, SC max, int i, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 

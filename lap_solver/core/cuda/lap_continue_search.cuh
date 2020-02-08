@@ -188,7 +188,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void continueSearchJMinMinSmall_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchJMinMinSmallVirtual_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -208,7 +208,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void continueSearchJMinMinMedium_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchJMinMinMediumVirtual_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -228,7 +228,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void continueSearchJMinMinLarge_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchJMinMinLargeVirtual_kernel(MS *s, unsigned int *semaphore, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 

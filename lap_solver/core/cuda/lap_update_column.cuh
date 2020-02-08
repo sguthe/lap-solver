@@ -38,7 +38,7 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, TC eps, int size)
+		__global__ void updateColumnPricesEpsilon_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, TC eps, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -53,7 +53,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, int *dst, int *src, int size)
+		__global__ void updateColumnPricesCopy_kernel(char *colactive, SC min, SC *v, SC *d, int *dst, int *src, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -67,7 +67,7 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, TC eps, int *dst, int *src, int size)
+		__global__ void updateColumnPricesEpsilonCopy_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, TC eps, int *dst, int *src, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -83,7 +83,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, int size, int *colsol, int csol)
+		__global__ void updateColumnPricesFast_kernel(char *colactive, SC min, SC *v, SC *d, int size, int *colsol, int csol)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;
@@ -97,7 +97,7 @@ namespace lap
 		}
 
 		template <class SC, class TC>
-		__global__ void updateColumnPrices_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, TC eps, int size, int *colsol, int csol)
+		__global__ void updateColumnPricesEpsilonFast_kernel(char *colactive, SC min, SC *v, SC *d, SC *total_d, SC *total_eps, TC eps, int size, int *colsol, int csol)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 			if (j >= size) return;

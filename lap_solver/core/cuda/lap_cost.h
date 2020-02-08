@@ -52,9 +52,46 @@ namespace lap
 			STATE *state;
 			TC initialEpsilon;
 			TC lowerEpsilon;
+
+			int devices;
+
+#ifdef LAP_CUDA_GRAPH
+			cudaGraph_t *graph;
+			cudaGraphNode_t *kernelNode;
+			cudaGraphExec_t *graphExec;
+			cudaKernelNodeParams *kernelNodeParams;
+			int *graphCreated;
+#endif
 		public:
-			SimpleCostFunction(GETCOST &getcost, STATE *state) : getcost(getcost), state(state), initialEpsilon(0), lowerEpsilon(0) {}
-			~SimpleCostFunction() {}
+			SimpleCostFunction(GETCOST &getcost, STATE *state, int devices) : getcost(getcost), state(state), initialEpsilon(0), lowerEpsilon(0), devices(devices)
+			{
+#ifdef LAP_CUDA_GRAPH
+				lapAlloc(graph, devices, __FILE__, __LINE__);
+				lapAlloc(kernelNode, devices, __FILE__, __LINE__);
+				lapAlloc(graphExec, devices, __FILE__, __LINE__);
+				lapAlloc(kernelNodeParams, devices, __FILE__, __LINE__);
+				lapAlloc(graphCreated, devices, __FILE__, __LINE__);
+				for (int t = 0; t < devices; t++) graphCreated[t] = 0;
+#endif
+			}
+			~SimpleCostFunction()
+			{
+#ifdef LAP_CUDA_GRAPH
+				for (int t = 0; t < devices; t++)
+				{
+					if (graphCreated[t] != 0)
+					{
+						checkCudaErrors(cudaGraphExecDestroy(graphExec[t]));
+						checkCudaErrors(cudaGraphDestroy(graph[t]));
+					}
+				}
+				lapFree(graph);
+				lapFree(kernelNode);
+				lapFree(graphExec);
+				lapFree(kernelNodeParams);
+				lapFree(graphCreated);
+#endif
+			}
 		public:
 			__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
@@ -62,11 +99,37 @@ namespace lap
 			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
 			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async) const
 			{
+#ifndef LAP_CUDA_GRAPH
 				dim3 block_size, grid_size;
 				block_size.x = 256;
 				grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
 				grid_size.y = rows;
 				getCostRow_kernel<<<grid_size, block_size, 0, stream>>>(row, getcost, state[t], x, start, end - start);
+#else
+				int count = end - start;
+				void* kernelArgs[6] = { (void*)&row, (void*)&getcost, (void*)&(state[t]), &x, &start, &count };
+				if (graphCreated[t] == 0)
+				{
+					checkCudaErrors(cudaGraphCreate(&(graph[t]), 0));
+					graphCreated[t] = 1;
+					memset(&(kernelNodeParams[t]), 0, sizeof(kernelNodeParams));
+					kernelNodeParams[t].func = (void*)getCostRow_kernel<TC, GETCOST, STATE>;
+					kernelNodeParams[t].gridDim = dim3((count + 255) / 256, rows, 1);
+					kernelNodeParams[t].blockDim = dim3(256, 1, 1);
+					kernelNodeParams[t].sharedMemBytes = 0;
+					kernelNodeParams[t].kernelParams = (void**)kernelArgs;
+					kernelNodeParams[t].extra = NULL;
+					checkCudaErrors(cudaGraphAddKernelNode(&(kernelNode[t]), graph[t], 0, 0, &(kernelNodeParams[t])));
+					checkCudaErrors(cudaGraphInstantiate(&(graphExec[t]), graph[t], NULL, NULL, 0));
+				}
+				else
+				{
+					kernelNodeParams[t].gridDim = dim3((count + 255) / 256, rows, 1);
+					kernelNodeParams[t].kernelParams = (void**)kernelArgs;
+					checkCudaErrors(cudaGraphExecKernelNodeSetParams(graphExec[t], kernelNode[t], &(kernelNodeParams[t])));
+				}
+				checkCudaErrors(cudaGraphLaunch(graphExec[t], stream));
+#endif
 			}
 			__forceinline void getCost(TC *row, cudaStream_t stream, int *rowsol, int dim) const
 			{

@@ -318,7 +318,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void getMinimalCostSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
+		__global__ void getMinimalCostSmallSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -341,7 +341,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void getMinimalCostMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
+		__global__ void getMinimalCostSmallMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -367,7 +367,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void getMinimalCostLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
+		__global__ void getMinimalCostSmallLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, TC *tt, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -537,7 +537,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int start, int size, int dim2)
+		__global__ void getMinimalCostSmallVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -558,7 +558,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int start, int size, int dim2)
+		__global__ void getMinimalCostMediumVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -582,7 +582,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int start, int size, int dim2)
+		__global__ void getMinimalCostLargeVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int start, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -606,7 +606,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
+		__global__ void getMinimalCostSmallSmallVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -629,7 +629,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
+		__global__ void getMinimalCostSmallMediumVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -655,7 +655,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
+		__global__ void getMinimalCostSmallLargeVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -681,7 +681,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostLargeSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
+		__global__ void getMinimalCostLargeSmallVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -704,7 +704,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostLargeMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
+		__global__ void getMinimalCostLargeMediumVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -730,7 +730,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostLargeLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
+		__global__ void getMinimalCostLargeLargeVirtual_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, volatile MS *s_old, SC max, int start, int size, int dim2, int devices)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -756,7 +756,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostSingleSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int size, int dim2)
+		__global__ void getMinimalCostSingleSmallVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -777,7 +777,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostSingleMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int size, int dim2)
+		__global__ void getMinimalCostSingleMediumVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -801,7 +801,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getMinimalCostSingleLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int size, int dim2)
+		__global__ void getMinimalCostSingleLargeVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile int *o_jmin, volatile SC *o_min_cost_real, SC *v, int *picked, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 

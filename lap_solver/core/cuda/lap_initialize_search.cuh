@@ -116,7 +116,7 @@ namespace lap
 
 		// copy colsol
 		template <class MS, class SC, class TC>
-		__global__ void initializeSearchMinSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinSmallCopy_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -128,7 +128,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void initializeSearchMinMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinMediumCopy_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -140,7 +140,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void initializeSearchMinLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinLargeCopy_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -153,7 +153,7 @@ namespace lap
 
 		// virtual row
 		template <class MS, class SC>
-		__global__ void initializeSearchMinSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinSmallVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -165,7 +165,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void initializeSearchMinMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinMediumVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -177,7 +177,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void initializeSearchMinLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinLargeVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -190,7 +190,7 @@ namespace lap
 
 		// copy colsol, virtual row
 		template <class MS, class SC>
-		__global__ void initializeSearchMinSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinSmallVirtualCopy_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -202,7 +202,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void initializeSearchMinMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinMediumVirtualCopy_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -214,7 +214,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void initializeSearchMinLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinLargeVirtualCopy_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -227,7 +227,7 @@ namespace lap
 
 		// normal + initialize second struct
 		template <class MS, class SC, class TC>
-		__global__ void initializeSearchMinSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinSmallRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -241,7 +241,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void initializeSearchMinMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinMediumRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -255,7 +255,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void initializeSearchMinLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinLargeRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -270,7 +270,7 @@ namespace lap
 
 		// copy colsol + initialize second struct
 		template <class MS, class SC, class TC>
-		__global__ void initializeSearchMinSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinSmallCopyRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -284,7 +284,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void initializeSearchMinMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinMediumCopyRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -298,7 +298,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void initializeSearchMinLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinLargeCopyRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -313,7 +313,7 @@ namespace lap
 
 		// virtual row + initialize second struct
 		template <class MS, class SC>
-		__global__ void initializeSearchMinSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinSmallVirtualRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -327,7 +327,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void initializeSearchMinMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinMediumVirtualRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -341,7 +341,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void initializeSearchMinLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinLargeVirtualRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -356,7 +356,7 @@ namespace lap
 
 		// copy colsol, virtual row + initialize second struct
 		template <class MS, class SC>
-		__global__ void initializeSearchMinSmall_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinSmallVirtualCopyRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -370,7 +370,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void initializeSearchMinMedium_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinMediumVirtualCopyRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -384,7 +384,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void initializeSearchMinLarge_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
+		__global__ void initializeSearchMinLargeVirtualCopyRemote_kernel(MS *s, MS *s2, unsigned int *semaphore, volatile SC *o_min, volatile int *o_jmin, volatile int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *colsol_in, int *pred, int f, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
