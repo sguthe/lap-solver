@@ -53,7 +53,7 @@ namespace lap
 				lapFree(table);
 			}
 
-			__forceinline void getHitMiss(long long &hit, long long &miss) { cache[0].getHitMiss(hit, miss); }
+			__forceinline void getHitMiss(long long &hit, long long &miss) { table[0].cache.getHitMiss(hit, miss); }
 
 			__forceinline const TC *getRow(int t, int i)
 			{
