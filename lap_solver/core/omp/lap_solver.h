@@ -395,13 +395,13 @@ namespace lap
 			return std::pair<SC, SC>((SC)upper, (SC)lower);
 		}
 
-		__forceinline void dijkstraCheck(int& endofpath, bool& unassignedfound, int jmin, int** colsol, char** colactive, std::pair<int, int>* part)
+		__forceinline void dijkstraCheck(int t, int& endofpath, bool& unassignedfound, int jmin, int** colsol, char** colactive, std::pair<int, int>* part)
 		{
-			int t = 0;
-			while (jmin >= part[t].second) t++;
-			int jmin_local = jmin - part[t].first;
-			colactive[t][jmin_local] = 0;
-			if (colsol[t][jmin_local] < 0)
+			int tt = 0;
+			while (jmin >= part[tt].second) tt++;
+			int jmin_local = jmin - part[tt].first;
+			if (t == tt) colactive[t][jmin_local] = 0;
+			if (colsol[tt][jmin_local] < 0)
 			{
 				endofpath = jmin;
 				unassignedfound = true;
@@ -590,10 +590,6 @@ namespace lap
 				memset(rowsol, -1, dim2 * sizeof(int));
 				//memset(colsol, -1, dim2 * sizeof(int));
 
-				int jmin;
-				SC min, min_n;
-				bool unassignedfound;
-
 #ifndef LAP_QUIET
 				int old_complete = 0;
 #endif
@@ -609,12 +605,18 @@ namespace lap
 #ifndef LAP_QUIET
 				displayProgress(start_time, elapsed, 0, dim2, " rows");
 #endif
-				jmin = dim2;
-				min = std::numeric_limits<SC>::max();
 				SC tt_jmin_global;
 
 #pragma omp parallel
 				{
+					// these will be calculated in every thread
+					int jmin;
+					SC min, min_n;
+					bool unassignedfound;
+
+					jmin = dim2;
+					min = std::numeric_limits<SC>::max();
+
 					int t = omp_get_thread_num();
 					int start = iterator.ws.part[t].first;
 					int end = iterator.ws.part[t].second;
@@ -676,40 +678,37 @@ namespace lap
 						min_private[t << 3] = min_local;
 						jmin_private[t << 3] = jmin_local;
 #pragma omp barrier
-						if (t == 0)
-						{
 #ifndef LAP_QUIET
-							if (f < dim) total_rows++; else total_virtual++;
+						if (t == 0) if (f < dim) total_rows++; else total_virtual++;
 #else
 #ifdef LAP_DISPLAY_EVALUATED
-							if (f < dim) total_rows++; else total_virtual++;
+						if (t == 0) if (f < dim) total_rows++; else total_virtual++;
 #endif
 #endif
 #ifdef LAP_ROWS_SCANNED
-							scancount[f]++;
+						if (t == 0) scancount[f]++;
 #endif
-							min = min_private[0];
-							jmin = jmin_private[0];
-							bool taken = false;
-							for (int tt = 1; tt < omp_get_num_threads(); tt++)
+						min = min_private[0];
+						jmin = jmin_private[0];
+						bool taken = false;
+						for (int tt = 1; tt < omp_get_num_threads(); tt++)
+						{
+							int start = iterator.ws.part[tt].first;
+							if (min_private[tt << 3] < min)
 							{
-								int start = iterator.ws.part[tt].first;
-								if (min_private[tt << 3] < min)
-								{
-									// better than previous
-									min = min_private[tt << 3];
-									jmin = jmin_private[tt << 3] + start;
-									taken = (colsol[tt][jmin_private[tt << 3]] >= 0);
-								}
-								else if ((min_private[tt << 3] == min) && (taken) && (colsol[tt][jmin_private[tt << 3]] < 0))
-								{
-									jmin = jmin_private[tt << 3] + start;
-									taken = false;
-								}
+								// better than previous
+								min = min_private[tt << 3];
+								jmin = jmin_private[tt << 3] + start;
+								taken = (colsol[tt][jmin_private[tt << 3]] >= 0);
 							}
-							unassignedfound = false;
-							dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, iterator.ws.part);
+							else if ((min_private[tt << 3] == min) && (taken) && (colsol[tt][jmin_private[tt << 3]] < 0))
+							{
+								jmin = jmin_private[tt << 3] + start;
+								taken = false;
+							}
 						}
+						unassignedfound = false;
+						dijkstraCheck(t, endofpath, unassignedfound, jmin, colsol, colactive, iterator.ws.part);
 						// marked skipped columns that were cheaper
 						if (f >= dim)
 						{
@@ -722,7 +721,6 @@ namespace lap
 								}
 							}
 						}
-#pragma omp barrier
 						while (!unassignedfound)
 						{
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
@@ -802,40 +800,37 @@ namespace lap
 							min_private[t << 3] = min_local;
 							jmin_private[t << 3] = jmin_local;
 #pragma omp barrier
-							if (t == 0)
-							{
 #ifndef LAP_QUIET
-								if (i < dim) total_rows++; else total_virtual++;
+							if (t == 0) if (i < dim) total_rows++; else total_virtual++;
 #else
 #ifdef LAP_DISPLAY_EVALUATED
-								if (i < dim) total_rows++; else total_virtual++;
+							if (t == 0) if (i < dim) total_rows++; else total_virtual++;
 #endif
 #endif
 #ifdef LAP_ROWS_SCANNED
-								scancount[i]++;
+							if (t == 0) scancount[i]++;
 #endif
-								min_n = min_private[0];
-								jmin = jmin_private[0];
-								bool taken = false;
-								for (int tt = 1; tt < omp_get_num_threads(); tt++)
+							min_n = min_private[0];
+							jmin = jmin_private[0];
+							bool taken = false;
+							for (int tt = 1; tt < omp_get_num_threads(); tt++)
+							{
+								int start = iterator.ws.part[tt].first;
+								if (min_private[tt << 3] < min_n)
 								{
-									int start = iterator.ws.part[tt].first;
-									if (min_private[tt << 3] < min_n)
-									{
-										// better than previous
-										min_n = min_private[tt << 3];
-										jmin = jmin_private[tt << 3] + start;
-										taken = (colsol[tt][jmin_private[tt << 3]] >= 0);
-									}
-									else if ((min_private[tt << 3] == min_n) && (taken) && (colsol[tt][jmin_private[tt << 3]] < 0))
-									{
-										jmin = jmin_private[tt << 3] + start;
-										taken = false;
-									}
+									// better than previous
+									min_n = min_private[tt << 3];
+									jmin = jmin_private[tt << 3] + start;
+									taken = (colsol[tt][jmin_private[tt << 3]] >= 0);
 								}
-								min = std::max(min, min_n);
-								dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, iterator.ws.part);
+								else if ((min_private[tt << 3] == min_n) && (taken) && (colsol[tt][jmin_private[tt << 3]] < 0))
+								{
+									jmin = jmin_private[tt << 3] + start;
+									taken = false;
+								}
 							}
+							min = std::max(min, min_n);
+							dijkstraCheck(t, endofpath, unassignedfound, jmin, colsol, colactive, iterator.ws.part);
 							// marked skipped columns that were cheaper
 							if (i >= dim)
 							{
@@ -848,8 +843,8 @@ namespace lap
 									}
 								}
 							}
-#pragma omp barrier
 						}
+#pragma omp barrier
 						// update column prices. can increase or decrease
 						if (epsilon > SC(0))
 						{
