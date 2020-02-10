@@ -395,8 +395,7 @@ namespace lap
 			return std::pair<SC, SC>((SC)upper, (SC)lower);
 		}
 
-		template <typename P>
-		__forceinline void dijkstraCheck(int& endofpath, bool& unassignedfound, int jmin, int** colsol, char** colactive, P part)
+		__forceinline void dijkstraCheck(int& endofpath, bool& unassignedfound, int jmin, int** colsol, char** colactive, std::pair<int, int>* part)
 		{
 			int t = 0;
 			while (jmin >= part[t].second) t++;
@@ -409,8 +408,7 @@ namespace lap
 			}
 		}
 
-		template <typename P>
-		__forceinline void resetRowColumnAssignment(int& endofpath, int f, int** pred, int* rowsol, int** colsol, P part)
+		__forceinline void resetRowColumnAssignment(int& endofpath, int f, int** pred, int* rowsol, int** colsol, std::pair<int, int>* part)
 		{
 			int i;
 			do
