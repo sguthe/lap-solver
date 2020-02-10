@@ -679,10 +679,10 @@ namespace lap
 						jmin_private[t << 3] = jmin_local;
 #pragma omp barrier
 #ifndef LAP_QUIET
-						if (t == 0) if (f < dim) total_rows++; else total_virtual++;
+						if ((t == 0) && (f < dim)) total_rows++; else total_virtual++;
 #else
 #ifdef LAP_DISPLAY_EVALUATED
-						if (t == 0) if (f < dim) total_rows++; else total_virtual++;
+						if ((t == 0) && (f < dim)) total_rows++; else total_virtual++;
 #endif
 #endif
 #ifdef LAP_ROWS_SCANNED
@@ -801,10 +801,10 @@ namespace lap
 							jmin_private[t << 3] = jmin_local;
 #pragma omp barrier
 #ifndef LAP_QUIET
-							if (t == 0) if (i < dim) total_rows++; else total_virtual++;
+							if ((t == 0) && (f < dim)) total_rows++; else total_virtual++;
 #else
 #ifdef LAP_DISPLAY_EVALUATED
-							if (t == 0) if (i < dim) total_rows++; else total_virtual++;
+							if ((t == 0) && (f < dim)) total_rows++; else total_virtual++;
 #endif
 #endif
 #ifdef LAP_ROWS_SCANNED
