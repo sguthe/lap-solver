@@ -60,14 +60,13 @@ namespace lap
 						const int t = omp_get_thread_num();
 						stride[t] = ws.part[t].second - ws.part[t].first;
 						lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
-						// first touch
-						cc[t][0] = TC(0);
-					}
-					for (int x = 0; x < x_size; x++)
-					{
-						for (int t = 0; t < omp_get_max_threads(); t++)
+						for (int x = 0; x < x_size; x++)
 						{
-							cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
+							for (int tt = 0; tt < omp_get_max_threads(); tt++)
+							{
+#pragma omp barrier
+								if (tt == t) cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
+							}
 						}
 					}
 				}
