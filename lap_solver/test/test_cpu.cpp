@@ -969,7 +969,8 @@ template <class C>
 void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C)
 {
 	// random costs (directly supply cost matrix)
-	for (int range = 0; range < 3; range++)
+	//for (int range = 0; range < 3; range++)
+	int range = 2;
 	{
 		for (long long NN = min_tab * min_tab; NN <= max_tab * max_tab; NN <<= 1)
 		{
