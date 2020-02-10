@@ -1,8 +1,6 @@
 #define LAP_CUDA
 // required for multiple devices
 #define LAP_CUDA_OPENMP
-// use CUDA graphs for reducing call overhead
-#define LAP_CUDA_GRAPH
 #define LAP_QUIET
 //#define LAP_DISPLAY_EVALUATED
 //#define LAP_DEBUG
@@ -599,7 +597,8 @@ template <class C>
 void testInteger(long long min_tab, long long max_tab, long long max_memory, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent)
 {
 	// random costs (directly supply cost matrix)
-	for (int range = 0; range < 3; range++)
+	//for (int range = 0; range < 3; range++)
+	int range = 2;
 	{
 		for (long long NN = min_tab * min_tab; NN <= max_tab * max_tab; NN <<= 1)
 		{

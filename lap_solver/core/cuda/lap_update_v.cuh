@@ -266,7 +266,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__ void updateVSingleSmall_kernel(SC *v, int *taken, int picked, int size)
+		__global__ void updateVSingleSmallVirtual_kernel(SC *v, int *taken, int picked, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -285,7 +285,7 @@ namespace lap
 		}
 
 		template <class SC>
-		__global__ void updateVSingle_kernel(SC *v, int *taken, int picked, int size)
+		__global__ void updateVSingleVirtual_kernel(SC *v, int *taken, int picked, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -305,7 +305,7 @@ namespace lap
 		}
 
 		template <class SC, class MS>
-		__global__ void updateVMultiSmall_kernel(volatile MS *s, volatile MS *s2, unsigned int *semaphore, SC *v, int *taken, int picked, int size)
+		__global__ void updateVMultiSmallVirtual_kernel(volatile MS *s, volatile MS *s2, unsigned int *semaphore, SC *v, int *taken, int picked, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -330,7 +330,7 @@ namespace lap
 		}
 
 		template <class SC, class MS>
-		__global__ void updateVMulti_kernel(volatile MS *s, volatile MS *s2, unsigned int *semaphore, SC *v, int *taken, int picked, int size)
+		__global__ void updateVMultiVirtual_kernel(volatile MS *s, volatile MS *s2, unsigned int *semaphore, SC *v, int *taken, int picked, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 

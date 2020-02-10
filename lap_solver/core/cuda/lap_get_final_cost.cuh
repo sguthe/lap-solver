@@ -235,7 +235,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getFinalCostSmall_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC *v, SC max, int j_picked, int size)
+		__global__ void getFinalCostSmallVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC *v, SC max, int j_picked, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -254,7 +254,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getFinalCostMedium_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC *v, SC max, int j_picked, int size)
+		__global__ void getFinalCostMediumVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC *v, SC max, int j_picked, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -275,7 +275,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__global__ void getFinalCostLarge_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC *v, SC max, int j_picked, int size)
+		__global__ void getFinalCostLargeVirtual_kernel(MS *s, unsigned int *semaphore, volatile SC *o_min_cost, volatile SC *o_picked_cost, volatile SC *o_picked_v, SC *v, SC max, int j_picked, int size)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
