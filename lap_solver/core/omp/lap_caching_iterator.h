@@ -15,9 +15,13 @@ namespace lap
 		protected:
 			int dim, dim2;
 			int entries;
-			TC** rows;
-			CACHE *cache;
-			bool *tc;
+			struct table_t
+			{
+				TC* rows;
+				CACHE cache;
+				char dummy[256 - sizeof(TC*) - sizeof(CACHE)];
+			};
+			table_t* table;
 		public:
 			CF &costfunc;
 			Worksharing &ws;
@@ -27,17 +31,15 @@ namespace lap
 				: dim(dim), dim2(dim2), entries(entries), costfunc(costfunc), ws(ws)
 			{
 				int max_threads = omp_get_max_threads();
-				lapAlloc(cache, max_threads, __FILE__, __LINE__);
-				lapAlloc(rows, max_threads, __FILE__, __LINE__);
-				lapAlloc(tc, max_threads, __FILE__, __LINE__);
+				lapAlloc(table, max_threads, __FILE__, __LINE__);
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
 					int size = ws.part[t].second - ws.part[t].first;
-					cache[t].setSize(entries, dim);
-					lapAlloc(rows[t], (size_t)entries * (size_t)size, __FILE__, __LINE__);
+					table[t].cache.setSize(entries, dim);
+					lapAlloc(table[t].rows, (size_t)entries * (size_t)size, __FILE__, __LINE__);
 					// first touch
-					rows[t][0] = TC(0);
+					table[t].rows[0] = TC(0);
 				}
 			}
 
@@ -46,11 +48,9 @@ namespace lap
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
-					lapFree(rows[t]);
+					lapFree(table[t].rows);
 				}
-				lapFree(rows);
-				lapFree(cache);
-				lapFree(tc);
+				lapFree(table);
 			}
 
 			__forceinline void getHitMiss(long long &hit, long long &miss) { cache[0].getHitMiss(hit, miss); }
@@ -59,12 +59,12 @@ namespace lap
 			{
 				int size = ws.part[t].second - ws.part[t].first;
 				int idx;
-				bool found = cache[t].find(idx, i);
+				bool found = table[t].cache.find(idx, i);
 				if (!found)
 				{
-					costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, i, ws.part[t].first, ws.part[t].second);
+					costfunc.getCostRow(table[t].rows + (long long)size * (long long)idx, i, ws.part[t].first, ws.part[t].second);
 				}
-				return rows[t] + (long long)size * (long long)idx;
+				return table[t].rows + (long long)size * (long long)idx;
 			}
 		};
 	}

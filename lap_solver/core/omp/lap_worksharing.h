@@ -8,12 +8,35 @@ namespace lap
 		class Worksharing
 		{
 		public:
-			std::pair<int, int> *part;
+			//std::pair<int, int> *part;
+			class pair_t
+			{
+			private:
+				std::pair<int, int>* data;
+			public:
+				pair_t() { data = 0; }
+				~pair_t() { free(); }
+
+				std::pair<int, int>& pair_t::operator[](int b)
+				{
+					return data[b << 5];
+				}
+				void alloc(int i)
+				{
+					lapAlloc(data, i << 5, __FILE__, __LINE__);
+				}
+				void free()
+				{
+					if (data != 0) lapFree(data);
+					data = 0;
+				}
+			};
+			pair_t part;
 		public:
 			Worksharing(int size, int multiple)
 			{
 				int max_threads = omp_get_max_threads();
-				lapAlloc(part, max_threads, __FILE__, __LINE__);
+				part.alloc(max_threads);
 				for (int p = 0; p < max_threads; p++)
 				{
 					long long x0 = (long long)p * (long long)size;
@@ -30,7 +53,7 @@ namespace lap
 					else part[p].second = size;
 				}
 			}
-			~Worksharing() { if (part != 0) lapFree(part); }
+			~Worksharing() { part.free(); }
 		};
 	}
 }

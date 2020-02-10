@@ -29,20 +29,24 @@ namespace lap
 		protected:
 			int x_size;
 			int y_size;
-			TC **cc;
-			int *stride;
+			struct table_t
+			{
+				TC* cc;
+				int stride;
+				char dummy[256 - sizeof (TC *) - sizeof(int)];
+			};
+			table_t* table;
 			bool free_in_destructor;
 			Worksharing &ws;
 		protected:
 			void referenceTable(TC *tab)
 			{
 				free_in_destructor = false;
-				lapAlloc(cc, omp_get_max_threads(), __FILE__, __LINE__);
-				lapAlloc(stride, omp_get_max_threads(), __FILE__, __LINE__);
+				lapAlloc(table, omp_get_max_threads(), __FILE__, __LINE__);
 				for (int t = 0; t < omp_get_max_threads(); t++)
 				{
-					stride[t] = y_size;
-					cc[t] = &(tab[ws.part[t].first]);
+					table[t].stride = y_size;
+					table[t].cc = &(tab[ws.part[t].first]);
 				}
 			}
 			
@@ -50,22 +54,21 @@ namespace lap
 			void initTable(DirectCost &cost)
 			{
 				free_in_destructor = true;
-				lapAlloc(cc, omp_get_max_threads(), __FILE__, __LINE__);
-				lapAlloc(stride, omp_get_max_threads(), __FILE__, __LINE__);
+				lapAlloc(table, omp_get_max_threads(), __FILE__, __LINE__);
 				if (cost.isSequential())
 				{
 					// cost table needs to be initialized sequentially
 #pragma omp parallel
 					{
 						const int t = omp_get_thread_num();
-						stride[t] = ws.part[t].second - ws.part[t].first;
-						lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+						table[t].stride = ws.part[t].second - ws.part[t].first;
+						lapAlloc(table[t].cc, (long long)(table[t].stride) * (long long)x_size, __FILE__, __LINE__);
 						for (int x = 0; x < x_size; x++)
 						{
 							for (int tt = 0; tt < omp_get_max_threads(); tt++)
 							{
 #pragma omp barrier
-								if (tt == t) cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
+								if (tt == t) cost.getCostRow(table[t].cc + (long long)x * (long long)table[t].stride, x, ws.part[t].first, ws.part[t].second);
 							}
 						}
 					}
@@ -76,13 +79,13 @@ namespace lap
 #pragma omp parallel
 					{
 						const int t = omp_get_thread_num();
-						stride[t] = ws.part[t].second - ws.part[t].first;
-						lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+						table[t].stride = ws.part[t].second - ws.part[t].first;
+						lapAlloc(table[t].cc, (long long)(table[t].stride) * (long long)x_size, __FILE__, __LINE__);
 						// first touch
-						cc[t][0] = TC(0);
+						table[t].cc[0] = TC(0);
 						for (int x = 0; x < x_size; x++)
 						{
-							cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
+							cost.getCostRow(table[t].cc + (long long)x * (long long)table[t].stride, x, ws.part[t].first, ws.part[t].second);
 						}
 					}
 				}
@@ -96,10 +99,10 @@ namespace lap
 #pragma omp parallel
 				{
 					const int t = omp_get_thread_num();
-					stride[t] = ws.part[t].second - ws.part[t].first;
-					lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+					table[t].stride = ws.part[t].second - ws.part[t].first;
+					lapAlloc(table[t].cc, (long long)(table[t].stride) * (long long)x_size, __FILE__, __LINE__);
 					// first touch
-					cc[t][0] = TC(0);
+					table[t].cc[0] = TC(0);
 				}
 			}
 		public:
@@ -116,29 +119,28 @@ namespace lap
 				if (free_in_destructor)
 				{
 #pragma omp parallel
-					lapFree(cc[omp_get_thread_num()]);
+					lapFree(table[omp_get_thread_num()].cc);
 				}
-				lapFree(cc);
-				lapFree(stride);
+				lapFree(table);
 			}
 			public:
-			__forceinline const TC *getRow(int t, int x) const { return cc[t] + (long long)x * (long long)stride[t]; }
+			__forceinline const TC *getRow(int t, int x) const { return table[t].cc + (long long)x * (long long)table[t].stride; }
 			__forceinline const TC getCost(int x, int y) const
 			{
 				int t = 0;
 				while (y >= ws.part[t].second) t++;
 				long long off_y = y - (long long)ws.part[t].first;
 				long long off_x = x;
-				off_x *= stride[t];
-				return cc[t][off_x + off_y];
+				off_x *= table[t].stride;
+				return table[t].cc[off_x + off_y];
 			}
 			__forceinline void setRow(int x, TC *v)
 			{
 				for (int t = 0; t < omp_get_max_threads(); t++)
 				{
 					long long off_x = x;
-					off_x *= stride[t];
-					memcpy(&(cc[t][off_x]), &(v[ws.part[t].first]), (ws.part[t].second - ws.part[t].first) * sizeof(TC));
+					off_x *= table[t].stride;
+					memcpy(&(table[t].cc[off_x]), &(v[ws.part[t].first]), (ws.part[t].second - ws.part[t].first) * sizeof(TC));
 				}
 			}
 		};
