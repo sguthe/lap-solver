@@ -94,8 +94,7 @@ namespace lap
 			void createTable()
 			{
 				free_in_destructor = true;
-				lapAlloc(cc, omp_get_max_threads(), __FILE__, __LINE__);
-				lapAlloc(stride, omp_get_max_threads(), __FILE__, __LINE__);
+				lapAlloc(table, omp_get_max_threads(), __FILE__, __LINE__);
 #pragma omp parallel
 				{
 					const int t = omp_get_thread_num();
