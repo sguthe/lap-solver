@@ -17,7 +17,7 @@ namespace lap
 				pair_t() { data = 0; }
 				~pair_t() { free(); }
 
-				std::pair<int, int>& pair_t::operator[](int b)
+				std::pair<int, int>& operator[](int b)
 				{
 					return data[b << 5];
 				}
