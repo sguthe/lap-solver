@@ -636,7 +636,9 @@ namespace lap
 
 					memset(colsol_private, -1, count * sizeof(int));
 
+#if _MSC_VER && !__INTEL_COMPILER
 					int threads = omp_get_num_threads();
+#endif
 
 					for (int fc = 0; fc < dim_limit; fc++)
 					{
