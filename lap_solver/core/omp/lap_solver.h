@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../lap_solver.h"
-#include <atomic>
 
 namespace lap
 {
@@ -45,29 +44,37 @@ namespace lap
 						auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
 						getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 						j_min += iterator.ws.part[t].first;
-						int idx = (i & 1) << 4;
 						// a little hacky
 						if ((i >= iterator.ws.part[t].first) && (i < iterator.ws.part[t].second))
 						{
-							merge_cost[idx + 1] = cost(i - iterator.ws.part[t].first);
+							merge_cost[threads << 1] = cost(i - iterator.ws.part[t].first);
 						}
-						merge_cost[idx + (t << 5)] = min_cost_l;
-						merge_cost[idx + (t << 5) + 2] = picked_cost_l;
-						merge_idx[idx + (t << 5)] = j_min;
+						merge_cost[t] = min_cost_l;
+						merge_cost[t + threads] = picked_cost_l;
+						merge_idx[t] = j_min;
+
 #pragma omp barrier
-						min_cost_l = merge_cost[idx];
-						max_cost_l = merge_cost[idx + 1];
-						picked_cost_l = merge_cost[idx + 2];
-						j_min = merge_idx[idx];
-						for (int ii = 1; ii < threads; ii++)
+						if (t == 0)
 						{
-							min_cost_l = std::min(min_cost_l, merge_cost[idx + (ii << 5)]);
-							if (merge_cost[idx + (ii << 5) + 2] < picked_cost_l)
+							for (int ii = 1; ii < threads; ii++)
 							{
-								picked_cost_l = merge_cost[idx + (ii << 5) + 2];
-								j_min = merge_idx[idx + (ii << 5)];
+								min_cost_l = std::min(min_cost_l, merge_cost[ii]);
+								if (merge_cost[ii + threads] < picked_cost_l)
+								{
+									picked_cost_l = merge_cost[ii + threads];
+									j_min = merge_idx[ii];
+								}
 							}
+							merge_cost[(threads << 2)] = min_cost_l;
+							merge_cost[(threads << 2) + 1] = merge_cost[threads << 1];
+							merge_cost[(threads << 2) + 2] = picked_cost_l;
+							merge_idx[threads] = j_min;
 						}
+#pragma omp barrier
+						min_cost_l = merge_cost[(threads << 2)];
+						max_cost_l = merge_cost[(threads << 2) + 1];
+						picked_cost_l = merge_cost[(threads << 2) + 2];
+						j_min = merge_idx[threads];
 						updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
 					else
@@ -75,29 +82,37 @@ namespace lap
 						auto cost = [](int j) -> SC { return SC(0); };
 						getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 						j_min += iterator.ws.part[t].first;
-						int idx = (i & 1) << 4;
 						// a little hacky
 						if ((i >= iterator.ws.part[t].first) && (i < iterator.ws.part[t].second))
 						{
-							merge_cost[idx + 1] = cost(i - iterator.ws.part[t].first);
+							merge_cost[threads << 1] = cost(i - iterator.ws.part[t].first);
 						}
-						merge_cost[idx + (t << 5)] = min_cost_l;
-						merge_cost[idx + (t << 5) + 2] = picked_cost_l;
-						merge_idx[idx + (t << 5)] = j_min;
+						merge_cost[t] = min_cost_l;
+						merge_cost[t + threads] = picked_cost_l;
+						merge_idx[t] = j_min;
+
 #pragma omp barrier
-						min_cost_l = merge_cost[idx];
-						max_cost_l = merge_cost[idx + 1];
-						picked_cost_l = merge_cost[idx + 2];
-						j_min = merge_idx[idx];
-						for (int ii = 1; ii < threads; ii++)
+						if (t == 0)
 						{
-							min_cost_l = std::min(min_cost_l, merge_cost[idx + (ii << 5)]);
-							if (merge_cost[idx + (ii << 5) + 2] < picked_cost_l)
+							for (int ii = 1; ii < threads; ii++)
 							{
-								picked_cost_l = merge_cost[idx + (ii << 5) + 2];
-								j_min = merge_idx[idx + (ii << 5)];
+								min_cost_l = std::min(min_cost_l, merge_cost[ii]);
+								if (merge_cost[ii + threads] < picked_cost_l)
+								{
+									picked_cost_l = merge_cost[ii + threads];
+									j_min = merge_idx[ii];
+								}
 							}
+							merge_cost[(threads << 2)] = min_cost_l;
+							merge_cost[(threads << 2) + 1] = merge_cost[threads << 1];
+							merge_cost[(threads << 2) + 2] = picked_cost_l;
+							merge_idx[threads] = j_min;
 						}
+#pragma omp barrier
+						min_cost_l = merge_cost[(threads << 2)];
+						max_cost_l = merge_cost[(threads << 2) + 1];
+						picked_cost_l = merge_cost[(threads << 2) + 2];
+						j_min = merge_idx[threads];
 						updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
 					if (t == 0)
@@ -160,29 +175,28 @@ namespace lap
 						getMinSecondBest(min_cost_l, second_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
 					j_min += iterator.ws.part[t].first;
-					int idx = (i & 1) << 4;
-					merge_cost[idx + (t << 5)] = min_cost_l;
-					merge_cost[idx + (t << 5) + 1] = second_cost_l;
-					merge_cost[idx + (t << 5) + 2] = picked_cost_l;
-					merge_idx[idx + (t << 5)] = j_min;
+					merge_cost[t] = min_cost_l;
+					merge_cost[t + threads] = second_cost_l;
+					merge_cost[t + (threads << 1)] = picked_cost_l;
+					merge_idx[t] = j_min;
 #pragma omp barrier
 					if (t == 0)
 					{
 						for (int ii = 1; ii < threads; ii++)
 						{
-							if (merge_cost[idx + (ii << 5)] < min_cost_l)
+							if (merge_cost[ii] < min_cost_l)
 							{
-								second_cost_l = std::min(min_cost_l, merge_cost[idx + (ii << 5) + 1]);
-								min_cost_l = merge_cost[idx + (ii << 5)];
+								second_cost_l = std::min(min_cost_l, merge_cost[ii + threads]);
+								min_cost_l = merge_cost[ii];
 							}
 							else
 							{
-								second_cost_l = std::min(second_cost_l, merge_cost[idx + (ii << 5)]);
+								second_cost_l = std::min(second_cost_l, merge_cost[ii]);
 							}
-							if (merge_cost[idx + (ii << 5) + 2] < picked_cost_l)
+							if (merge_cost[ii + (threads << 1)] < picked_cost_l)
 							{
-								picked_cost_l = merge_cost[idx + (ii << 5) + 2];
-								j_min = merge_idx[idx + (ii << 5)];
+								picked_cost_l = merge_cost[ii + (threads << 1)];
+								j_min = merge_idx[ii];
 							}
 						}
 						perm[i] = i;
@@ -192,6 +206,7 @@ namespace lap
 						lower_bound += min_cost_l + v[j_min];
 						upper_bound += picked_cost_l + v[j_min];
 					}
+#pragma omp barrier
 				}
 			}
 
@@ -236,23 +251,20 @@ namespace lap
 							auto cost = [&v, &iterator, &t](int j) -> SC { return -v[j + iterator.ws.part[t].first]; };
 							getMinimalCost(j_min, min_cost, min_cost_real, cost, mod_v + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 						}
-						merge_cost[(t << 5)] = min_cost;
-						merge_cost[(t << 5) + 1] = min_cost_real;
-						merge_idx[(t << 5)] = j_min + iterator.ws.part[t].first;
+						merge_cost[t] = min_cost;
+						merge_cost[t + threads] = min_cost_real;
+						merge_idx[t] = j_min + iterator.ws.part[t].first;
 #pragma omp barrier
 						if (t == 0)
 						{
-							min_cost = merge_cost[0];
-							min_cost_real = merge_cost[1];
-							j_min = merge_idx[0];
 							for (int ii = 1; ii < threads; ii++)
 							{
-								if (merge_cost[(ii << 5)] < min_cost)
+								if (merge_cost[ii] < min_cost)
 								{
-									min_cost = merge_cost[(ii << 5)];
-									j_min = merge_idx[(ii << 5)];
+									min_cost = merge_cost[ii];
+									j_min = merge_idx[ii];
 								}
-								min_cost_real = std::min(min_cost_real, merge_cost[(ii << 5) + 1]);
+								min_cost_real = std::min(min_cost_real, merge_cost[ii + threads]);
 							}
 							mod_v[j_min] = SC(0);
 							upper_bound += min_cost + v[j_min];
@@ -396,12 +408,12 @@ namespace lap
 			return std::pair<SC, SC>((SC)upper, (SC)lower);
 		}
 
-		__forceinline void dijkstraCheck(int& endofpath, bool& unassignedfound, int jmin, int** colsol, char** colactive, std::pair<int, int>* part)
+		__forceinline void dijkstraCheck(int& endofpath, bool& unassignedfound, int jmin, int** colsol, char** colactive, int tt, std::pair<int, int>* part)
 		{
 			int t = 0;
 			while (jmin >= part[t].second) t++;
 			int jmin_local = jmin - part[t].first;
-			colactive[t][jmin_local] = 0;
+			if (t == tt) colactive[t][jmin_local] = 0;
 			if (colsol[t][jmin_local] < 0)
 			{
 				endofpath = jmin;
@@ -591,9 +603,9 @@ namespace lap
 				memset(rowsol, -1, dim2 * sizeof(int));
 				//memset(colsol, -1, dim2 * sizeof(int));
 
-				int jmin;
-				SC min, min_n;
-				bool unassignedfound;
+				//int jmin;
+				//SC min, min_n;
+				//bool unassignedfound;
 
 #ifndef LAP_QUIET
 				int old_complete = 0;
@@ -610,12 +622,9 @@ namespace lap
 #ifndef LAP_QUIET
 				displayProgress(start_time, elapsed, 0, dim2, " rows");
 #endif
-				jmin = dim2;
-				min = std::numeric_limits<SC>::max();
+				//jmin = dim2;
+				//min = std::numeric_limits<SC>::max();
 				SC tt_jmin_global;
-
-				std::atomic<int> thread_counter;
-				thread_counter = 0;
 
 #pragma omp parallel
 				{
@@ -639,6 +648,7 @@ namespace lap
 						int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
 						int jmin_local = dim2;
 						SC min_local = std::numeric_limits<SC>::max();
+						bool unassignedfound_local;
 						if (f < dim)
 						{
 							auto tt = iterator.getRow(t, f);
@@ -679,66 +689,62 @@ namespace lap
 								else if ((h == min_local) && (colsol_private[jmin_local] >= 0) && (colsol_private[j] < 0)) jmin_local = j;
 							}
 						}
-						min_private[t << 4] = min_local;
-						jmin_private[t << 4] = jmin_local;
-						int passed = thread_counter++;
-						if (passed == threads - 1)
-						{
-							thread_counter = 0;
+						min_private[t] = min_local;
+						jmin_private[t] = jmin_local;
+#pragma omp barrier
 #ifndef LAP_QUIET
-							if (f < dim) total_rows++; else total_virtual++;
+						if (t == 0) { if (f < dim) total_rows++; else total_virtual++; }
 #else
 #ifdef LAP_DISPLAY_EVALUATED
-							if (f < dim) total_rows++; else total_virtual++;
+						if (t == 0) { if (f < dim) total_rows++; else total_virtual++; }
 #endif
 #endif
 #ifdef LAP_ROWS_SCANNED
-							scancount[f]++;
+						if (t == 0) scancount[f]++;
 #endif
-							min = min_private[0];
-							jmin = jmin_private[0];
-							bool taken = false;
-							for (int tt = 1; tt < omp_get_num_threads(); tt++)
+						bool taken = false;
+						min_local = min_private[0];
+						jmin_local = jmin_private[0];
+						for (int tt = 1; tt < omp_get_num_threads(); tt++)
+						{
+							int start = iterator.ws.part[tt].first;
+							if (min_private[tt] < min_local)
 							{
-								int start = iterator.ws.part[tt].first;
-								if (min_private[tt << 4] < min)
-								{
-									// better than previous
-									min = min_private[tt << 4];
-									jmin = jmin_private[tt << 4] + start;
-									taken = (colsol[tt][jmin_private[tt << 4]] >= 0);
-								}
-								else if ((min_private[tt << 4] == min) && (taken) && (colsol[tt][jmin_private[tt << 4]] < 0))
-								{
-									jmin = jmin_private[tt << 4] + start;
-									taken = false;
-								}
+								// better than previous
+								min_local = min_private[tt];
+								jmin_local = jmin_private[tt] + start;
+								taken = (colsol[tt][jmin_private[tt]] >= 0);
 							}
-							unassignedfound = false;
-							dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, iterator.ws.part);
+							else if ((min_private[tt] == min_local) && (taken) && (colsol[tt][jmin_private[tt]] < 0))
+							{
+								jmin_local = jmin_private[tt] + start;
+								taken = false;
+							}
 						}
+						unassignedfound_local = false;
+						dijkstraCheck(endofpath, unassignedfound_local, jmin_local, colsol, colactive, t, iterator.ws.part);
+
 						// marked skipped columns that were cheaper
 						if (f >= dim)
 						{
-#pragma omp barrier
 							for (int j = 0; j < count; j++)
 							{
 								// ignore any columns assigned to virtual rows
-								if ((colsol_private[j] >= dim) && (d_private[j] <= min))
+								if ((colsol_private[j] >= dim) && (d_private[j] <= min_local))
 								{
 									colactive_private[j] = 0;
 								}
 							}
 						}
-#pragma omp barrier
-						while (!unassignedfound)
+						while (!unassignedfound_local)
 						{
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
 							int t_jmin = 0;
-							while (jmin >= iterator.ws.part[t_jmin].second) t_jmin++;
-							int idx_jmin = jmin - iterator.ws.part[t_jmin].first;
+							while (jmin_local >= iterator.ws.part[t_jmin].second) t_jmin++;
+							int idx_jmin = jmin_local - iterator.ws.part[t_jmin].first;
 							int i = colsol[t_jmin][idx_jmin];
 							jmin_local = dim2;
+							SC old_min_local = min_local;
 							min_local = std::numeric_limits<SC>::max();
 							if (i < dim)
 							{
@@ -747,7 +753,7 @@ namespace lap
 								auto tt = iterator.getRow(t, i);
 								if (t_jmin == t)
 								{
-									tt_jmin_global = tt_jmin = (SC)tt[jmin - start];
+									tt_jmin_global = tt_jmin = (SC)tt[idx_jmin];
 								}
 #pragma omp barrier
 								if (t_jmin != t)
@@ -758,7 +764,7 @@ namespace lap
 								{
 									if (colactive_private[j] != 0)
 									{
-										SC v2 = (tt[j] - tt_jmin) - (v_private[j] - v_jmin) + min;
+										SC v2 = (tt[j] - tt_jmin) - (v_private[j] - v_jmin) + old_min_local;
 										SC h = d_private[j];
 										if (v2 < h)
 										{
@@ -784,7 +790,7 @@ namespace lap
 								{
 									if (colactive_private[j] != 0)
 									{
-										SC v2 = -(v_private[j] - v_jmin) + min;
+										SC v2 = -(v_private[j] - v_jmin) + old_min_local;
 										SC h = d_private[j];
 										if (v2 < h)
 										{
@@ -807,77 +813,72 @@ namespace lap
 									}
 								}
 							}
-							min_private[t << 4] = min_local;
-							jmin_private[t << 4] = jmin_local;
-							int passed = thread_counter++;
-							if (passed == threads - 1)
-							{
-								thread_counter = 0;
+							min_private[t] = min_local;
+							jmin_private[t] = jmin_local;
+#pragma omp barrier
 #ifndef LAP_QUIET
-								if (i < dim) total_rows++; else total_virtual++;
+							if (t == 0) { if (f < dim) total_rows++; else total_virtual++; }
 #else
 #ifdef LAP_DISPLAY_EVALUATED
-								if (i < dim) total_rows++; else total_virtual++;
+							if (t == 0) { if (f < dim) total_rows++; else total_virtual++; }
 #endif
 #endif
 #ifdef LAP_ROWS_SCANNED
-								scancount[i]++;
+							if (t == 0) scancount[i]++;
 #endif
-								min_n = min_private[0];
-								jmin = jmin_private[0];
-								bool taken = false;
-								for (int tt = 1; tt < omp_get_num_threads(); tt++)
+							bool taken = false;
+							min_local = min_private[0];
+							jmin_local = jmin_private[0];
+							for (int tt = 1; tt < omp_get_num_threads(); tt++)
 								{
-									int start = iterator.ws.part[tt].first;
-									if (min_private[tt << 4] < min_n)
-									{
-										// better than previous
-										min_n = min_private[tt << 4];
-										jmin = jmin_private[tt << 4] + start;
-										taken = (colsol[tt][jmin_private[tt << 4]] >= 0);
-									}
-									else if ((min_private[tt << 4] == min_n) && (taken) && (colsol[tt][jmin_private[tt << 4]] < 0))
-									{
-										jmin = jmin_private[tt << 4] + start;
-										taken = false;
-									}
+								int start = iterator.ws.part[tt].first;
+								if (min_private[tt] < min_local)
+								{
+									// better than previous
+									min_local = min_private[tt];
+									jmin_local = jmin_private[tt] + start;
+									taken = (colsol[tt][jmin_private[tt]] >= 0);
 								}
-								min = std::max(min, min_n);
-								dijkstraCheck(endofpath, unassignedfound, jmin, colsol, colactive, iterator.ws.part);
+								else if ((min_private[tt] == min_local) && (taken) && (colsol[tt][jmin_private[tt]] < 0))
+								{
+									jmin_local = jmin_private[tt] + start;
+									taken = false;
+								}
 							}
+							unassignedfound_local = false;
+							dijkstraCheck(endofpath, unassignedfound_local, jmin_local, colsol, colactive, t, iterator.ws.part);
+							min_local = std::max(old_min_local, min_local);
 							// marked skipped columns that were cheaper
 							if (i >= dim)
 							{
-#pragma omp barrier
 								for (int j = 0; j < count; j++)
 								{
 									// ignore any columns assigned to virtual rows
-									if ((colactive_private[j] == 1) && (colsol_private[j] >= dim) && (d_private[j] <= min))
+									if ((colactive_private[j] == 1) && (colsol_private[j] >= dim) && (d_private[j] <= min_local))
 									{
 										colactive_private[j] = 0;
 									}
 								}
 							}
-#pragma omp barrier
 						}
 						// update column prices. can increase or decrease
 						if (epsilon > SC(0))
 						{
-							min_private[t << 4] = SC(0);
-							min_private[(t << 4) + 1] = SC(0);
-							updateColumnPrices(colactive_private, 0, count, min, v_private, d_private, epsilon, min_private[t << 4], min_private[(t << 4) + 1]);
+							min_private[t + 2 * threads] = SC(0);
+							min_private[t + 3 * threads] = SC(0);
+							updateColumnPrices(colactive_private, 0, count, min_local, v_private, d_private, epsilon, min_private[t + 2 * threads], min_private[t + 3 * threads]);
 						}
 						else
 						{
-							updateColumnPrices(colactive_private, 0, count, min, v_private, d_private);
+							updateColumnPrices(colactive_private, 0, count, min_local, v_private, d_private);
 						}
 #pragma omp barrier
 						if (t == 0)
 						{
 							if (epsilon > SC(0)) for (int tt = 0; tt < omp_get_num_threads(); tt++)
 							{
-								total_d += min_private[tt << 4];
-								total_eps += min_private[(tt << 4) + 1];
+								total_d += min_private[tt + 2 * threads];
+								total_eps += min_private[tt + 3 * threads];
 							}
 #ifdef LAP_ROWS_SCANNED
 							{
@@ -895,8 +896,8 @@ namespace lap
 							// reset row and column assignments along the alternating path.
 							resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol, iterator.ws.part);
 							// for next iteration
-							jmin = dim2;
-							min = std::numeric_limits<SC>::max();
+							jmin_local = dim2;
+							min_local = std::numeric_limits<SC>::max();
 #ifndef LAP_QUIET
 							int level;
 							if ((level = displayProgress(start_time, elapsed, fc + 1, dim_limit, " rows")) != 0)
