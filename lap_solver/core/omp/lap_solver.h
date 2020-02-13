@@ -614,7 +614,8 @@ namespace lap
 				min = std::numeric_limits<SC>::max();
 				SC tt_jmin_global;
 
-				std::atomic<int> thread_counter = 0;
+				std::atomic<int> thread_counter;
+				thread_counter.store(0);
 
 #pragma omp parallel
 				{
@@ -685,7 +686,7 @@ namespace lap
 						int passed = ++thread_counter;
 						if (passed == threads)
 						{
-							thread_counter = 0;
+							thread_counter.store(0);
 #ifndef LAP_QUIET
 							if (f < dim) total_rows++; else total_virtual++;
 #else
