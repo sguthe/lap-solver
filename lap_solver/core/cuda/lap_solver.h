@@ -64,6 +64,9 @@ namespace lap
 			SC picked;
 			SC v_jmin;
 			int jmin;
+		private:
+			// 64 bytes to avoid false sharing
+			char dummy[64 - 4 * sizeof(SC) - sizeof(int)];
 		};
 
 		template <class SC>
@@ -75,6 +78,9 @@ namespace lap
 			int jmin;
 			int colsol;
 			int data_valid;
+		private:
+			// 64 bytes to avoid false sharing
+			char dummy[64 - 2 * sizeof(SC) - 3 * sizeof(int)];
 		};
 
 		template <class SC, class MS>

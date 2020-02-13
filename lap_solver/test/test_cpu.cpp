@@ -10,6 +10,11 @@
 #define LAP_MINIMIZE_V
 
 //#define RANDOM_SEED 1234
+#ifndef RANDOM_SEED
+#ifdef LAP_OPENMP
+#define RANDOM_PARALLEL
+#endif
+#endif
 
 // use a sparse solver for problems that have many (>20%) virtual rows
 //#define LAP_SPARSE
@@ -494,7 +499,13 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 			std::mt19937_64 generator(RANDOM_SEED);
 #else
 			std::random_device rd;
+#ifdef RANDOM_PARALLEL
+			int threads = omp_get_max_threads();
+			std::mt19937_64* generator = new std::mt19937_64[threads];
+			for (int t = 0; t < threads; t++) generator[t].seed(rd());
+#else
 			std::mt19937_64 generator(rd());
+#endif
 #endif
 
 			auto start_time = std::chrono::high_resolution_clock::now();
@@ -503,14 +514,22 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 
 			auto get_cost = [&distribution, &generator](int x, int y) -> C
 			{
+#ifdef RANDOM_PARALLEL
+				return distribution(generator[omp_get_thread_num()]);
+#else
 				return distribution(generator);
+#endif
 			};
 
 			if (omp)
 			{
 #ifdef LAP_OPENMP
 				// initialization needs to be serial
+#ifdef RANDOM_PARALLEL
+				solveTableOMP<C, C>(start_time, N, N, get_cost, rowsol, epsilon);
+#else
 				solveTableOMP<C, C>(start_time, N, N, get_cost, rowsol, epsilon, true);
+#endif
 #endif
 			}
 			else
@@ -997,14 +1016,24 @@ void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool 
 				std::mt19937_64 generator(RANDOM_SEED);
 #else
 				std::random_device rd;
+#ifdef RANDOM_PARALLEL
+				int threads = omp_get_max_threads();
+				std::mt19937_64* generator = new std::mt19937_64[threads];
+				for (int t = 0; t < threads; t++) generator[t].seed(rd());
+#else
 				std::mt19937_64 generator(rd());
+#endif
 #endif
 
 				auto start_time = std::chrono::high_resolution_clock::now();
 
 				auto get_cost = [&distribution, &generator](int x, int y) -> int
 				{
+#ifdef RANDOM_PARALLEL
+					return distribution(generator[omp_get_thread_num()]);
+#else
 					return distribution(generator);
+#endif
 				};
 
 				int *rowsol = new int[N];
@@ -1013,7 +1042,11 @@ void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool 
 				{
 #ifdef LAP_OPENMP
 					// initialization needs to be serial
+#ifdef RANDOM_PARALLEL
+					solveTableOMP<C, int>(start_time, N, N, get_cost, rowsol, epsilon);
+#else
 					solveTableOMP<C, int>(start_time, N, N, get_cost, rowsol, epsilon, true);
+#endif
 #endif
 				}
 				else

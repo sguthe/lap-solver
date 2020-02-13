@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../lap_solver.h"
+#include <atomic>
 
 namespace lap
 {
@@ -21,8 +22,8 @@ namespace lap
 			lapAlloc(mod_v, dim2, __FILE__, __LINE__);
 			lapAlloc(v2, dim2, __FILE__, __LINE__);
 			lapAlloc(picked, dim2, __FILE__, __LINE__);
-			lapAlloc(merge_cost, (long long)omp_get_max_threads() << 3, __FILE__, __LINE__);
-			lapAlloc(merge_idx, (long long)omp_get_max_threads() << 3, __FILE__, __LINE__);
+			lapAlloc(merge_cost, (long long)omp_get_max_threads() << 4, __FILE__, __LINE__);
+			lapAlloc(merge_idx, (long long)omp_get_max_threads() << 4, __FILE__, __LINE__);
 
 			SC lower_bound = SC(0);
 			SC upper_bound = SC(0);
@@ -41,7 +42,6 @@ namespace lap
 					if (i < dim)
 					{
 						const auto *tt = iterator.getRow(t, i);
-#pragma omp barrier
 						auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
 						getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 						j_min += iterator.ws.part[t].first;
@@ -50,9 +50,9 @@ namespace lap
 						{
 							merge_cost[1] = cost(i - iterator.ws.part[t].first);
 						}
-						merge_cost[(t << 3)] = min_cost_l;
-						merge_cost[(t << 3) + 2] = picked_cost_l;
-						merge_idx[(t << 3)] = j_min;
+						merge_cost[(t << 4)] = min_cost_l;
+						merge_cost[(t << 4) + 2] = picked_cost_l;
+						merge_idx[(t << 4)] = j_min;
 #pragma omp barrier
 						min_cost_l = merge_cost[0];
 						max_cost_l = merge_cost[1];
@@ -60,11 +60,11 @@ namespace lap
 						j_min = merge_idx[0];
 						for (int ii = 1; ii < threads; ii++)
 						{
-							min_cost_l = std::min(min_cost_l, merge_cost[(ii << 3)]);
-							if (merge_cost[(ii << 3) + 2] < picked_cost_l)
+							min_cost_l = std::min(min_cost_l, merge_cost[(ii << 4)]);
+							if (merge_cost[(ii << 4) + 2] < picked_cost_l)
 							{
-								picked_cost_l = merge_cost[(ii << 3) + 2];
-								j_min = merge_idx[(ii << 3)];
+								picked_cost_l = merge_cost[(ii << 4) + 2];
+								j_min = merge_idx[(ii << 4)];
 							}
 						}
 						updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
@@ -79,9 +79,9 @@ namespace lap
 						{
 							merge_cost[1] = cost(i - iterator.ws.part[t].first);
 						}
-						merge_cost[(t << 3)] = min_cost_l;
-						merge_cost[(t << 3) + 2] = picked_cost_l;
-						merge_idx[(t << 3)] = j_min;
+						merge_cost[(t << 4)] = min_cost_l;
+						merge_cost[(t << 4) + 2] = picked_cost_l;
+						merge_idx[(t << 4)] = j_min;
 #pragma omp barrier
 						min_cost_l = merge_cost[0];
 						max_cost_l = merge_cost[1];
@@ -89,11 +89,11 @@ namespace lap
 						j_min = merge_idx[0];
 						for (int ii = 1; ii < threads; ii++)
 						{
-							min_cost_l = std::min(min_cost_l, merge_cost[(ii << 3)]);
-							if (merge_cost[(ii << 3) + 2] < picked_cost_l)
+							min_cost_l = std::min(min_cost_l, merge_cost[(ii << 4)]);
+							if (merge_cost[(ii << 4) + 2] < picked_cost_l)
 							{
-								picked_cost_l = merge_cost[(ii << 3) + 2];
-								j_min = merge_idx[(ii << 3)];
+								picked_cost_l = merge_cost[(ii << 4) + 2];
+								j_min = merge_idx[(ii << 4)];
 							}
 						}
 						updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
@@ -158,29 +158,28 @@ namespace lap
 						getMinSecondBest(min_cost_l, second_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
 					j_min += iterator.ws.part[t].first;
-#pragma omp barrier
-					merge_cost[(t << 3)] = min_cost_l;
-					merge_cost[(t << 3) + 1] = second_cost_l;
-					merge_cost[(t << 3) + 2] = picked_cost_l;
-					merge_idx[(t << 3)] = j_min;
+					merge_cost[(t << 4)] = min_cost_l;
+					merge_cost[(t << 4) + 1] = second_cost_l;
+					merge_cost[(t << 4) + 2] = picked_cost_l;
+					merge_idx[(t << 4)] = j_min;
 #pragma omp barrier
 					if (t == 0)
 					{
 						for (int ii = 1; ii < threads; ii++)
 						{
-							if (merge_cost[(ii << 3)] < min_cost_l)
+							if (merge_cost[(ii << 4)] < min_cost_l)
 							{
-								second_cost_l = std::min(min_cost_l, merge_cost[(ii << 3) + 1]);
-								min_cost_l = merge_cost[(ii << 3)];
+								second_cost_l = std::min(min_cost_l, merge_cost[(ii << 4) + 1]);
+								min_cost_l = merge_cost[(ii << 4)];
 							}
 							else
 							{
-								second_cost_l = std::min(second_cost_l, merge_cost[(ii << 3)]);
+								second_cost_l = std::min(second_cost_l, merge_cost[(ii << 4)]);
 							}
-							if (merge_cost[(ii << 3) + 2] < picked_cost_l)
+							if (merge_cost[(ii << 4) + 2] < picked_cost_l)
 							{
-								picked_cost_l = merge_cost[(ii << 3) + 2];
-								j_min = merge_idx[(ii << 3)];
+								picked_cost_l = merge_cost[(ii << 4) + 2];
+								j_min = merge_idx[(ii << 4)];
 							}
 						}
 						perm[i] = i;
@@ -234,9 +233,9 @@ namespace lap
 							auto cost = [&v, &iterator, &t](int j) -> SC { return -v[j + iterator.ws.part[t].first]; };
 							getMinimalCost(j_min, min_cost, min_cost_real, cost, mod_v + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 						}
-						merge_cost[(t << 3)] = min_cost;
-						merge_cost[(t << 3) + 1] = min_cost_real;
-						merge_idx[(t << 3)] = j_min + iterator.ws.part[t].first;
+						merge_cost[(t << 4)] = min_cost;
+						merge_cost[(t << 4) + 1] = min_cost_real;
+						merge_idx[(t << 4)] = j_min + iterator.ws.part[t].first;
 #pragma omp barrier
 						if (t == 0)
 						{
@@ -245,12 +244,12 @@ namespace lap
 							j_min = merge_idx[0];
 							for (int ii = 1; ii < threads; ii++)
 							{
-								if (merge_cost[(ii << 3)] < min_cost)
+								if (merge_cost[(ii << 4)] < min_cost)
 								{
-									min_cost = merge_cost[(ii << 3)];
-									j_min = merge_idx[(ii << 3)];
+									min_cost = merge_cost[(ii << 4)];
+									j_min = merge_idx[(ii << 4)];
 								}
-								min_cost_real = std::min(min_cost_real, merge_cost[(ii << 3) + 1]);
+								min_cost_real = std::min(min_cost_real, merge_cost[(ii << 4) + 1]);
 							}
 							mod_v[j_min] = SC(0);
 							upper_bound += min_cost + v[j_min];
@@ -352,13 +351,12 @@ namespace lap
 							min_cost_real = std::numeric_limits<SC>::max();
 							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++) min_cost_real = std::min(min_cost_real, -v[j]);
 						}
-#pragma omp barrier
-						merge_cost[t << 3] = min_cost_real;
+						merge_cost[t << 4] = min_cost_real;
 #pragma omp barrier
 						// bounds are relative to v
 						if (t == 0)
 						{
-							for (int ii = 1; ii < threads; ii++) min_cost_real = std::min(min_cost_real, merge_cost[ii << 3]);
+							for (int ii = 1; ii < threads; ii++) min_cost_real = std::min(min_cost_real, merge_cost[ii << 4]);
 							lower_bound += min_cost_real + v[picked[i]];
 						}
 					}
@@ -503,9 +501,9 @@ namespace lap
 
 			SC *min_private;
 			int *jmin_private;
-			// use << 3 to avoid false sharing
-			lapAlloc(min_private, omp_get_max_threads() << 3, __FILE__, __LINE__);
-			lapAlloc(jmin_private, omp_get_max_threads() << 3, __FILE__, __LINE__);
+			// use << 4 to avoid false sharing
+			lapAlloc(min_private, omp_get_max_threads() << 4, __FILE__, __LINE__);
+			lapAlloc(jmin_private, omp_get_max_threads() << 4, __FILE__, __LINE__);
 
 #ifdef LAP_ROWS_SCANNED
 			unsigned long long *scancount;
@@ -673,8 +671,8 @@ namespace lap
 								else if ((h == min_local) && (colsol_private[jmin_local] >= 0) && (colsol_private[j] < 0)) jmin_local = j;
 							}
 						}
-						min_private[t << 3] = min_local;
-						jmin_private[t << 3] = jmin_local;
+						min_private[t << 4] = min_local;
+						jmin_private[t << 4] = jmin_local;
 #pragma omp barrier
 						if (t == 0)
 						{
@@ -694,16 +692,16 @@ namespace lap
 							for (int tt = 1; tt < omp_get_num_threads(); tt++)
 							{
 								int start = iterator.ws.part[tt].first;
-								if (min_private[tt << 3] < min)
+								if (min_private[tt << 4] < min)
 								{
 									// better than previous
-									min = min_private[tt << 3];
-									jmin = jmin_private[tt << 3] + start;
-									taken = (colsol[tt][jmin_private[tt << 3]] >= 0);
+									min = min_private[tt << 4];
+									jmin = jmin_private[tt << 4] + start;
+									taken = (colsol[tt][jmin_private[tt << 4]] >= 0);
 								}
-								else if ((min_private[tt << 3] == min) && (taken) && (colsol[tt][jmin_private[tt << 3]] < 0))
+								else if ((min_private[tt << 4] == min) && (taken) && (colsol[tt][jmin_private[tt << 4]] < 0))
 								{
-									jmin = jmin_private[tt << 3] + start;
+									jmin = jmin_private[tt << 4] + start;
 									taken = false;
 								}
 							}
@@ -800,8 +798,8 @@ namespace lap
 									}
 								}
 							}
-							min_private[t << 3] = min_local;
-							jmin_private[t << 3] = jmin_local;
+							min_private[t << 4] = min_local;
+							jmin_private[t << 4] = jmin_local;
 #pragma omp barrier
 							if (t == 0)
 							{
@@ -821,16 +819,16 @@ namespace lap
 								for (int tt = 1; tt < omp_get_num_threads(); tt++)
 								{
 									int start = iterator.ws.part[tt].first;
-									if (min_private[tt << 3] < min_n)
+									if (min_private[tt << 4] < min_n)
 									{
 										// better than previous
-										min_n = min_private[tt << 3];
-										jmin = jmin_private[tt << 3] + start;
-										taken = (colsol[tt][jmin_private[tt << 3]] >= 0);
+										min_n = min_private[tt << 4];
+										jmin = jmin_private[tt << 4] + start;
+										taken = (colsol[tt][jmin_private[tt << 4]] >= 0);
 									}
-									else if ((min_private[tt << 3] == min_n) && (taken) && (colsol[tt][jmin_private[tt << 3]] < 0))
+									else if ((min_private[tt << 4] == min_n) && (taken) && (colsol[tt][jmin_private[tt << 4]] < 0))
 									{
-										jmin = jmin_private[tt << 3] + start;
+										jmin = jmin_private[tt << 4] + start;
 										taken = false;
 									}
 								}
@@ -855,9 +853,9 @@ namespace lap
 						// update column prices. can increase or decrease
 						if (epsilon > SC(0))
 						{
-							min_private[t << 3] = SC(0);
-							min_private[(t << 3) + 1] = SC(0);
-							updateColumnPrices(colactive_private, 0, count, min, v_private, d_private, epsilon, min_private[t << 3], min_private[(t << 3) + 1]);
+							min_private[t << 4] = SC(0);
+							min_private[(t << 4) + 1] = SC(0);
+							updateColumnPrices(colactive_private, 0, count, min, v_private, d_private, epsilon, min_private[t << 4], min_private[(t << 4) + 1]);
 						}
 						else
 						{
@@ -868,8 +866,8 @@ namespace lap
 						{
 							if (epsilon > SC(0)) for (int tt = 0; tt < omp_get_num_threads(); tt++)
 							{
-								total_d += min_private[tt << 3];
-								total_eps += min_private[(tt << 3) + 1];
+								total_d += min_private[tt << 4];
+								total_eps += min_private[(tt << 4) + 1];
 							}
 #ifdef LAP_ROWS_SCANNED
 							{
