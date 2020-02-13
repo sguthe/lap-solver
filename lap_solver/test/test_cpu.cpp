@@ -12,7 +12,7 @@
 //#define RANDOM_SEED 1234
 #ifndef RANDOM_SEED
 #ifdef LAP_OPENMP
-//#define RANDOM_PARALLEL
+#define RANDOM_PARALLEL
 #endif
 #endif
 
