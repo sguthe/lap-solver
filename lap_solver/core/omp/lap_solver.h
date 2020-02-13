@@ -786,6 +786,7 @@ namespace lap
 							else
 							{
 								SC v_jmin = v[t_jmin][idx_jmin];
+#pragma omp barrier
 								for (int j = 0; j < count; j++)
 								{
 									if (colactive_private[j] != 0)
