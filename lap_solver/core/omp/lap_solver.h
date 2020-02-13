@@ -619,8 +619,6 @@ namespace lap
 #if _MSC_VER && !__INTEL_COMPILER
 				std::atomic<int> thread_counter;
 				thread_counter = 0;
-#else
-				int thread_counter = 0;
 #endif
 
 #pragma omp parallel
@@ -687,16 +685,16 @@ namespace lap
 						}
 						min_private[t << 4] = min_local;
 						jmin_private[t << 4] = jmin_local;
-//#pragma omp barrier
-//						if (t == 0)
-						int passed;
-#if !(_MSC_VER && !__INTEL_COMPILER)
-#pragma omp atomic capture
-#endif
-						passed = thread_counter++;
+#if _MSC_VER && !__INTEL_COMPILER
+						int passed = thread_counter++;
 						if (passed == threads - 1)
 						{
 							thread_counter = 0;
+#else
+#pragma omp barrier
+						if (t == 0)
+						{
+#endif
 #ifndef LAP_QUIET
 							if (f < dim) total_rows++; else total_virtual++;
 #else
@@ -821,16 +819,16 @@ namespace lap
 							}
 							min_private[t << 4] = min_local;
 							jmin_private[t << 4] = jmin_local;
-//#pragma omp barrier
-//							if (t == 0)
-							int passed;
-#if !(_MSC_VER && !__INTEL_COMPILER)
-#pragma omp atomic capture
-#endif
-							passed = thread_counter++;
+#if _MSC_VER && !__INTEL_COMPILER
+							int passed = thread_counter++;
 							if (passed == threads - 1)
 							{
 								thread_counter = 0;
+#else
+#pragma omp barrier
+							if (t == 0)
+							{
+#endif
 #ifndef LAP_QUIET
 								if (i < dim) total_rows++; else total_virtual++;
 #else
