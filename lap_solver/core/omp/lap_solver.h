@@ -617,6 +617,9 @@ namespace lap
 				std::atomic<int> thread_counter;
 				thread_counter.store(0);
 
+				if (thread_counter.is_lock_free()) std::cout << "atomic<int> is lock free." << std::endl;
+				else std::cout << "atomic<int> is not lock free." << std::endl;
+
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
