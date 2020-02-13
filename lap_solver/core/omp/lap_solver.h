@@ -22,8 +22,8 @@ namespace lap
 			lapAlloc(mod_v, dim2, __FILE__, __LINE__);
 			lapAlloc(v2, dim2, __FILE__, __LINE__);
 			lapAlloc(picked, dim2, __FILE__, __LINE__);
-			lapAlloc(merge_cost, (long long)omp_get_max_threads() << 4, __FILE__, __LINE__);
-			lapAlloc(merge_idx, (long long)omp_get_max_threads() << 4, __FILE__, __LINE__);
+			lapAlloc(merge_cost, (long long)omp_get_max_threads() << 5, __FILE__, __LINE__);
+			lapAlloc(merge_idx, (long long)omp_get_max_threads() << 5, __FILE__, __LINE__);
 
 			SC lower_bound = SC(0);
 			SC upper_bound = SC(0);
@@ -45,7 +45,7 @@ namespace lap
 						auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
 						getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 						j_min += iterator.ws.part[t].first;
-						int idx = (i & 1) << 2;
+						int idx = (i & 1) << 5;
 						// a little hacky
 						if ((i >= iterator.ws.part[t].first) && (i < iterator.ws.part[t].second))
 						{
@@ -75,7 +75,7 @@ namespace lap
 						auto cost = [](int j) -> SC { return SC(0); };
 						getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 						j_min += iterator.ws.part[t].first;
-						int idx = (i & 1) << 2;
+						int idx = (i & 1) << 5;
 						// a little hacky
 						if ((i >= iterator.ws.part[t].first) && (i < iterator.ws.part[t].second))
 						{
@@ -160,7 +160,7 @@ namespace lap
 						getMinSecondBest(min_cost_l, second_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
 					j_min += iterator.ws.part[t].first;
-					int idx = (i & 1) << 2;
+					int idx = (i & 1) << 5;
 					merge_cost[idx + (t << 4)] = min_cost_l;
 					merge_cost[idx + (t << 4) + 1] = second_cost_l;
 					merge_cost[idx + (t << 4) + 2] = picked_cost_l;
