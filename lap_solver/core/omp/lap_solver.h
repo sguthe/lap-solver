@@ -1,7 +1,9 @@
 #pragma once
 
 #include "../lap_solver.h"
+#if _MSC_VER && !__INTEL_COMPILER
 #include <atomic>
+#endif
 
 namespace lap
 {
@@ -614,11 +616,12 @@ namespace lap
 				min = std::numeric_limits<SC>::max();
 				SC tt_jmin_global;
 
+#if _MSC_VER && !__INTEL_COMPILER
 				std::atomic<int> thread_counter;
-				thread_counter.store(0);
-
-				if (thread_counter.is_lock_free()) std::cout << "atomic<int> is lock free." << std::endl;
-				else std::cout << "atomic<int> is not lock free." << std::endl;
+				thread_counter = 0;
+#else
+				int thread_counter = 0;
+#endif
 
 #pragma omp parallel
 				{
@@ -686,10 +689,14 @@ namespace lap
 						jmin_private[t << 4] = jmin_local;
 //#pragma omp barrier
 //						if (t == 0)
-						int passed = ++thread_counter;
-						if (passed == threads)
+						int passed;
+#if !(_MSC_VER && !__INTEL_COMPILER)
+#pragma omp atomic capture
+#endif
+						passed = thread_counter++;
+						if (passed == threads - 1)
 						{
-							thread_counter.store(0);
+							thread_counter = 0;
 #ifndef LAP_QUIET
 							if (f < dim) total_rows++; else total_virtual++;
 #else
@@ -816,8 +823,12 @@ namespace lap
 							jmin_private[t << 4] = jmin_local;
 //#pragma omp barrier
 //							if (t == 0)
-							int passed = ++thread_counter;
-							if (passed == threads)
+							int passed;
+#if !(_MSC_VER && !__INTEL_COMPILER)
+#pragma omp atomic capture
+#endif
+							passed = thread_counter++;
+							if (passed == threads - 1)
 							{
 								thread_counter = 0;
 #ifndef LAP_QUIET
