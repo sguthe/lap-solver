@@ -64,9 +64,6 @@ namespace lap
 			SC picked;
 			SC v_jmin;
 			int jmin;
-		private:
-			// 64 bytes to avoid false sharing
-			char dummy[64 - 4 * sizeof(SC) - sizeof(int)];
 		};
 
 		template <class SC>
@@ -78,9 +75,6 @@ namespace lap
 			int jmin;
 			int colsol;
 			int data_valid;
-		private:
-			// 64 bytes to avoid false sharing
-			char dummy[64 - 2 * sizeof(SC) - 3 * sizeof(int)];
 		};
 
 		template <class SC, class MS>
@@ -959,7 +953,6 @@ namespace lap
 #endif
 #endif
 
-			int  endofpath = -1;
 #ifdef LAP_DEBUG
 			SC *v;
 #endif
@@ -1118,7 +1111,7 @@ namespace lap
 						checkCudaErrors(cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
 					}
 					for (int t = 0; t < devices; t++) checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
-					SC *vv;
+					SC* vv;
 					lapAlloc(vv, dim2, __FILE__, __LINE__);
 					v_list.push_back(vv);
 					eps_list.push_back(epsilon);
@@ -1151,16 +1144,12 @@ namespace lap
 					checkCudaErrors(cudaMemsetAsync(colsol_private[t], -1, num_items * sizeof(int), stream));
 				}
 
-				int jmin, colsol_old;
-				SC min, min_n;
-				bool unassignedfound;
-
 #ifndef LAP_QUIET
 				int old_complete = 0;
 #endif
 
 #ifdef LAP_MINIMIZE_V
-//				int dim_limit = ((reverse) || (epsilon < TC(0))) ? dim2 : dim;
+				//				int dim_limit = ((reverse) || (epsilon < TC(0))) ? dim2 : dim;
 				int dim_limit = dim2;
 #else
 				int dim_limit = dim2;
@@ -1172,15 +1161,20 @@ namespace lap
 #endif
 				long long count = 0ll;
 
-				bool require_colsol_copy = false;
-
 				if (devices == 1)
 				{
+					int jmin, colsol_old;
+					SC min, min_n;
+					bool unassignedfound;
+
+					bool require_colsol_copy = false;
+					int  endofpath = -1;
+
 					int t = 0;
 					int start, num_items, bs, gs;
 					cudaStream_t stream;
 					selectDevice(start, num_items, stream, bs, gs, t, iterator);
-					
+
 					for (int fc = 0; fc < dim_limit; fc++)
 					{
 						// mark as incomplete
@@ -1253,7 +1247,7 @@ namespace lap
 							unassignedfound = false;
 						}
 
-						markedSkippedColumns_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], f, dim, num_items);
+						markedSkippedColumns_kernel<<< (num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], f, dim, num_items);
 
 						bool fast = unassignedfound;
 
@@ -1371,6 +1365,26 @@ namespace lap
 #endif
 					}
 
+#ifdef LAP_MINIMIZE_V
+					if (epsilon > TC(0))
+					{
+						if (dim_limit < dim2)
+						{
+							if (require_colsol_copy)
+							{
+								checkCudaErrors(cudaMemcpyAsync(colsol_private[t], &(colsol[start]), num_items * sizeof(int), cudaMemcpyHostToDevice, stream));
+							}
+							findMaximum(v_private[0], colsol_private[0], &(host_min_private[0]), stream, dim2);
+							subtractMaximumLimited_kernel<<<gs, bs, 0, stream>>>(v_private[0], &(host_min_private[0]), dim2);
+						}
+						else
+						{
+							findMaximum(v_private[0], &(host_min_private[0]), stream, dim2);
+							subtractMaximum_kernel<<<gs, bs, 0, stream>>>(v_private[0], &(host_min_private[0]), dim2);
+						}
+					}
+#endif
+
 					// download updated v
 					checkCudaErrors(cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
 					checkCudaErrors(cudaMemcpyAsync(&(h_total_eps[start]), total_eps_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
@@ -1384,8 +1398,15 @@ namespace lap
 				{
 					int triggered = -1;
 					int start_t = -1;
-#pragma omp parallel num_threads(devices) shared(triggered, start_t, unassignedfound, require_colsol_copy, min, jmin, colsol_old)
+#pragma omp parallel num_threads(devices) shared(triggered, start_t)
 					{
+						int jmin_local, colsol_old_local;
+						SC min_local, min_n_local;
+						bool unassignedfound_local;
+
+						bool require_colsol_copy_local = false;
+						int  endofpath_local = -1;
+
 						int t = omp_get_thread_num();
 						int start, num_items, bs, gs;
 						cudaStream_t stream;
@@ -1396,7 +1417,7 @@ namespace lap
 							int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
 #pragma omp barrier
 							// start search and find minimum value
-							if (require_colsol_copy)
+							if (require_colsol_copy_local)
 							{
 								if (f < dim)
 								{
@@ -1466,28 +1487,28 @@ namespace lap
 							}
 							checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
+							// Dijkstra search
+							min_local = host_min_private[0].min;
+							jmin_local = host_min_private[0].jmin;
+							colsol_old_local = host_min_private[0].colsol;
+
+							// read additional values
+							for (int ti = 1; ti < devices; ti++)
+							{
+								SC c_min = host_min_private[ti].min;
+								int c_jmin = host_min_private[ti].jmin + iterator.ws.part[ti].first;
+								int c_colsol = host_min_private[ti].colsol;
+								if ((c_min < min_local) || ((c_min == min_local) && (colsol_old_local >= 0) && (c_colsol < 0)))
+								{
+									min_local = c_min;
+									jmin_local = c_jmin;
+									colsol_old_local = c_colsol;
+								}
+							}
+
+							require_colsol_copy_local = false;
 							if (t == 0)
 							{
-								// Dijkstra search
-								min = host_min_private[0].min;
-								jmin = host_min_private[0].jmin;
-								colsol_old = host_min_private[0].colsol;
-
-								// read additional values
-								for (int ti = 1; ti < devices; ti++)
-								{
-									SC c_min = host_min_private[ti].min;
-									int c_jmin = host_min_private[ti].jmin + iterator.ws.part[ti].first;
-									int c_colsol = host_min_private[ti].colsol;
-									if ((c_min < min) || ((c_min == min) && (colsol_old >= 0) && (c_colsol < 0)))
-									{
-										min = c_min;
-										jmin = c_jmin;
-										colsol_old = c_colsol;
-									}
-								}
-
-								require_colsol_copy = false;
 #ifndef LAP_QUIET
 								if (f < dim) total_rows++; else total_virtual++;
 #else
@@ -1499,30 +1520,30 @@ namespace lap
 								scancount[f]++;
 #endif
 								count++;
-
-								unassignedfound = false;
-
-								// dijkstraCheck
-								if (colsol_old < 0)
-								{
-									endofpath = jmin;
-									unassignedfound = true;
-								}
-								else
-								{
-									unassignedfound = false;
-								}
 							}
-#pragma omp barrier
-							markedSkippedColumns_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], f, dim, num_items);
 
-							bool fast = unassignedfound;
-							while (!unassignedfound)
+							unassignedfound_local = false;
+
+							// dijkstraCheck
+							if (colsol_old_local < 0)
+							{
+								endofpath_local = jmin_local;
+								unassignedfound_local = true;
+							}
+							else
+							{
+								unassignedfound_local = false;
+							}
+
+							markedSkippedColumns_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min_local, jmin_local - start, colsol_private[t], d_private[t], f, dim, num_items);
+
+							bool fast = unassignedfound_local;
+							while (!unassignedfound_local)
 							{
 								// update 'distances' between freerow and all unscanned columns, via next scanned column.
-								int i = colsol_old;
+								int i = colsol_old_local;
 
-								if ((jmin >= start) && (jmin < start + num_items))
+								if ((jmin_local >= start) && (jmin_local < start + num_items))
 								{
 									triggered = t;
 									start_t = start;
@@ -1537,18 +1558,18 @@ namespace lap
 										// get row
 										tt[t] = iterator.getRow(t, i, false);
 #pragma omp barrier
-										if (bs == 32) continueSearchMinPeerSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) continueSearchMinPeerMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else continueSearchMinPeerLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin - start_t]), &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+										if (bs == 32) continueSearchMinPeerSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin_local - start_t]), &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else if (bs == 256) continueSearchMinPeerMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin_local - start_t]), &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else continueSearchMinPeerLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin_local - start_t]), &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
 									}
 									else
 									{
 #pragma omp barrier
 										// get row
 										tt[t] = iterator.getRow(t, i, false);
-										if (bs == 32) continueSearchMinSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) continueSearchMinMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else continueSearchMinLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+										if (bs == 32) continueSearchMinSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else if (bs == 256) continueSearchMinMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else continueSearchMinLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
 									}
 								}
 								else
@@ -1557,39 +1578,38 @@ namespace lap
 									// continue search
 									if (peerEnabled)
 									{
-										if (bs == 32) continueSearchMinPeerSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) continueSearchMinPeerMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else continueSearchMinPeerLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin - start_t]), jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+										if (bs == 32) continueSearchMinPeerSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else if (bs == 256) continueSearchMinPeerMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else continueSearchMinPeerLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
 									}
 									else
 									{
-										if (bs == 32) continueSearchMinSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) continueSearchMinMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
-										else continueSearchMinLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin - start, min, std::numeric_limits<SC>::max(), num_items, dim2);
+										if (bs == 32) continueSearchMinSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else if (bs == 256) continueSearchMinMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else continueSearchMinLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
 									}
 								}
 								checkCudaErrors(cudaStreamSynchronize(stream));
 #pragma omp barrier
+								min_n_local = host_min_private[0].min;
+								jmin_local = host_min_private[0].jmin;
+								colsol_old_local = host_min_private[0].colsol;
+
+								// read additional values
+								for (int ti = 1; ti < devices; ti++)
+								{
+									SC c_min = host_min_private[ti].min;
+									int c_jmin = host_min_private[ti].jmin + iterator.ws.part[ti].first;
+									int c_colsol = host_min_private[ti].colsol;
+									if ((c_min < min_n_local) || ((c_min == min_n_local) && (colsol_old_local >= 0) && (c_colsol < 0)))
+									{
+										min_n_local = c_min;
+										jmin_local = c_jmin;
+										colsol_old_local = c_colsol;
+									}
+								}
 								if (t == 0)
 								{
-									min_n = host_min_private[0].min;
-									jmin = host_min_private[0].jmin;
-									colsol_old = host_min_private[0].colsol;
-
-									// read additional values
-									for (int ti = 1; ti < devices; ti++)
-									{
-										SC c_min = host_min_private[ti].min;
-										int c_jmin = host_min_private[ti].jmin + iterator.ws.part[ti].first;
-										int c_colsol = host_min_private[ti].colsol;
-										if ((c_min < min_n) || ((c_min == min_n) && (colsol_old >= 0) && (c_colsol < 0)))
-										{
-											min_n = c_min;
-											jmin = c_jmin;
-											colsol_old = c_colsol;
-										}
-									}
-
 #ifndef LAP_QUIET
 									if (i < dim) total_rows++; else total_virtual++;
 #else
@@ -1601,51 +1621,51 @@ namespace lap
 									scancount[i]++;
 #endif
 									count++;
-
-									min = std::max(min, min_n);
-
-									// dijkstraCheck
-									if (colsol_old < 0)
-									{
-										endofpath = jmin;
-										unassignedfound = true;
-									}
-									else
-									{
-										unassignedfound = false;
-									}
 								}
-#pragma omp barrier
+
+								min_local = std::max(min_local, min_n_local);
+
+								// dijkstraCheck
+								if (colsol_old_local < 0)
+								{
+									endofpath_local = jmin_local;
+									unassignedfound_local = true;
+								}
+								else
+								{
+									unassignedfound_local = false;
+								}
+
 								// mark last column scanned
-								markedSkippedColumnsUpdate_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, jmin - start, colsol_private[t], d_private[t], i, dim, num_items);
+								markedSkippedColumnsUpdate_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min_local, jmin_local - start, colsol_private[t], d_private[t], i, dim, num_items);
 
 							}
 
 							// update column prices. can increase or decrease
 							if (fast)
 							{
-								if ((endofpath >= start) && (endofpath < start + num_items))
+								if ((endofpath_local >= start) && (endofpath_local < start + num_items))
 								{
-									colsol[endofpath] = f;
-									rowsol[f] = endofpath;
+									colsol[endofpath_local] = f;
+									rowsol[f] = endofpath_local;
 									if (epsilon > TC(0))
 									{
-										updateColumnPricesEpsilonFast_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, num_items, &(colsol_private[t][endofpath - start]), f);
+										updateColumnPricesEpsilonFast_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min_local, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, num_items, &(colsol_private[t][endofpath_local - start]), f);
 									}
 									else
 									{
-										updateColumnPricesFast_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], num_items, &(colsol_private[t][endofpath - start]), f);
+										updateColumnPricesFast_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min_local, v_private[t], d_private[t], num_items, &(colsol_private[t][endofpath_local - start]), f);
 									}
 								}
 								else
 								{
 									if (epsilon > TC(0))
 									{
-										updateColumnPricesEpsilon_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, num_items);
+										updateColumnPricesEpsilon_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min_local, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, num_items);
 									}
 									else
 									{
-										updateColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], num_items);
+										updateColumnPrices_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min_local, v_private[t], d_private[t], num_items);
 									}
 								}
 							}
@@ -1653,11 +1673,11 @@ namespace lap
 							{
 								if (epsilon > TC(0))
 								{
-									updateColumnPricesEpsilonCopy_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, pred + start, pred_private[t], num_items);
+									updateColumnPricesEpsilonCopy_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min_local, v_private[t], d_private[t], total_d_private[t], total_eps_private[t], epsilon, pred + start, pred_private[t], num_items);
 								}
 								else
 								{
-									updateColumnPricesCopy_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min, v_private[t], d_private[t], pred + start, pred_private[t], num_items);
+									updateColumnPricesCopy_kernel<<<(num_items + 255) >> 8, 256, 0, stream>>>(colactive_private[t], min_local, v_private[t], d_private[t], pred + start, pred_private[t], num_items);
 								}
 								checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
 #pragma omp barrier
@@ -1666,7 +1686,7 @@ namespace lap
 #ifdef LAP_ROWS_SCANNED
 									{
 										int i;
-										int eop = endofpath;
+										int eop = endofpath_local;
 										do
 										{
 											i = pred[eop];
@@ -1675,11 +1695,10 @@ namespace lap
 										} while (i != f);
 									}
 #endif
-									resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
-									require_colsol_copy = true;
+									resetRowColumnAssignment(endofpath_local, f, pred, rowsol, colsol);
 								}
+								require_colsol_copy_local = true;
 							}
-#pragma omp barrier
 #ifndef LAP_QUIET
 							if (t == 0)
 							{
@@ -1701,48 +1720,15 @@ namespace lap
 #endif
 						}
 
-						// download updated v
-						checkCudaErrors(cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
-						checkCudaErrors(cudaMemcpyAsync(&(h_total_eps[start]), total_eps_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
-#ifdef LAP_DEBUG
-						checkCudaErrors(cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
-#endif
-						checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
-					}
-				}
-#endif
 #ifdef LAP_MINIMIZE_V
-				if (epsilon > TC(0))
-				{
-					if (devices == 1)
-					{
-						int start, num_items, bs, gs;
-						cudaStream_t stream;
-						selectDevice(start, num_items, stream, bs, gs, 0, iterator);
-
-						if (dim_limit < dim2)
+						if (epsilon > TC(0))
 						{
-							findMaximum(v_private[0], colsol_private[0], &(host_min_private[0]), stream, dim2);
-							subtractMaximumLimited_kernel<<<gs, bs, 0, stream>>>(v_private[0], &(host_min_private[0]), dim2);
-						}
-						else
-						{
-							findMaximum(v_private[0], &(host_min_private[0]), stream, dim2);
-							subtractMaximum_kernel<<<gs, bs, 0, stream>>>(v_private[0], &(host_min_private[0]), dim2);
-						}
-					}
-#ifdef LAP_CUDA_OPENMP
-					else
-					{
-#pragma omp parallel num_threads(devices)
-						{
-							int t = omp_get_thread_num();
-							int start, num_items, bs, gs;
-							cudaStream_t stream;
-							selectDevice(start, num_items, stream, bs, gs, t, iterator);
-
 							if (dim_limit < dim2)
 							{
+								if (require_colsol_copy_local)
+								{
+									checkCudaErrors(cudaMemcpyAsync(colsol_private[t], &(colsol[start]), num_items * sizeof(int), cudaMemcpyHostToDevice, stream));
+								}
 								findMaximum(v_private[t], colsol_private[t], &(host_min_private[t]), stream, num_items);
 							}
 							else
@@ -1762,8 +1748,16 @@ namespace lap
 								subtractMaximum_kernel<<<gs, bs, 0, stream>>>(v_private[t], max_v, num_items);
 							}
 						}
-					}
 #endif
+
+						// download updated v
+						checkCudaErrors(cudaMemcpyAsync(&(h_total_d[start]), total_d_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
+						checkCudaErrors(cudaMemcpyAsync(&(h_total_eps[start]), total_eps_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
+#ifdef LAP_DEBUG
+						checkCudaErrors(cudaMemcpyAsync(&(v[start]), v_private[t], sizeof(SC) * num_items, cudaMemcpyDeviceToHost, stream));
+#endif
+						checkCudaErrors(cudaStreamSynchronize(iterator.ws.stream[t]));
+					}
 				}
 #endif
 				// get total_d and total_eps

@@ -896,9 +896,6 @@ namespace lap
 
 							// reset row and column assignments along the alternating path.
 							resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol, iterator.ws.part);
-							// for next iteration
-							jmin_local = dim2;
-							min_local = std::numeric_limits<SC>::max();
 #ifndef LAP_QUIET
 							int level;
 							if ((level = displayProgress(start_time, elapsed, fc + 1, dim_limit, " rows")) != 0)
