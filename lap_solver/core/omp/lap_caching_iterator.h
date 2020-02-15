@@ -19,7 +19,6 @@ namespace lap
 			{
 				TC* rows;
 				CACHE cache;
-				char dummy[256 - sizeof(TC*) - sizeof(CACHE)];
 			};
 			table_t* table;
 		public:
@@ -38,8 +37,8 @@ namespace lap
 					int size = ws.part[t].second - ws.part[t].first;
 					table[t].cache.setSize(entries, dim);
 					lapAlloc(table[t].rows, (size_t)entries * (size_t)size, __FILE__, __LINE__);
-					// first touch
-					table[t].rows[0] = TC(0);
+					// actually allocate memory (fill with 0)
+					std::memset(table[t].rows, 0, sizeof(TC) * (size_t)entries * (size_t)size);
 				}
 			}
 
