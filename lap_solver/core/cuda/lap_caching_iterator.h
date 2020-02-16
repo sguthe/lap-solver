@@ -61,14 +61,14 @@ namespace lap
 				bool found = cache[t].find(idx, i);
 				if (!found)
 				{
-					costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, t, ws.stream[t], i, ws.part[t].first, ws.part[t].second, 1, async);
+					costfunc.getCostRow(rows[t] + (long long)size * (long long)idx, t, ws.stream[t], i, ws.part[t].first, ws.part[t].second, 1);
 				}
 				return rows[t] + (long long)size * (long long)idx;
 			}
 
-			__forceinline void fillRows(int t, int row_count, bool async)
+			__forceinline void fillRows(int t, int row_count)
 			{
-				costfunc.getCostRow(rows[t], t, ws.stream[t], 0, ws.part[t].first, ws.part[t].second, row_count, async);
+				costfunc.getCostRow(rows[t], t, ws.stream[t], 0, ws.part[t].first, ws.part[t].second, row_count);
 			}
 
 			__forceinline bool checkRow(int t, int i)

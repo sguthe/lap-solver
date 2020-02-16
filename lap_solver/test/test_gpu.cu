@@ -10,7 +10,6 @@
 //#define LAP_CUDA_ALLOW_WDDM
 //#define LAP_CUDA_COMPARE_CPU
 #define LAP_MINIMIZE_V
-#define TEST_MATRIX_PINNED
 
 //#define RANDOM_SEED 1234
 
@@ -153,7 +152,7 @@ void solveCachingCUDA(TP &start_time, int N1, int N2, CF &get_cost, STATE *state
 			iterator.getCache(t).find(idx, i);
 		}
 		checkCudaErrors(cudaSetDevice(ws.device[t]));
-		iterator.fillRows(t, rows, true);
+		iterator.fillRows(t, rows);
 	}
 	for (int t = 0; t < devices; t++)
 	{
@@ -170,78 +169,35 @@ void solveCachingCUDA(TP &start_time, int N1, int N2, CF &get_cost, STATE *state
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
+template <class SC, class TC, class CF, class STATE, class TP>
+void solveDirectCUDA(TP& start_time, int N1, int N2, CF& get_cost, STATE* state, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon)
+{
+	int devices = (int)ws.device.size();
+
+	lap::cuda::SimpleCostFunction<TC, CF, STATE> costFunction(get_cost, state, devices);
+	lap::cuda::GPUTableCost<TC> costMatrix(N1, N2, costFunction, ws);
+
+	lap::cuda::DirectIterator<SC, TC, decltype(costMatrix)> iterator(N1, N2, costMatrix, ws);
+
+	lap::displayTime(start_time, "setup complete", std::cout);
+
+	lap::cuda::solve<SC, TC>(N1, N2, costMatrix, iterator, rowsol, epsilon);
+
+	std::stringstream ss;
+	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cuda::cost<SC, TC>(N1, N2, costFunction, rowsol, ws.stream[0]);
+	lap::displayTime(start_time, ss.str().c_str(), std::cout);
+}
+
 template <class SC, class TC, class CF, class TP>
-void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon, bool sequential)
+void solveCachingTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon, bool sequential, bool pinned)
 {
 	lap::cuda::CpuCostFunction<TC, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu, sequential);
-	lap::cuda::PinnedTableCost<TC> costMatrix(N1, N2, cpuCostFunction, ws);
+	lap::cuda::CPUTableCost<TC> costMatrix(N1, N2, cpuCostFunction, ws, pinned);
 
 	int devices = (int)ws.device.size();
-#ifndef TEST_MATRIX_PINNED
-	std::vector<TC *>buffer(devices);
-	std::vector<int> off(devices);
-	// 16 should be enough
-#pragma omp parallel num_threads(devices)
-	{
-		int t = omp_get_thread_num();
-		off[t] = ((ws.part[t].second - ws.part[t].first + 255) >> 8) << 8;
-		lapAllocPinned(buffer[t], 16 * off[t], __FILE__, __LINE__);
-	}
-
-	std::vector<int> idx(devices);
-	for (int i = 0; i < devices; i++) idx[i] = 0;
-
-	std::vector<cudaEvent_t> cudaEvent(16 * devices);
-	for (int t = 0; t < devices; t++)
-	{
-		checkCudaErrors(cudaSetDevice(ws.device[t]));
-		for (int i = 0; i < 16; i++)
-		{
-			checkCudaErrors(cudaEventCreateWithFlags(&cudaEvent[t * 16 + i], cudaEventDisableTiming));
-		}
-	}
-#endif
-
-	// cost function (copy data from table, cudaMemcpy may not be complete prior to next call)
-#ifndef TEST_MATRIX_PINNED
-	auto get_cost_row = [&costMatrix, &buffer, &idx, &off, &cudaEvent](TC *d_row, int t, cudaStream_t stream, int x, int start, int end, bool async)
-	{
-		if (async)
-		{
-			if (cudaEventQuery(cudaEvent[t * 16 + idx[t]]) != cudaSuccess) checkCudaErrors(cudaEventSynchronize(cudaEvent[t * 16 + idx[t]]));
-			memcpy(buffer[t] + off[t] * idx[t], costMatrix.getRow(x) + start, (end - start) * sizeof(TC));
-			checkCudaErrors(cudaMemcpyAsync(d_row, buffer[t] + off[t] * idx[t], (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream));
-			checkCudaErrors(cudaEventRecord(cudaEvent[t * 16 + idx[t]], stream));
-			idx[t]++;
-			if (idx[t] >= 16) idx[t] = 0;
-		}
-		else if (end - start < 12800)
-		{
-			memcpy(buffer[t], costMatrix.getRow(x) + start, (end - start) * sizeof(TC));
-			checkCudaErrors(cudaMemcpyAsync(d_row, buffer[t], (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream));
-		}
-		else
-		{
-			cudaMemcpyAsync(d_row, costMatrix.getRow(x) + start, (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
-		}
-	};
-#else
-	auto get_cost_row = [&costMatrix](TC* d_row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async)
-	{
-		cudaMemcpyAsync(d_row, costMatrix.getRow(t, x), (end - start) * sizeof(TC) * rows, cudaMemcpyHostToDevice, stream);
-	};
-#endif
-
-	// cost function
-	auto get_cost = [](TC *d_row, cudaStream_t stream, int *d_rowsol, int N)
-	{
-		std::cerr << "Function not supported, use lap::cost() on cpu cost matrix instead." << std::endl;
-	};
-
-	lap::cuda::RowCostFunction<TC, decltype(get_cost_row), decltype(get_cost)> costFunction(get_cost_row, get_cost);
 
 	// different cache size, so always use SLRU
-	lap::cuda::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costFunction, ws);
+	lap::cuda::CachingIterator<SC, TC, decltype(costMatrix), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costMatrix, ws);
 
 	// pre-load cache
 	for (int t = 0; t < devices; t++)
@@ -253,7 +209,7 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 			iterator.getCache(t).find(idx, i);
 		}
 		checkCudaErrors(cudaSetDevice(ws.device[t]));
-		iterator.fillRows(t, rows, true);
+		iterator.fillRows(t, rows);
 	}
 	for (int t = 0; t < devices; t++)
 	{
@@ -263,23 +219,71 @@ void solveTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap::cuda:
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
-	lap::cuda::solve<SC, TC>(N1, N2, costFunction, iterator, rowsol, epsilon);
-
-#ifndef TEST_MATRIX_PINNED
-	for (int t = 0; t < devices; t++)
-	{
-		lapFreePinned(buffer[t]);
-		checkCudaErrors(cudaSetDevice(ws.device[t]));
-		for (int i = 0; i < 16; i++)
-		{
-			checkCudaErrors(cudaEventDestroy(cudaEvent[t * 16 + i]));
-		}
-	}
-#endif
+	lap::cuda::solve<SC, TC>(N1, N2, costMatrix, iterator, rowsol, epsilon);
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costMatrix, rowsol);
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
+}
+
+template <class SC, class TC, class CF, class TP>
+void solveDirectTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool sequential, bool pinned)
+{
+	lap::cuda::CpuCostFunction<TC, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu, sequential);
+	lap::cuda::CPUTableCost<TC> hostMatrix(N1, N2, cpuCostFunction, ws, pinned);
+	lap::cuda::GPUTableCost<TC> costMatrix(N1, N2, hostMatrix, ws);
+
+	int devices = (int)ws.device.size();
+
+	lap::cuda::DirectIterator<SC, TC, decltype(costMatrix)> iterator(N1, N2, costMatrix, ws);
+
+	lap::displayTime(start_time, "setup complete", std::cout);
+
+	lap::cuda::solve<SC, TC>(N1, N2, costMatrix, iterator, rowsol, epsilon);
+
+	std::stringstream ss;
+	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, hostMatrix, rowsol);
+	lap::displayTime(start_time, ss.str().c_str(), std::cout);
+}
+
+template <class SC, class TC, class CF, class STATE, class TP>
+void solveCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, STATE* state, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon)
+{
+	bool useTable = true;
+	int devices = (int)ws.device.size();
+	for (int t = 0; t < devices; t++)
+	{
+		long long required = (long long)N1 * (long long)(ws.part[t].second - ws.part[t].first) * sizeof(TC);
+		if (required > max_memory) useTable = false;
+	}
+	if (useTable)
+	{
+		solveDirectCUDA<SC, TC, CF, STATE, TP>(start_time, N1, N2, get_cost_cpu, state, ws, max_memory, rowsol, epsilon);
+	}
+	else
+	{
+		solveCachingCUDA<SC, TC, CF, STATE, TP>(start_time, N1, N2, get_cost_cpu, state, ws, max_memory, rowsol, epsilon);
+	}
+}
+
+template <class SC, class TC, class CF, class TP>
+void solveTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool sequential, bool pinned)
+{
+	bool useTable = true;
+	int devices = (int)ws.device.size();
+	for (int t = 0; t < devices; t++)
+	{
+		long long required = (long long)N1 * (long long)(ws.part[t].second - ws.part[t].first) * sizeof(TC);
+		if (required > max_memory) useTable = false;
+	}
+	if (useTable)
+	{
+		solveDirectTableCUDA<SC, TC, CF, TP>(start_time, N1, N2, get_cost_cpu, ws, max_memory, rowsol, epsilon, sequential, pinned);
+	}
+	else
+	{
+		solveCachingTableCUDA<SC, TC, CF, TP>(start_time, N1, N2, get_cost_cpu, ws, max_memory, rowsol, epsilon, sequential, pinned);
+	}
 }
 
 // needs to be declared outside of a function
@@ -375,7 +379,7 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 				return d0 * d0 + d1 * d1;
 			};
 
-			solveCachingCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
+			solveCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
 
 			for (int i = 0; i < num_enabled; i++)
 			{
@@ -465,7 +469,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 				return r;
 			};
 
-			solveCachingCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
+			solveCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
 
 			bool passed = true;
 			for (long long i = 0; (passed) && (i < N); i++)
@@ -577,7 +581,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 					return sum;
 				};
 
-				solveCachingCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
+				solveCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
 
 				for (int i = 0; i < num_enabled; i++)
 				{
@@ -638,7 +642,7 @@ void testInteger(long long min_tab, long long max_tab, long long max_memory, int
 
 				int *rowsol = new int[N];
 
-				solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true);
+				solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true, N < max_tab);
 
 				delete[] rowsol;
 			}
@@ -679,7 +683,7 @@ template <class C> void testRandom(long long min_tab, long long max_tab, long lo
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true, N < max_tab);
 
 			delete[] rowsol;
 		}
@@ -727,7 +731,7 @@ template <class C> void testSanity(long long min_tab, long long max_tab, long lo
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab);
 
 			bool passed = true;
 			for (long long i = 0; (passed) && (i < N); i++)
@@ -813,7 +817,7 @@ template <class C> void testGeometric(long long min_tab, long long max_tab, long
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab);
 
 			delete[] tab_s;
 			delete[] tab_t;
@@ -875,7 +879,7 @@ template <class C> void testRandomLowRank(long long min_tab, long long max_tab, 
 
 				lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-				solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false);
+				solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab);
 
 				delete[] vec;
 				delete[] rowsol;
@@ -1015,7 +1019,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				int *rowsol = new int[N2];
 
-				solveCachingCUDA<C, C>(start_time, N1, N2, get_cost, d_state, ws, max_memory, rowsol, epsilon);
+				solveCUDA<C, C>(start_time, N1, N2, get_cost, d_state, ws, max_memory, rowsol, epsilon);
 
 				for (int t = 0; t < num_devices; t++)
 				{

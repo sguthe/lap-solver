@@ -656,12 +656,12 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			if (omp)
 			{
 #ifdef LAP_OPENMP
-				solveCachingOMP<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
+				solveAdaptiveOMP<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 #endif
 			}
 			else
 			{
-				solveCaching<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
+				solveAdaptive<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 			}
 
 			bool passed = true;
@@ -804,12 +804,12 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				if (omp)
 				{
 #ifdef LAP_OPENMP
-					solveCachingOMP<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
+					solveAdaptiveOMP<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 #endif
 				}
 				else
 				{
-					solveCaching<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
+					solveAdaptive<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 				}
 
 				delete[] rowsol;
@@ -969,12 +969,12 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			if (omp)
 			{
 #ifdef LAP_OPENMP
-				solveCachingOMP<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
+				solveAdaptiveOMP<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 #endif
 			}
 			else
 			{
-				solveCaching<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
+				solveAdaptive<C, C>(start_time, N, N, get_cost, rowsol, entries, epsilon);
 			}
 
 			delete[] rowsol;

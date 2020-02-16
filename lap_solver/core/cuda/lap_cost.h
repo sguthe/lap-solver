@@ -39,7 +39,7 @@ namespace lap
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
 			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
 			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
-			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async) const { getcostrow(row, t, stream, x, start, end, rows, async); }
+			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows) const { getcostrow(row, t, stream, x, start, end, rows); }
 			__forceinline void getCost(TC *row, cudaStream_t stream, int *rowsol, int dim) const { getcost(row, stream, rowsol, dim); }
 		};
 
@@ -67,7 +67,7 @@ namespace lap
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
 			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
 			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
-			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async) const
+			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows) const
 			{
 				dim3 block_size, grid_size;
 				block_size.x = 256;
@@ -84,37 +84,23 @@ namespace lap
 			}
 		};
 
-		// Costs stored in a table. Used for conveniency only
-		// This can be constructed using a CostFunction from above or by specifying an array that holds the data (does not copy the data in this case).
+		// Costs stored in a host table. Used for conveniency only
+		// This can be constructed using a CPU CostFunction.
 		template <class TC>
-		class PinnedTableCost
+		class CPUTableCost
 		{
 		protected:
 			int x_size;
 			int y_size;
 			TC** cc;
 			int* stride;
-			bool free_in_destructor;
 			Worksharing& ws;
+			bool pinned;
 		protected:
-			void referenceTable(TC* tab)
-			{
-				free_in_destructor = false;
-				int devices = (int)ws.device.size();
-				lapAlloc(cc, devices, __FILE__, __LINE__);
-				lapAlloc(stride, devices, __FILE__, __LINE__);
-				for (int t = 0; t < devices; t++)
-				{
-					stride[t] = y_size;
-					cc[t] = &(tab[ws.part[t].first]);
-				}
-			}
-
 			template <class DirectCost>
 			void initTable(DirectCost& cost)
 			{
 				int devices = (int)ws.device.size();
-				free_in_destructor = true;
 				lapAlloc(cc, devices, __FILE__, __LINE__);
 				lapAlloc(stride, devices, __FILE__, __LINE__);
 #ifdef LAP_OPENMP
@@ -125,7 +111,8 @@ namespace lap
 					{
 						const int t = omp_get_thread_num();
 						stride[t] = ws.part[t].second - ws.part[t].first;
-						lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+						if (pinned) lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+						else lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
 						// first touch
 						cc[t][0] = TC(0);
 					}
@@ -144,7 +131,8 @@ namespace lap
 					{
 						const int t = omp_get_thread_num();
 						stride[t] = ws.part[t].second - ws.part[t].first;
-						lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+						if (pinned) lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+						else lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
 						// first touch
 						cc[t][0] = TC(0);
 						for (int x = 0; x < x_size; x++)
@@ -157,7 +145,8 @@ namespace lap
 				for (int t = 0; t < devices; t++)
 				{
 					stride[t] = ws.part[t].second - ws.part[t].first;
-					lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+					if (pinned) lapAllocPinned(cc[t], (long long)(stride[t])* (long long)x_size, __FILE__, __LINE__);
+					else lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
 					for (int x = 0; x < x_size; x++)
 					{
 						cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
@@ -166,51 +155,20 @@ namespace lap
 #endif
 			}
 
-			void createTable()
-			{
-				int devices = ws.device.size();
-				free_in_destructor = true;
-				lapAlloc(cc, devices, __FILE__, __LINE__);
-				lapAlloc(stride, devices, __FILE__, __LINE__);
-#ifdef LAP_OPENMP
-#pragma omp parallel num_threads(devices)
-				{
-					const int t = omp_get_thread_num();
-#else
-				for (int t = 0; t < devices; t++)
-				{
-#endif
-					stride[t] = ws.part[t].second - ws.part[t].first;
-					lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
-					// first touch
-					cc[t][0] = TC(0);
-				}
-			}
 		public:
-			template <class DirectCost> PinnedTableCost(int x_size, int y_size, DirectCost& cost, Worksharing& ws) :
-				x_size(x_size), y_size(y_size), ws(ws) {
+			template <class DirectCost> CPUTableCost(int x_size, int y_size, DirectCost& cost, Worksharing& ws, bool pinned) :
+				x_size(x_size), y_size(y_size), ws(ws), pinned(pinned) {
 				initTable(cost);
 			}
-			template <class DirectCost> PinnedTableCost(int size, DirectCost& cost, Worksharing& ws) :
-				x_size(size), y_size(size), ws(ws) {
+			template <class DirectCost> CPUTableCost(int size, DirectCost& cost, Worksharing& ws, bool pinned) :
+				x_size(size), y_size(size), ws(ws), pinned(pinned) {
 				initTable(cost);
 			}
-			PinnedTableCost(int x_size, int y_size, Worksharing& ws) : x_size(x_size), y_size(y_size), ws(ws) { createTable(); }
-			PinnedTableCost(int size, Worksharing& ws) : x_size(size), y_size(size), ws(ws) { createTable(); }
-			PinnedTableCost(int x_size, int y_size, TC* tab, Worksharing& ws) : x_size(x_size), y_size(y_size), ws(ws) { referenceTable(tab); }
-			PinnedTableCost(int size, TC* tab, Worksharing& ws) : x_size(size), y_size(size), ws(ws) { referenceTable(tab); }
-			~PinnedTableCost()
+			~CPUTableCost()
 			{
 				int devices = (int)ws.device.size();
-				if (free_in_destructor)
-				{
-#ifdef LAP_OPENMP
-#pragma omp parallel num_threads(devices)
-					lapFreePinned(cc[omp_get_thread_num()]);
-#else
-					for (int t = 0; t < devices; t++) lapFreePinned(cc[t]);
-#endif
-				}
+				if (pinned) for (int t = 0; t < devices; t++) lapFreePinned(cc[t]);
+				else for (int t = 0; t < devices; t++) lapFree(cc[t]);
 				lapFree(cc);
 				lapFree(stride);
 			}
@@ -225,16 +183,72 @@ namespace lap
 				off_x *= stride[t];
 				return cc[t][off_x + off_y];
 			}
-			__forceinline void setRow(int x, TC* v)
+			__forceinline void getCostRow(TC* row, int t, cudaStream_t stream, int x, int start, int end, int rows) const
+			{
+				cudaMemcpyAsync(row, getRow(t, x), (end - start) * sizeof(TC) * rows, cudaMemcpyHostToDevice, stream);
+			}
+			__forceinline void getCost(TC* row, cudaStream_t stream, int* rowsol, int dim) const
+			{
+				std::cerr << "Function not supported, use lap::cost() on cpu cost matrix instead." << std::endl;
+			}
+		};
+
+		// Costs stored in a device table. Used for conveniency only
+		// This can be constructed using a host matrix or simple cost function.
+		template <class TC>
+		class GPUTableCost
+		{
+		protected:
+			int x_size;
+			int y_size;
+			TC** cc;
+			int* stride;
+			Worksharing& ws;
+		protected:
+			template <class DirectCost>
+			void initTable(DirectCost& cost)
+			{
+				int devices = (int)ws.device.size();
+				lapAlloc(cc, devices, __FILE__, __LINE__);
+				lapAlloc(stride, devices, __FILE__, __LINE__);
+#ifdef LAP_OPENMP
+				// create and initialize in parallel
+#pragma omp parallel num_threads(devices)
+				{
+					const int t = omp_get_thread_num();
+#else
+				for (int t = 0; t < devices; t++)
+				{
+#endif
+					cudaSetDevice(ws.device[t]);
+					stride[t] = ws.part[t].second - ws.part[t].first;
+					lapAllocDevice(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+					cost.getCostRow(cc[t], t, ws.stream[t], 0, ws.part[t].first, ws.part[t].second, x_size);
+				}
+			}
+
+		public:
+			template <class DirectCost> GPUTableCost(int x_size, int y_size, DirectCost& cost, Worksharing& ws) :
+				x_size(x_size), y_size(y_size), ws(ws) {
+				initTable(cost);
+			}
+			template <class DirectCost> GPUTableCost(int size, DirectCost& cost, Worksharing& ws) :
+				x_size(size), y_size(size), ws(ws) {
+				initTable(cost);
+			}
+			~GPUTableCost()
 			{
 				int devices = (int)ws.device.size();
 				for (int t = 0; t < devices; t++)
 				{
-					long long off_x = x;
-					off_x *= stride[t];
-					memcpy(&(cc[t][off_x]), &(v[ws.part[t].first]), (ws.part[t].second - ws.part[t].first) * sizeof(TC));
+					cudaSetDevice(ws.device[t]);
+					lapFreeDevice(cc[t]);
 				}
+				lapFree(cc);
+				lapFree(stride);
 			}
+		public:
+			__forceinline const TC* getRow(int t, int i) { return cc[t] + (long long)i * (long long)stride[t]; }
 		};
 	}
 }

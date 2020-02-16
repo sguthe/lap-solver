@@ -122,7 +122,7 @@ namespace lap
 		}
 
 		template <class T>
-		void alloc(int idx, T a, unsigned long long s, const char *file, const int line)
+		void alloc(int idx, T *a, unsigned long long s, const char *file, const int line)
 		{
 			std::lock_guard<std::mutex> guard(lock);
 #ifdef LAP_DEBUG
