@@ -1031,6 +1031,7 @@ namespace lap
 			lapFree(min_private);
 			lapFree(jmin_private);
 			lapFree(perm);
+			lapFree(tt);
 		}
 
 		// shortcut for square problems
