@@ -397,7 +397,7 @@ namespace lap
 	{
 		if (SC(4) * greedy_gap > initial_gap) greedy_gap = initial_gap / SC(4);
 		if ((double)greedy_gap < 1.0e-6 * (double)initial_gap) upper = SC(0);
-		else upper = (SC)((double)dim * (double)greedy_gap * sqrt((double)greedy_gap / (double)initial_gap) / ((double)dim2 * (double)dim2));
+		else upper = (SC)(0.5 + (double)dim * (double)greedy_gap * sqrt((double)greedy_gap / (double)initial_gap) / ((double)dim2 * (double)dim2)) - SC(0.5);
 		lower = (SC)((double)initial_gap / (16.0 * (double)dim2 * (double)dim2));
 		if (upper < lower) upper = lower = SC(0);
 	}
