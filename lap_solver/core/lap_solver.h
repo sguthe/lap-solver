@@ -392,13 +392,13 @@ namespace lap
 		}
 	}
 
-	template <class SC>
-	void getUpperLower(SC &upper, SC &lower, SC greedy_gap, SC initial_gap, int dim, int dim2)
+	template<typename SC>
+	void getUpperLower(SC& upper, SC& lower, double greedy_gap, double initial_gap, int dim, int dim2)
 	{
-		if (SC(4) * greedy_gap > initial_gap) greedy_gap = initial_gap / SC(4);
-		if ((double)greedy_gap < 1.0e-6 * (double)initial_gap) upper = SC(0);
-		else upper = (SC)(0.5 + (double)dim * (double)greedy_gap * sqrt((double)greedy_gap / (double)initial_gap) / ((double)dim2 * (double)dim2)) - SC(0.5);
-		lower = (SC)((double)initial_gap / (16.0 * (double)dim2 * (double)dim2));
+		greedy_gap = std::min(greedy_gap, initial_gap / 4.0);
+		if (greedy_gap < 1.0e-6 * initial_gap) upper = SC(0);
+		else upper = (SC)((double)dim * greedy_gap * sqrt(greedy_gap / initial_gap) / ((double)dim2 * (double)dim2));
+		lower = (SC)(initial_gap / (16.0 * (double)dim2 * (double)dim2));
 		if (upper < lower) upper = lower = SC(0);
 	}
 
@@ -416,9 +416,9 @@ namespace lap
 		lapAlloc(v2, dim2, __FILE__, __LINE__);
 		lapAlloc(picked, dim2, __FILE__, __LINE__);
 
-		SC lower_bound = SC(0);
-		SC greedy_bound = SC(0);
-		SC upper_bound = SC(0);
+		double lower_bound = 0.0;
+		double greedy_bound = 0.0;
+		double upper_bound = 0.0;
 
 		memset(picked, 0, sizeof(int) * dim2);
 
@@ -434,7 +434,7 @@ namespace lap
 				picked[j_min] = 1;
 				updateEstimatedV(v, mod_v, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, dim2);
 				lower_bound += min_cost_l;
-				upper_bound += (SC)tt[i];
+				upper_bound += tt[i];
 				greedy_bound += picked_cost_l;
 			}
 			else
@@ -452,9 +452,9 @@ namespace lap
 
 		greedy_bound = std::min(greedy_bound, upper_bound);
 
-		SC initial_gap = upper_bound - lower_bound;
-		SC greedy_gap = greedy_bound - lower_bound;
-		SC initial_greedy_gap = greedy_gap;
+		double initial_gap = upper_bound - lower_bound;
+		double greedy_gap = greedy_bound - lower_bound;
+		double initial_greedy_gap = greedy_gap;
 
 #ifdef LAP_DEBUG
 		{
@@ -464,18 +464,15 @@ namespace lap
 		}
 		{
 			std::stringstream ss;
-			ss << "upper_bound = " << greedy_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+			ss << "upper_bound = " << greedy_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << greedy_gap / initial_gap;
 			lap::displayTime(start_time, ss.str().c_str(), lapDebug);
 		}
 #endif
 
-		SC upper = std::numeric_limits<SC>::max();
-		SC lower;
-
 		memset(picked, 0, sizeof(int) * dim2);
 
-		lower_bound = SC(0);
-		upper_bound = SC(0);
+		lower_bound = 0.0;
+		upper_bound = 0.0;
 
 		// reverse order
 		for (int i = dim2 - 1; i >= 0; --i)
@@ -508,18 +505,18 @@ namespace lap
 #ifdef LAP_DEBUG
 		{
 			std::stringstream ss;
-			ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+			ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << greedy_gap / initial_gap;
 			lap::displayTime(start_time, ss.str().c_str(), lapDebug);
 		}
 #endif
-		if (initial_gap < SC(4) * greedy_gap)
+		if (initial_gap < 4.0 * greedy_gap)
 		{
 			memcpy(v2, v, dim2 * sizeof(SC));
 			// sort permutation by keys
 			std::sort(perm, perm + dim, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
 
-			lower_bound = SC(0);
-			upper_bound = SC(0);
+			lower_bound = 0.0;
+			upper_bound = 0.0;
 			// greedy search
 			std::fill(mod_v, mod_v + dim2, SC(-1));
 			for (int i = 0; i < dim2; i++)
@@ -549,7 +546,7 @@ namespace lap
 #ifdef LAP_DEBUG
 			{
 				std::stringstream ss;
-				ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+				ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << greedy_gap / initial_gap;
 				lap::displayTime(start_time, ss.str().c_str(), lapDebug);
 			}
 #endif
@@ -588,10 +585,10 @@ namespace lap
 
 			normalizeV(v, dim2);
 
-			SC old_upper_bound = upper_bound;
-			SC old_lower_bound = lower_bound;
-			upper_bound = SC(0);
-			lower_bound = SC(0);
+			double old_upper_bound = upper_bound;
+			double old_lower_bound = lower_bound;
+			upper_bound = 0.0;
+			lower_bound = 0.0;
 			for (int i = 0; i < dim2; i++)
 			{
 				SC min_cost, min_cost_real;
@@ -620,14 +617,14 @@ namespace lap
 			lower_bound = std::max(lower_bound, old_lower_bound);
 			greedy_gap = upper_bound - lower_bound;
 #ifdef LAP_DEBUG
-			double ratio = (double)greedy_gap / (double)initial_gap;
+			double ratio = greedy_gap / initial_gap;
 #endif
-			double ratio2 = (double)greedy_gap / (double)initial_greedy_gap;
+			double ratio2 = greedy_gap / initial_greedy_gap;
 
 #ifdef LAP_DEBUG
 			{
 				std::stringstream ss;
-				ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+				ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << greedy_gap / initial_gap;
 				lap::displayTime(start_time, ss.str().c_str(), lapDebug);
 			}
 #endif
@@ -640,6 +637,7 @@ namespace lap
 			}
 		}
 
+		SC upper, lower;
 		getUpperLower(upper, lower, greedy_gap, initial_gap, dim, dim2);
 
 		lapFree(mod_v);
@@ -710,27 +708,32 @@ namespace lap
 		{
 			if (!first)
 			{
-#ifdef LAP_DEBUG
-				lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon;
-#endif
-				if ((!second) && (total_d > total_eps))
-				{
-					epsilon = TC(0);
-				}
+				if ((TC(0.5) == TC(0)) && (epsilon == epsilon_lower)) epsilon = TC(0);
 				else
 				{
-					epsilon = std::min(epsilon / TC(4), (TC)(total_eps / SC(8 * (size_t)dim2)));
-				}
 #ifdef LAP_DEBUG
-				lapDebug << " -> " << epsilon;
+					lapDebug << "  v_d = " << total_d / SC(dim2) << " v_eps = " << total_eps / SC(dim2) << " eps = " << epsilon;
 #endif
-				if (epsilon < epsilon_lower)
-				{
-					epsilon = TC(0);
-				}
+					if ((!second) && (total_d > total_eps))
+					{
+						epsilon = TC(0);
+					}
+					else
+					{
+						epsilon = std::min(epsilon / TC(4), (TC)(total_eps / SC(8 * (size_t)dim2)));
+					}
 #ifdef LAP_DEBUG
-				lapDebug << " -> " << epsilon << std::endl;
+					lapDebug << " -> " << epsilon;
 #endif
+					if (epsilon < epsilon_lower)
+					{
+						if (TC(0.5) == TC(0)) epsilon = epsilon_lower;
+						else epsilon = TC(0);
+					}
+#ifdef LAP_DEBUG
+					lapDebug << " -> " << epsilon << std::endl;
+#endif
+				}
 			}
 		}
 	}

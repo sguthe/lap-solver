@@ -212,9 +212,9 @@ namespace lap
 				lapFreePinned(host_start);
 			}
 
-			SC lower_bound = SC(0);
-			SC greedy_bound = SC(0);
-			SC upper_bound = SC(0);
+			double lower_bound = 0.0;
+			double greedy_bound = 0.0;
+			double upper_bound = 0.0;
 
 			if (devices == 1)
 			{
@@ -333,9 +333,9 @@ namespace lap
 
 			greedy_bound = std::min(greedy_bound, upper_bound);
 
-			SC initial_gap = upper_bound - lower_bound;
-			SC greedy_gap = greedy_bound - lower_bound;
-			SC initial_greedy_gap = greedy_gap;
+			double initial_gap = upper_bound - lower_bound;
+			double greedy_gap = greedy_bound - lower_bound;
+			double initial_greedy_gap = greedy_gap;
 
 #ifdef LAP_DEBUG
 			{
@@ -345,16 +345,13 @@ namespace lap
 			}
 			{
 				std::stringstream ss;
-				ss << "upper_bound = " << greedy_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+				ss << "upper_bound = " << greedy_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << greedy_gap / initial_gap;
 				lap::displayTime(start_time, ss.str().c_str(), lapDebug);
 			}
 #endif
 
-			SC upper = std::numeric_limits<SC>::max();
-			SC lower;
-
-			lower_bound = SC(0);
-			upper_bound = SC(0);
+			lower_bound = 0.0;
+			upper_bound = 0.0;
 
 			if (devices == 1)
 			{
@@ -509,18 +506,18 @@ namespace lap
 #ifdef LAP_DEBUG
 			{
 				std::stringstream ss;
-				ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+				ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << greedy_gap / initial_gap;
 				lap::displayTime(start_time, ss.str().c_str(), lapDebug);
 			}
 #endif
 
-			if (initial_gap < SC(4) * greedy_gap)
+			if (initial_gap < 4.0 * greedy_gap)
 			{
 				// sort permutation by keys
 				std::sort(perm, perm + dim, [&mod_v](int a, int b) { return (mod_v[a] > mod_v[b]) || ((mod_v[a] == mod_v[b]) && (a > b)); });
 
-				lower_bound = SC(0);
-				upper_bound = SC(0);
+				lower_bound = 0.0;
+				upper_bound = 0.0;
 				// greedy search
 				if (devices == 1)
 				{
@@ -676,7 +673,7 @@ namespace lap
 #ifdef LAP_DEBUG
 				{
 					std::stringstream ss;
-					ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << (double)greedy_gap / (double)initial_gap;
+					ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << greedy_gap / initial_gap;
 					lap::displayTime(start_time, ss.str().c_str(), lapDebug);
 				}
 #endif
@@ -746,10 +743,10 @@ namespace lap
 				}
 #endif
 
-				SC old_upper_bound = upper_bound;
-				SC old_lower_bound = lower_bound;
-				upper_bound = SC(0);
-				lower_bound = SC(0);
+				double old_upper_bound = upper_bound;
+				double old_lower_bound = lower_bound;
+				upper_bound = 0.0;
+				lower_bound = 0.0;
 				if (devices == 1)
 				{
 					int start, num_items, bs, gs;
@@ -845,14 +842,14 @@ namespace lap
 				greedy_gap = upper_bound - lower_bound;
 
 #ifdef LAP_DEBUG
-				double ratio = (double)greedy_gap / (double)initial_gap;
+				double ratio = greedy_gap / initial_gap;
 				{
 					std::stringstream ss;
 					ss << "upper_bound = " << upper_bound << " lower_bound = " << lower_bound << " greedy_gap = " << greedy_gap << " ratio = " << ratio;
 					lap::displayTime(start_time, ss.str().c_str(), lapDebug);
 				}
 #endif
-				double ratio2 = (double)greedy_gap / (double)initial_greedy_gap;
+				double ratio2 = greedy_gap / initial_greedy_gap;
 				if (ratio2 > 1.0e-09)
 				{
 					if (devices == 1)
@@ -881,6 +878,7 @@ namespace lap
 				}
 			}
 
+			SC upper, lower;
 			getUpperLower(upper, lower, greedy_gap, initial_gap, dim, dim2);
 
 			for (int t = 0; t < devices; t++)

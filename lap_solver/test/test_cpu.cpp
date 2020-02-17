@@ -125,8 +125,16 @@ int main(int argc, char* argv[])
 			if (opt.use_single) testInteger<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("float"));
 			if (opt.use_epsilon) testInteger<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("float"));
 		}
-		if (opt.use_single) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("long long"));
-		if (opt.use_epsilon) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("long long"));
+		if (opt.use_int)
+		{
+			if (opt.use_single) testInteger<int>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("int"));
+			if (opt.use_epsilon) testInteger<int>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("int"));
+		}
+		if (opt.use_long)
+		{
+			if (opt.use_single) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, std::string("long long"));
+			if (opt.use_epsilon) testInteger<long long>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, std::string("long long"));
+		}
 	}
 
 #ifndef LAP_QUIET
