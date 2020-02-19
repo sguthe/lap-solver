@@ -1408,39 +1408,21 @@ namespace lap
 						{
 							int f = perm[((reverse) && (fc < dim)) ? (dim - 1 - fc) : fc];
 #pragma omp barrier
-							// start search and find minimum value
+							// start search and find minimum value, no difference if peer access is enabled
 							if (require_colsol_copy_local)
 							{
 								if (f < dim)
 								{
 									tt[t] = iterator.getRow(t, f, false);
-									if (peerEnabled)
-									{
-										if (bs == 32) initializeSearchMinSmallCopy_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) initializeSearchMinMediumCopy_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else initializeSearchMinLargeCopy_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-									}
-									else
-									{
-										if (bs == 32) initializeSearchMinSmallCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) initializeSearchMinMediumCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else initializeSearchMinLargeCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-									}
+									if (bs == 32) initializeSearchMinSmallCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else if (bs == 256) initializeSearchMinMediumCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else initializeSearchMinLargeCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
 								}
 								else
 								{
-									if (peerEnabled)
-									{
-										if (bs == 32) initializeSearchMinSmallVirtualCopy_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) initializeSearchMinMediumVirtualCopy_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else initializeSearchMinLargeVirtualCopy_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-									}
-									else
-									{
-										if (bs == 32) initializeSearchMinSmallVirtualCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) initializeSearchMinMediumVirtualCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else initializeSearchMinLargeVirtualCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-									}
+									if (bs == 32) initializeSearchMinSmallVirtualCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else if (bs == 256) initializeSearchMinMediumVirtualCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else initializeSearchMinLargeVirtualCopyRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], colsol + start, pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
 								}
 							}
 							else
@@ -1448,33 +1430,15 @@ namespace lap
 								if (f < dim)
 								{
 									tt[t] = iterator.getRow(t, f, false);
-									if (peerEnabled)
-									{
-										if (bs == 32) initializeSearchMinSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) initializeSearchMinMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else initializeSearchMinLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-									}
-									else
-									{
-										if (bs == 32) initializeSearchMinSmallRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) initializeSearchMinMediumRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else initializeSearchMinLargeRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-									}
+									if (bs == 32) initializeSearchMinSmallRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else if (bs == 256) initializeSearchMinMediumRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else initializeSearchMinLargeRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
 								}
 								else
 								{
-									if (peerEnabled)
-									{
-										if (bs == 32) initializeSearchMinSmallVirtual_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) initializeSearchMinMediumVirtual_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else initializeSearchMinLargeVirtual_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-									}
-									else
-									{
-										if (bs == 32) initializeSearchMinSmallVirtualRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) initializeSearchMinMediumVirtualRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-										else initializeSearchMinLargeVirtualRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
-									}
+									if (bs == 32) initializeSearchMinSmallVirtualRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else if (bs == 256) initializeSearchMinMediumVirtualRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
+									else initializeSearchMinLargeVirtualRemote_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], f, std::numeric_limits<SC>::max(), num_items, dim2);
 								}
 							}
 							checkCudaErrors(cudaStreamSynchronize(stream));
@@ -1528,8 +1492,10 @@ namespace lap
 							}
 
 							bool fast = unassignedfound_local;
+							int iter = 0;
 							while (!unassignedfound_local)
 							{
+								++iter;
 								// update 'distances' between freerow and all unscanned columns, via next scanned column.
 								int i = colsol_old_local;
 
@@ -1548,18 +1514,18 @@ namespace lap
 										// get row
 										tt[t] = iterator.getRow(t, i, false);
 #pragma omp barrier
-										if (bs == 32) continueSearchMinPeerSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin_local - start_t]), &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) continueSearchMinPeerMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin_local - start_t]), &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
-										else continueSearchMinPeerLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin_local - start_t]), &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										if (bs == 32) continueSearchMinPeerSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], iter, semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin_local - start_t]), &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else if (bs == 256) continueSearchMinPeerMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], iter, semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin_local - start_t]), &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else continueSearchMinPeerLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], iter, semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, &(tt[triggered][jmin_local - start_t]), &(v_private[triggered][jmin_local - start_t]), jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
 									}
 									else
 									{
 #pragma omp barrier
 										// get row
 										tt[t] = iterator.getRow(t, i, false);
-										if (bs == 32) continueSearchMinSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
-										else if (bs == 256) continueSearchMinMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
-										else continueSearchMinLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										if (bs == 32) continueSearchMinSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], iter, semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else if (bs == 256) continueSearchMinMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], iter, semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
+										else continueSearchMinLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], iter, semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], tt[t], colactive_private[t], colsol_private[t], pred_private[t], i, tt_jmin, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim2);
 									}
 								}
 								else
@@ -1574,9 +1540,9 @@ namespace lap
 									}
 									else
 									{
-										if (bs == 32) continueSearchMinSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim, dim2);
-										else if (bs == 256) continueSearchMinMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim, dim2);
-										else continueSearchMinLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim, dim2);
+										if (bs == 32) continueSearchMinSmall_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], iter, semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim, dim2);
+										else if (bs == 256) continueSearchMinMedium_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], iter, semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim, dim2);
+										else continueSearchMinLarge_kernel<<<gs, bs, 0, stream>>>(&(host_min_private[t]), gpu_min_private[t], iter, semaphore_private[t], &(host_min_private[triggered].data_valid), min_private[t], jmin_private[t], csol_private[t], v_private[t], d_private[t], colactive_private[t], colsol_private[t], pred_private[t], i, v_jmin, jmin_local - start, min_local, std::numeric_limits<SC>::max(), num_items, dim, dim2);
 									}
 								}
 								checkCudaErrors(cudaStreamSynchronize(stream));
