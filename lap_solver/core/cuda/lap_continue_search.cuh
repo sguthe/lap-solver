@@ -44,7 +44,7 @@ namespace lap
 			if (j < size)
 			{
 				// ignore any columns assigned to virtual rows
-				if ((j == jmin) || ((colsol[j] >= dim) && (d[j] <= min))) colactive[jmin] = 0;
+				if ((j == jmin) || ((colsol[j] >= dim) && (d[j] <= min))) colactive[j] = 0;
 				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
@@ -103,7 +103,7 @@ namespace lap
 			if (j < size)
 			{
 				// ignore any columns assigned to virtual rows
-				if ((j == jmin) || ((colsol[j] >= dim) && (d[j] <= min))) colactive[jmin] = 0;
+				if ((j == jmin) || ((colsol[j] >= dim) && (d[j] <= min))) colactive[j] = 0;
 				else if (colactive[j] != 0)
 				{
 					SC h = d[j];
@@ -250,7 +250,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__device__ __forceinline__ void continueSearchMinPeerExchange(volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, SC *v2, TC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
+		__device__ __forceinline__ void continueSearchMinPeerExchange(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, SC *v2, TC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
 		{
 			__shared__ SC b_tt_jmin, b_v_jmin;
 
@@ -261,7 +261,7 @@ namespace lap
 					b_tt_jmin = tt_jmin = (SC)tt[jmin];
 					b_v_jmin = v_jmin = v[jmin];
 					int sem = atomicInc(semaphore, gridDim.x - 1);
-					if (sem == 0) data_valid[0] = 0;
+					if (sem == 0) data_valid[0] = 1;
 				}
 			}
 			else
@@ -276,11 +276,11 @@ namespace lap
 						b_tt_jmin = s2->min = (SC)tt2[0];
 						b_v_jmin = s2->max = v2[0];
 						__threadfence();
-						s2->data_valid = iter;
+						s2->data_valid = 1;
 					}
 					else
 					{
-						while (s2->data_valid != iter) {}
+						while (s2->data_valid == 0) {}
 						__threadfence();
 						b_tt_jmin = s2->min;
 						b_v_jmin = s2->max;
@@ -293,7 +293,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__device__ __forceinline__ void continueSearchMinPeerExchangeSmall(volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, SC *v2, TC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
+		__device__ __forceinline__ void continueSearchMinPeerExchangeSmall(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, SC *v2, TC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
 		{
 			if ((jmin >= 0) && (jmin < size))
 			{
@@ -317,11 +317,11 @@ namespace lap
 						s2->min = tt_jmin = (SC)tt2[0];
 						s2->max = v_jmin = v2[0];
 						__threadfence();
-						s2->data_valid = iter;
+						s2->data_valid = 1;
 					}
 					else
 					{
-						while (s2->data_valid != iter) {}
+						while (s2->data_valid == 0) {}
 						__threadfence();
 						tt_jmin = s2->min;
 						v_jmin = s2->max;
@@ -350,7 +350,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__device__ __forceinline__ void continueSearchMinExchange(volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, volatile SC *v2, volatile SC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
+		__device__ __forceinline__ void continueSearchMinExchange(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, volatile SC *v2, volatile SC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
 		{
 			__shared__ SC b_tt_jmin, b_v_jmin;
 
@@ -382,11 +382,11 @@ namespace lap
 						b_tt_jmin = s2->min = (SC)tt2[0];
 						b_v_jmin = s2->max = v2[0];
 						__threadfence();
-						s2->data_valid = iter;
+						s2->data_valid = 1;
 					}
 					else
 					{
-						while (s2->data_valid != iter) {}
+						while (s2->data_valid == 0) {}
 						__threadfence();
 						b_tt_jmin = s2->min;
 						b_v_jmin = s2->max;
@@ -399,7 +399,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC>
-		__device__ __forceinline__ void continueSearchMinExchangeSmall(volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, volatile SC *v2, volatile SC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
+		__device__ __forceinline__ void continueSearchMinExchangeSmall(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, TC *tt, volatile SC *v2, volatile SC *tt2, SC &tt_jmin, SC &v_jmin, int jmin, int size)
 		{
 			if ((jmin >= 0) && (jmin < size))
 			{
@@ -429,11 +429,11 @@ namespace lap
 						s2->min = tt_jmin = (SC)tt2[0];
 						s2->max = v_jmin = v2[0];
 						__threadfence();
-						s2->data_valid = iter;
+						s2->data_valid = 1;
 					}
 					else
 					{
-						while (s2->data_valid != iter) {}
+						while (s2->data_valid == 0) {}
 						__threadfence();
 						tt_jmin = s2->min;
 						v_jmin = s2->max;
@@ -445,7 +445,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__device__ __forceinline__ void continueSearchMinExchange(volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *v, volatile SC *v2, SC &v_jmin, int jmin, int size)
+		__device__ __forceinline__ void continueSearchMinExchange(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, volatile SC *v2, SC &v_jmin, int jmin, int size)
 		{
 			__shared__ SC b_v_jmin;
 
@@ -474,11 +474,11 @@ namespace lap
 						__threadfence_system();
 						b_v_jmin = s2->max = v2[0];
 						__threadfence();
-						s2->data_valid = iter;
+						s2->data_valid = 1;
 					}
 					else
 					{
-						while (s2->data_valid != iter) {}
+						while (s2->data_valid == 0) {}
 						__threadfence();
 						b_v_jmin = s2->max;
 					}
@@ -489,7 +489,7 @@ namespace lap
 		}
 
 		template <class MS, class SC>
-		__device__ __forceinline__ void continueSearchMinExchangeSmall(volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *v, volatile SC *v2, SC &v_jmin, int jmin, int size)
+		__device__ __forceinline__ void continueSearchMinExchangeSmall(volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *v, volatile SC *v2, SC &v_jmin, int jmin, int size)
 		{
 			if ((jmin >= 0) && (jmin < size))
 			{
@@ -516,11 +516,11 @@ namespace lap
 						__threadfence_system();
 						s2->max = v_jmin = v2[0];
 						__threadfence();
-						s2->data_valid = iter;
+						s2->data_valid = 1;
 					}
 					else
 					{
-						while (s2->data_valid != iter) {}
+						while (s2->data_valid == 0) {}
 						__threadfence();
 						v_jmin = s2->max;
 					}
@@ -572,7 +572,7 @@ namespace lap
 		}
 
 		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinPeerSmall_kernel(MS *s, volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinPeerSmall_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -580,13 +580,13 @@ namespace lap
 			int t_jmin, t_colsol;
 			SC tt_jmin, v_jmin;
 
-			continueSearchMinPeerExchangeSmall(s2, iter, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinPeerExchangeSmall(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchSmall(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinPeerMedium_kernel(MS *s, volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinPeerMedium_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -594,13 +594,13 @@ namespace lap
 			int t_jmin, t_colsol;
 			SC tt_jmin, v_jmin;
 
-			continueSearchMinPeerExchange(s2, iter, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinPeerExchange(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchMedium(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC, class TC, class TC2>
-		__global__ void continueSearchMinPeerLarge_kernel(MS *s, volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinPeerLarge_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, TC2 *tt2, SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -608,13 +608,13 @@ namespace lap
 			int t_jmin, t_colsol;
 			SC tt_jmin, v_jmin;
 
-			continueSearchMinPeerExchange(s2, iter, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinPeerExchange(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchLarge(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC>
-		__global__ void continueSearchMinSmall_kernel(MS *s, volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim, int dim2)
+		__global__ void continueSearchMinSmall_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -622,13 +622,13 @@ namespace lap
 			int t_jmin, t_colsol;
 			SC v_jmin;
 
-			continueSearchMinExchangeSmall(s2, iter, semaphore + 1, data_valid, v, v2, v_jmin, jmin, size);
+			continueSearchMinExchangeSmall(s2, semaphore + 1, data_valid, v, v2, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim, dim2);
 			searchSmall(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC>
-		__global__ void continueSearchMinMedium_kernel(MS *s, volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim, int dim2)
+		__global__ void continueSearchMinMedium_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -636,13 +636,13 @@ namespace lap
 			int t_jmin, t_colsol;
 			SC v_jmin;
 
-			continueSearchMinExchange(s2, iter, semaphore + 1, data_valid, v, v2, v_jmin, jmin, size);
+			continueSearchMinExchange(s2, semaphore + 1, data_valid, v, v2, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim, dim2);
 			searchMedium(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC>
-		__global__ void continueSearchMinLarge_kernel(MS *s, volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim, int dim2)
+		__global__ void continueSearchMinLarge_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, char *colactive, int *colsol, int *pred, int i, SC *v2, int jmin, SC min, SC max, int size, int dim, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -650,13 +650,13 @@ namespace lap
 			int t_jmin, t_colsol;
 			SC v_jmin;
 
-			continueSearchMinExchange(s2, iter, semaphore + 1, data_valid, v, v2, v_jmin, jmin, size);
+			continueSearchMinExchange(s2, semaphore + 1, data_valid, v, v2, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, v, min, v_jmin, jmin, max, size, dim, dim2);
 			searchLarge(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void continueSearchMinSmall_kernel(MS *s, volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile SC *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinSmall_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile SC *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -664,13 +664,13 @@ namespace lap
 			int t_jmin, t_colsol;
 			SC tt_jmin, v_jmin;
 
-			continueSearchMinExchangeSmall(s2, iter, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinExchangeSmall(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchSmall(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void continueSearchMinMedium_kernel(MS *s, volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile SC *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinMedium_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile SC *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -678,13 +678,13 @@ namespace lap
 			int t_jmin, t_colsol;
 			SC tt_jmin, v_jmin;
 
-			continueSearchMinExchange(s2, iter, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinExchange(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchMedium(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
 
 		template <class MS, class SC, class TC>
-		__global__ void continueSearchMinLarge_kernel(MS *s, volatile MS *s2, int iter, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile SC *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
+		__global__ void continueSearchMinLarge_kernel(MS *s, volatile MS *s2, unsigned int *semaphore, volatile int *data_valid, SC *o_min, int *o_jmin, int *o_colsol, SC *v, SC *d, TC *tt, char *colactive, int *colsol, int *pred, int i, volatile SC *tt2, volatile SC *v2, int jmin, SC min, SC max, int size, int dim2)
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -692,7 +692,7 @@ namespace lap
 			int t_jmin, t_colsol;
 			SC tt_jmin, v_jmin;
 
-			continueSearchMinExchange(s2, iter, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
+			continueSearchMinExchange(s2, semaphore + 1, data_valid, v, tt, v2, tt2, tt_jmin, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, tt, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchLarge(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
 		}
