@@ -1,10 +1,10 @@
 #define LAP_CUDA
 // required for multiple devices
 #define LAP_CUDA_OPENMP
-//#define LAP_QUIET
+#define LAP_QUIET
 //#define LAP_DISPLAY_EVALUATED
-#define LAP_DEBUG
-#define LAP_NO_MEM_DEBUG
+//#define LAP_DEBUG
+//#define LAP_NO_MEM_DEBUG
 //#define LAP_ROWS_SCANNED
 // should only be enabled for testing purposes
 //#define LAP_CUDA_ALLOW_WDDM
