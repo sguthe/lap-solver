@@ -580,7 +580,6 @@ namespace lap
 
 						for (int i = 0; i < dim2; i++)
 						{
-#pragma omp barrier
 							if (perm[i] < dim)
 							{
 								tt[t] = iterator.getRow(t, perm[i], true);
@@ -609,7 +608,6 @@ namespace lap
 							}
 							else
 							{
-#pragma omp barrier
 								if (i == 0)
 								{
 									if (bs == 32) getMinimalCostSmallVirtual_kernel<<<gs, bs, 0, stream>>>(&(host_struct_private[i * devices + t]), gpu_struct_private[t], semaphore_private[t], picked_cost_private[t], jmin_private[t], min_cost_private[t], v_private[t], picked_private[t], std::numeric_limits<SC>::max(), start, num_items, dim2);
