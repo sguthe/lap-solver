@@ -224,6 +224,7 @@ namespace lap
 					stride[t] = ws.part[t].second - ws.part[t].first;
 					lapAllocDevice(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
 					cost.getCostRow(cc[t], t, ws.stream[t], 0, ws.part[t].first, ws.part[t].second, x_size);
+					cudaStreamSynchronize(ws.stream[t]);
 				}
 			}
 
