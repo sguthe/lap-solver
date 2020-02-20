@@ -247,7 +247,7 @@ void solveDirectTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, lap:
 }
 
 template <class SC, class TC, class CF, class STATE, class TP>
-void solveCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, STATE* state, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon)
+void solveCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, STATE* state, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool silent)
 {
 	bool useTable = true;
 	int devices = (int)ws.device.size();
@@ -258,16 +258,18 @@ void solveCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, STATE* state, l
 	}
 	if (useTable)
 	{
+		if (!silent) lap::displayTime(start_time, "Solver using GPU table", std::cout);
 		solveDirectCUDA<SC, TC, CF, STATE, TP>(start_time, N1, N2, get_cost_cpu, state, ws, max_memory, rowsol, epsilon);
 	}
 	else
 	{
+		if (!silent) lap::displayTime(start_time, "Solver using GPU caching", std::cout);
 		solveCachingCUDA<SC, TC, CF, STATE, TP>(start_time, N1, N2, get_cost_cpu, state, ws, max_memory, rowsol, epsilon);
 	}
 }
 
 template <class SC, class TC, class CF, class TP>
-void solveTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool sequential, bool pinned)
+void solveTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool sequential, bool pinned, bool silent)
 {
 	bool useTable = true;
 	int devices = (int)ws.device.size();
@@ -278,10 +280,16 @@ void solveTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, lap::cuda:
 	}
 	if (useTable)
 	{
+		if (!silent) lap::displayTime(start_time, "Solver using GPU table", std::cout);
 		solveDirectTableCUDA<SC, TC, CF, TP>(start_time, N1, N2, get_cost_cpu, ws, max_memory, rowsol, epsilon, sequential, pinned);
 	}
 	else
 	{
+		if (!silent)
+		{
+			if (pinned) lap::displayTime(start_time, "Solver using GPU caching of pinned CPU table", std::cout);
+			else lap::displayTime(start_time, "Solver using GPU caching of pageable CPU table", std::cout);
+		}
 		solveCachingTableCUDA<SC, TC, CF, TP>(start_time, N1, N2, get_cost_cpu, ws, max_memory, rowsol, epsilon, sequential, pinned);
 	}
 }
@@ -379,7 +387,7 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 				return d0 * d0 + d1 * d1;
 			};
 
-			solveCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
+			solveCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon, silent);
 
 			for (int i = 0; i < num_enabled; i++)
 			{
@@ -469,7 +477,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 				return r;
 			};
 
-			solveCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
+			solveCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon, silent);
 
 			bool passed = true;
 			for (long long i = 0; (passed) && (i < N); i++)
@@ -581,7 +589,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 					return sum;
 				};
 
-				solveCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon);
+				solveCUDA<C, C>(start_time, N, N, get_cost, d_state, ws, max_memory, rowsol, epsilon, silent);
 
 				for (int i = 0; i < num_enabled; i++)
 				{
@@ -642,7 +650,7 @@ void testInteger(long long min_tab, long long max_tab, long long max_memory, int
 
 				int *rowsol = new int[N];
 
-				solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true, N < max_tab);
+				solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true, N < max_tab, silent);
 
 				delete[] rowsol;
 			}
@@ -683,7 +691,7 @@ template <class C> void testRandom(long long min_tab, long long max_tab, long lo
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true, N < max_tab);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true, N < max_tab, silent);
 
 			delete[] rowsol;
 		}
@@ -731,7 +739,7 @@ template <class C> void testSanity(long long min_tab, long long max_tab, long lo
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
 
 			bool passed = true;
 			for (long long i = 0; (passed) && (i < N); i++)
@@ -817,7 +825,7 @@ template <class C> void testGeometric(long long min_tab, long long max_tab, long
 
 			lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
 
 			delete[] tab_s;
 			delete[] tab_t;
@@ -879,7 +887,7 @@ template <class C> void testRandomLowRank(long long min_tab, long long max_tab, 
 
 				lap::cuda::Worksharing ws(N, 256, devs, silent);
 
-				solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab);
+				solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
 
 				delete[] vec;
 				delete[] rowsol;
@@ -1019,7 +1027,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				int *rowsol = new int[N2];
 
-				solveCUDA<C, C>(start_time, N1, N2, get_cost, d_state, ws, max_memory, rowsol, epsilon);
+				solveCUDA<C, C>(start_time, N1, N2, get_cost, d_state, ws, max_memory, rowsol, epsilon, silent);
 
 				for (int t = 0; t < num_devices; t++)
 				{

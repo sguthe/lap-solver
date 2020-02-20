@@ -39,7 +39,7 @@ namespace lap
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
 			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
 			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
-			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows) const { getcostrow(row, t, stream, x, start, end, rows); }
+			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async) const { getcostrow(row, t, stream, x, start, end, rows, async); }
 			__forceinline void getCost(TC *row, cudaStream_t stream, int *rowsol, int dim) const { getcost(row, stream, rowsol, dim); }
 		};
 
@@ -67,7 +67,7 @@ namespace lap
 			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
 			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
 			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
-			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows) const
+			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async) const
 			{
 				dim3 block_size, grid_size;
 				block_size.x = 256;
@@ -93,9 +93,13 @@ namespace lap
 			int x_size;
 			int y_size;
 			TC** cc;
+			TC** staging;
 			int* stride;
+			int* length;
+			int* idx;
 			Worksharing& ws;
 			bool pinned;
+			cudaEvent_t* cudaEvent;
 		protected:
 			template <class DirectCost>
 			void initTable(DirectCost& cost)
@@ -103,39 +107,50 @@ namespace lap
 				int devices = (int)ws.device.size();
 				lapAlloc(cc, devices, __FILE__, __LINE__);
 				lapAlloc(stride, devices, __FILE__, __LINE__);
-#ifdef LAP_OPENMP
-				if (cost.isSequential())
+				if (pinned)
 				{
-					// cost table needs to be initialized sequentially
-#pragma omp parallel num_threads(devices)
-					{
-						const int t = omp_get_thread_num();
-						stride[t] = ws.part[t].second - ws.part[t].first;
-						if (pinned) lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
-						else lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
-						// first touch
-						cc[t][0] = TC(0);
-					}
-					for (int x = 0; x < x_size; x++)
-					{
-						for (int t = 0; t < devices; t++)
-						{
-							cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
-						}
-					}
+					staging = 0;
+					length = 0;
+					idx = 0;
 				}
 				else
 				{
-					// create and initialize in parallel
+					lapAlloc(staging, devices, __FILE__, __LINE__);
+					lapAlloc(length, devices, __FILE__, __LINE__);
+					lapAlloc(cudaEvent, 4 * devices, __FILE__, __LINE__);
+					lapAlloc(idx, devices, __FILE__, __LINE__);
+				}
+#ifdef LAP_OPENMP
 #pragma omp parallel num_threads(devices)
+				{
+					const int t = omp_get_thread_num();
+					stride[t] = ws.part[t].second - ws.part[t].first;
+					if (pinned) lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+					else
 					{
-						const int t = omp_get_thread_num();
-						stride[t] = ws.part[t].second - ws.part[t].first;
-						if (pinned) lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
-						else lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
-						// first touch
-						cc[t][0] = TC(0);
-						for (int x = 0; x < x_size; x++)
+						length[t] = stride[t];
+						idx[t] = 0;
+						lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+						lapAllocPinned(staging[t], (long long)(length[t]) * (long long)4, __FILE__, __LINE__);
+						// actually allocate memory
+						std::memset(staging[t], 0, (long long)length[t] * 4ll * sizeof(TC));
+						for (int i = 0; i < 4; i++) checkCudaErrors(cudaEventCreateWithFlags(&cudaEvent[t * 4 + i], cudaEventDisableTiming));
+					}
+					for (int x = 0; x < x_size; x++)
+					{
+						if (cost.isSequential())
+						{
+							// cost table needs to be initialized sequentially
+							for (int tt = 0; tt < devices; tt++)
+							{
+								if (t == tt)
+								{
+#pragma omp barrier
+									cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
+								}
+							}
+						}
+						else
 						{
 							cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
 						}
@@ -146,7 +161,16 @@ namespace lap
 				{
 					stride[t] = ws.part[t].second - ws.part[t].first;
 					if (pinned) lapAllocPinned(cc[t], (long long)(stride[t])* (long long)x_size, __FILE__, __LINE__);
-					else lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+					else
+					{
+						length[t] = stride[t];
+						idx[t] = 0;
+						lapAlloc(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+						lapAllocPinned(staging[t], (long long)(length[t]) * (long long)16, __FILE__, __LINE__);
+						// actually allocate memory
+						std::memset(staging[t], 0, (long long)length[t] * 16ll * sizeof(TC));
+						for (int i = 0; i < 4; i++) checkCudaErrors(cudaEventCreateWithFlags(&cudaEvent[t * 4 + i], cudaEventDisableTiming));
+					}
 					for (int x = 0; x < x_size; x++)
 					{
 						cost.getCostRow(cc[t] + (long long)x * (long long)stride[t], x, ws.part[t].first, ws.part[t].second);
@@ -168,9 +192,22 @@ namespace lap
 			{
 				int devices = (int)ws.device.size();
 				if (pinned) for (int t = 0; t < devices; t++) lapFreePinned(cc[t]);
-				else for (int t = 0; t < devices; t++) lapFree(cc[t]);
+				else for (int t = 0; t < devices; t++)
+				{
+					lapFree(cc[t]);
+					lapFreePinned(staging[t]);
+					checkCudaErrors(cudaSetDevice(ws.device[t]));
+					for (int i = 0; i < 4; i++) checkCudaErrors(cudaEventDestroy(cudaEvent[t * 4 + i]));
+				}
 				lapFree(cc);
 				lapFree(stride);
+				if (!pinned)
+				{
+					lapFree(staging);
+					lapFree(length);
+					lapFree(cudaEvent);
+					lapFree(idx);
+				}
 			}
 		public:
 			__forceinline const TC* getRow(int t, int x) const { return cc[t] + (long long)x * (long long)stride[t]; }
@@ -183,9 +220,41 @@ namespace lap
 				off_x *= stride[t];
 				return cc[t][off_x + off_y];
 			}
-			__forceinline void getCostRow(TC* row, int t, cudaStream_t stream, int x, int start, int end, int rows) const
+			__forceinline void getCostRow(TC* row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async) const
 			{
-				cudaMemcpyAsync(row, getRow(t, x), (end - start) * sizeof(TC) * rows, cudaMemcpyHostToDevice, stream);
+				if ((pinned) || (rows > 1))
+				{
+					if (((end - start) == stride[t]) || (rows == 1)) cudaMemcpyAsync(row, getRow(t, x), (end - start) * sizeof(TC) * rows, cudaMemcpyHostToDevice, stream);
+					else
+					{
+						// this one should never be performance ciritcal
+						for (int r = 0; r < rows; r++)
+						{
+							cudaMemcpyAsync(row + (long long)(end - start) * (long long)r, getRow(t, x + r), (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
+						}
+					}
+				}
+				else
+				{
+					if (async)
+					{
+						if (cudaEventQuery(cudaEvent[t * 4 + idx[t]]) != cudaSuccess) checkCudaErrors(cudaEventSynchronize(cudaEvent[t * 4 + idx[t]]));
+						memcpy(staging[t] + length[t] * idx[t], getRow(t, x), (end - start) * sizeof(TC));
+						checkCudaErrors(cudaMemcpyAsync(row, staging[t] + length[t] * idx[t], (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream));
+						checkCudaErrors(cudaEventRecord(cudaEvent[t * 4 + idx[t]], stream));
+						idx[t]++;
+						if (idx[t] >= 4) idx[t] = 0;
+					}
+					else if ((end - start) * sizeof(TC) < 0x20000ll)
+					{
+						memcpy(staging[t], getRow(t, x), (end - start) * sizeof(TC));
+						checkCudaErrors(cudaMemcpyAsync(row, staging[t], (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream));
+					}
+					else
+					{
+						cudaMemcpyAsync(row, getRow(t, x), (end - start) * sizeof(TC), cudaMemcpyHostToDevice, stream);
+					}
+				}
 			}
 			__forceinline void getCost(TC* row, cudaStream_t stream, int* rowsol, int dim) const
 			{
@@ -223,7 +292,7 @@ namespace lap
 					cudaSetDevice(ws.device[t]);
 					stride[t] = ws.part[t].second - ws.part[t].first;
 					lapAllocDevice(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
-					cost.getCostRow(cc[t], t, ws.stream[t], 0, ws.part[t].first, ws.part[t].second, x_size);
+					cost.getCostRow(cc[t], t, ws.stream[t], 0, ws.part[t].first, ws.part[t].second, x_size, false);
 					cudaStreamSynchronize(ws.stream[t]);
 				}
 			}
