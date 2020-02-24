@@ -21,7 +21,7 @@ namespace lap
 			lapAlloc(mod_v, dim2, __FILE__, __LINE__);
 			lapAlloc(v2, dim2, __FILE__, __LINE__);
 			lapAlloc(picked, dim2, __FILE__, __LINE__);
-			lapAlloc(merge_cost, std::max((long long)omp_get_max_threads() * (long long)dim2, (long long)omp_get_max_threads() << 5), __FILE__, __LINE__);
+			lapAlloc(merge_cost, std::max((long long)(omp_get_max_threads() + 1) * (long long)dim2, (long long)omp_get_max_threads() << 5), __FILE__, __LINE__);
 			lapAlloc(merge_idx, (long long)omp_get_max_threads() << 5, __FILE__, __LINE__);
 
 			double lower_bound = 0.0;
@@ -327,6 +327,7 @@ namespace lap
 				double old_lower_bound = lower_bound;
 				upper_bound = 0.0;
 				lower_bound = 0.0;
+				int off = threads * dim2;
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
@@ -338,7 +339,7 @@ namespace lap
 							const auto* tt = iterator.getRow(t, perm[i]);
 							if ((picked[i] >= iterator.ws.part[t].first) && (picked[i] < iterator.ws.part[t].second))
 							{
-								upper_bound += (SC)tt[picked[i] - iterator.ws.part[t].first];
+								merge_cost[i + off] = (SC)tt[picked[i] - iterator.ws.part[t].first];
 							}
 							min_cost_real = std::numeric_limits<SC>::max();
 
@@ -362,6 +363,7 @@ namespace lap
 					SC min_cost_real = merge_cost[i];
 					for (int ii = 1; ii < threads; ii++) min_cost_real = std::min(min_cost_real, merge_cost[i + ii * dim2]);
 					lower_bound += min_cost_real + v[picked[i]];
+					upper_bound += merge_cost[i + off];
 				}
 				upper_bound = std::min(upper_bound, old_upper_bound);
 				lower_bound = std::max(lower_bound, old_lower_bound);
