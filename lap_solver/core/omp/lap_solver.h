@@ -67,6 +67,7 @@ namespace lap
 								j_min = merge_idx[off + ii];
 							}
 						}
+						if ((j_min >= iterator.ws.part[t].first) && (j_min < iterator.ws.part[t].second)) picked[j_min] = 1;
 						updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
 					else
@@ -96,6 +97,7 @@ namespace lap
 								j_min = merge_idx[off + ii];
 							}
 						}
+						if ((j_min >= iterator.ws.part[t].first) && (j_min < iterator.ws.part[t].second)) picked[j_min] = 1;
 						updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
 					if (t == 0)
@@ -277,7 +279,7 @@ namespace lap
 					// update v in reverse order
 					for (int i = dim2 - 1; i >= 0; --i)
 					{
-						int off = ((i & 1) == 0) ? 0 : (threads << 2);
+						int off = ((i & 1) == 0) ? 0 : 32;
 						if (perm[i] < dim)
 						{
 							const auto *tt = iterator.getRow(t, perm[i]);
@@ -349,6 +351,7 @@ namespace lap
 						else
 						{
 							min_cost_real = std::numeric_limits<SC>::max();
+							if (t == 0) merge_cost[i + off] = SC(0);
 							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++) min_cost_real = std::min(min_cost_real, -v[j]);
 						}
 						merge_cost[i + t * dim2] = min_cost_real;
