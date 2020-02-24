@@ -951,11 +951,14 @@ namespace lap
 						for (int l = 0; l < count; l++)
 						{
 							SC dlt(0), dlt2(0);
-							for (int i = 0; i < dim2; i++)
+							for (int j = 0; j < omp_get_max_threads(); j++)
 							{
-								SC diff = v_list[l][i] - v[i];
-								dlt += diff;
-								dlt2 += diff * diff;
+								for (int i = iterator.ws.part[j].first; i < iterator.ws.part[j].second; i++)
+								{
+									SC diff = v_list[l][i] - v[j][i - iterator.ws.part[j].first];
+									dlt += diff;
+									dlt2 += diff * diff;
+								}
 							}
 							dlt /= SC(dim2);
 							dlt2 /= SC(dim2);
