@@ -241,9 +241,9 @@ namespace lap
 	}
 
 	template <class SC, typename COST>
-	void getMinMaxBest(SC &min_cost_l, SC &max_cost_l, SC &picked_cost_l, int &j_min, COST &cost, int *taken, int count)
+	void getMinMaxBest(int i, SC &min_cost_l, SC &max_cost_l, SC &picked_cost_l, int &j_min, COST &cost, int *taken, int count)
 	{
-		min_cost_l = max_cost_l = cost(0);
+		max_cost_l = min_cost_l = cost(0);
 		if (taken[0] == 0)
 		{
 			j_min = 0;
@@ -258,7 +258,7 @@ namespace lap
 		{
 			SC cost_l = cost(j);
 			min_cost_l = std::min(min_cost_l, cost_l);
-			max_cost_l = std::max(max_cost_l, cost_l);
+			if (i == j) max_cost_l = cost_l;
 			if ((cost_l < picked_cost_l) && (taken[j] == 0))
 			{
 				j_min = j;
@@ -430,17 +430,17 @@ namespace lap
 			{
 				const auto *tt = iterator.getRow(i);
 				auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
-				getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked, dim2);
+				getMinMaxBest(i, min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked, dim2);
 				picked[j_min] = 1;
 				updateEstimatedV(v, mod_v, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, dim2);
 				lower_bound += min_cost_l;
-				upper_bound += tt[i];
+				upper_bound += max_cost_l;
 				greedy_bound += picked_cost_l;
 			}
 			else
 			{
 				auto cost = [](int j) -> SC { return SC(0); };
-				getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked, dim2);
+				getMinMaxBest(i, min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked, dim2);
 				picked[j_min] = 1;
 				updateEstimatedV(v, mod_v, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, dim2);
 				lower_bound += min_cost_l;

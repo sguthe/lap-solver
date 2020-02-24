@@ -21,7 +21,7 @@ namespace lap
 			lapAlloc(mod_v, dim2, __FILE__, __LINE__);
 			lapAlloc(v2, dim2, __FILE__, __LINE__);
 			lapAlloc(picked, dim2, __FILE__, __LINE__);
-			lapAlloc(merge_cost, (long long)omp_get_max_threads() << 5, __FILE__, __LINE__);
+			lapAlloc(merge_cost, std::max((long long)omp_get_max_threads() * (long long)dim2, (long long)omp_get_max_threads() << 5), __FILE__, __LINE__);
 			lapAlloc(merge_idx, (long long)omp_get_max_threads() << 5, __FILE__, __LINE__);
 
 			double lower_bound = 0.0;
@@ -36,83 +36,66 @@ namespace lap
 				int threads = omp_get_num_threads();
 				for (int i = 0; i < dim2; i++)
 				{
+					int off = ((i & 1) == 0) ? 0 : (threads << 2);
 					SC min_cost_l, max_cost_l, picked_cost_l;
-					int j_min;
+					int j_min = dim2;
 					if (i < dim)
 					{
 						const auto *tt = iterator.getRow(t, i);
 						auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
-						getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
-						j_min += iterator.ws.part[t].first;
+						getMinMaxBest(i - iterator.ws.part[t].first, min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
+						if (j_min >= dim2) j_min = dim2; else j_min += iterator.ws.part[t].first;
 						// a little hacky
 						if ((i >= iterator.ws.part[t].first) && (i < iterator.ws.part[t].second))
 						{
-							merge_cost[threads << 1] = cost(i - iterator.ws.part[t].first);
+							merge_cost[off + (threads << 1)] = max_cost_l;
 						}
-						merge_cost[t] = min_cost_l;
-						merge_cost[t + threads] = picked_cost_l;
-						merge_idx[t] = j_min;
-
+						merge_cost[off + t] = min_cost_l;
+						merge_cost[off + t + threads] = picked_cost_l;
+						merge_idx[off + t] = j_min;
 #pragma omp barrier
-						if (t == 0)
+						min_cost_l = merge_cost[off];
+						picked_cost_l = merge_cost[off + threads];
+						max_cost_l = merge_cost[off + (threads << 1)];
+						j_min = merge_idx[off];
+						for (int ii = 1; ii < threads; ii++)
 						{
-							for (int ii = 1; ii < threads; ii++)
+							min_cost_l = std::min(min_cost_l, merge_cost[off + ii]);
+							if (merge_cost[off + ii + threads] < picked_cost_l)
 							{
-								min_cost_l = std::min(min_cost_l, merge_cost[ii]);
-								if (merge_cost[ii + threads] < picked_cost_l)
-								{
-									picked_cost_l = merge_cost[ii + threads];
-									j_min = merge_idx[ii];
-								}
+								picked_cost_l = merge_cost[off + ii + threads];
+								j_min = merge_idx[off + ii];
 							}
-							merge_cost[(threads << 2)] = min_cost_l;
-							merge_cost[(threads << 2) + 1] = merge_cost[threads << 1];
-							merge_cost[(threads << 2) + 2] = picked_cost_l;
-							merge_idx[threads] = j_min;
 						}
-#pragma omp barrier
-						min_cost_l = merge_cost[(threads << 2)];
-						max_cost_l = merge_cost[(threads << 2) + 1];
-						picked_cost_l = merge_cost[(threads << 2) + 2];
-						j_min = merge_idx[threads];
 						updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
 					else
 					{
 						auto cost = [](int j) -> SC { return SC(0); };
-						getMinMaxBest(min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
-						j_min += iterator.ws.part[t].first;
+						getMinMaxBest(i - iterator.ws.part[t].first, min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
+						if (j_min >= dim2) j_min = dim2; else j_min += iterator.ws.part[t].first;
 						// a little hacky
 						if ((i >= iterator.ws.part[t].first) && (i < iterator.ws.part[t].second))
 						{
-							merge_cost[threads << 1] = cost(i - iterator.ws.part[t].first);
+							merge_cost[off + (threads << 1)] = max_cost_l;
 						}
-						merge_cost[t] = min_cost_l;
-						merge_cost[t + threads] = picked_cost_l;
-						merge_idx[t] = j_min;
-
+						merge_cost[off + t] = min_cost_l;
+						merge_cost[off + t + threads] = picked_cost_l;
+						merge_idx[off + t] = j_min;
 #pragma omp barrier
-						if (t == 0)
+						min_cost_l = merge_cost[off];
+						picked_cost_l = merge_cost[off + threads];
+						max_cost_l = merge_cost[off + (threads << 1)];
+						j_min = merge_idx[off];
+						for (int ii = 1; ii < threads; ii++)
 						{
-							for (int ii = 1; ii < threads; ii++)
+							min_cost_l = std::min(min_cost_l, merge_cost[off + ii]);
+							if (merge_cost[off + ii + threads] < picked_cost_l)
 							{
-								min_cost_l = std::min(min_cost_l, merge_cost[ii]);
-								if (merge_cost[ii + threads] < picked_cost_l)
-								{
-									picked_cost_l = merge_cost[ii + threads];
-									j_min = merge_idx[ii];
-								}
+								picked_cost_l = merge_cost[off + ii + threads];
+								j_min = merge_idx[off + ii];
 							}
-							merge_cost[(threads << 2)] = min_cost_l;
-							merge_cost[(threads << 2) + 1] = merge_cost[threads << 1];
-							merge_cost[(threads << 2) + 2] = picked_cost_l;
-							merge_idx[threads] = j_min;
 						}
-#pragma omp barrier
-						min_cost_l = merge_cost[(threads << 2)];
-						max_cost_l = merge_cost[(threads << 2) + 1];
-						picked_cost_l = merge_cost[(threads << 2) + 2];
-						j_min = merge_idx[threads];
 						updateEstimatedV(v + iterator.ws.part[t].first, mod_v + iterator.ws.part[t].first, cost, (i == 0), (i == 1), min_cost_l, max_cost_l, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
 					if (t == 0)
@@ -158,8 +141,9 @@ namespace lap
 				// reverse order
 				for (int i = dim2 - 1; i >= 0; --i)
 				{
+					int off = ((i & 1) == 0) ? 0 : (threads << 2);
 					SC min_cost_l, second_cost_l, picked_cost_l;
-					int j_min;
+					int j_min = dim2;
 					if (i < dim)
 					{
 						const auto *tt = iterator.getRow(t, i);
@@ -171,39 +155,41 @@ namespace lap
 						auto cost = [&v, &iterator, &t](int j) -> SC { return -v[j + iterator.ws.part[t].first]; };
 						getMinSecondBest(min_cost_l, second_cost_l, picked_cost_l, j_min, cost, picked + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 					}
-					j_min += iterator.ws.part[t].first;
-					merge_cost[t] = min_cost_l;
-					merge_cost[t + threads] = second_cost_l;
-					merge_cost[t + (threads << 1)] = picked_cost_l;
-					merge_idx[t] = j_min;
+					if (j_min >= dim2) j_min = dim2; else j_min += iterator.ws.part[t].first;
+					merge_cost[off + t] = min_cost_l;
+					merge_cost[off + t + threads] = second_cost_l;
+					merge_cost[off + t + (threads << 1)] = picked_cost_l;
+					merge_cost[off + t + (threads * 3)] = (j_min < dim2)?v[j_min]:std::numeric_limits<SC>::max();
+					merge_idx[off + t] = j_min;
 #pragma omp barrier
 					if (t == 0)
 					{
+						SC v_jmin = merge_cost[off + threads * 3];
 						for (int ii = 1; ii < threads; ii++)
 						{
-							if (merge_cost[ii] < min_cost_l)
+							if (merge_cost[off + ii] < min_cost_l)
 							{
-								second_cost_l = std::min(min_cost_l, merge_cost[ii + threads]);
-								min_cost_l = merge_cost[ii];
+								second_cost_l = std::min(min_cost_l, merge_cost[off + ii + threads]);
+								min_cost_l = merge_cost[off + ii];
 							}
 							else
 							{
-								second_cost_l = std::min(second_cost_l, merge_cost[ii]);
+								second_cost_l = std::min(second_cost_l, merge_cost[off + ii]);
 							}
-							if (merge_cost[ii + (threads << 1)] < picked_cost_l)
+							if (merge_cost[off + ii + (threads << 1)] < picked_cost_l)
 							{
-								picked_cost_l = merge_cost[ii + (threads << 1)];
-								j_min = merge_idx[ii];
+								picked_cost_l = merge_cost[off + ii + (threads << 1)];
+								j_min = merge_idx[off + ii];
+								v_jmin = merge_cost[off + ii + (threads * 3)];
 							}
 						}
 						perm[i] = i;
 						picked[j_min] = 1;
 						mod_v[i] = second_cost_l - min_cost_l;
 						// need to use the same v values in total
-						lower_bound += min_cost_l + v[j_min];
-						upper_bound += picked_cost_l + v[j_min];
+						lower_bound += min_cost_l + v_jmin;
+						upper_bound += picked_cost_l + v_jmin;
 					}
-#pragma omp barrier
 				}
 			}
 
@@ -234,8 +220,9 @@ namespace lap
 					int threads = omp_get_num_threads();
 					for (int i = 0; i < dim2; i++)
 					{
+						int off = ((i & 1) == 0) ? 0 : (threads << 2);
 						// greedy order
-						int j_min;
+						int j_min = dim2;
 						SC min_cost, min_cost_real;
 						if (perm[i] < dim)
 						{
@@ -248,28 +235,31 @@ namespace lap
 							auto cost = [&v, &iterator, &t](int j) -> SC { return -v[j + iterator.ws.part[t].first]; };
 							getMinimalCost(j_min, min_cost, min_cost_real, cost, mod_v + iterator.ws.part[t].first, iterator.ws.part[t].second - iterator.ws.part[t].first);
 						}
-						merge_cost[t] = min_cost;
-						merge_cost[t + threads] = min_cost_real;
-						merge_idx[t] = j_min + iterator.ws.part[t].first;
+						if (j_min >= dim2) j_min = dim2; else j_min += iterator.ws.part[t].first;
+						merge_cost[off + t] = min_cost;
+						merge_cost[off + t + threads] = min_cost_real;
+						merge_cost[off + t + (threads << 1)] = (j_min < dim2) ? v[j_min] : std::numeric_limits<SC>::max();;
+						merge_idx[off + t] = j_min;
 #pragma omp barrier
 						if (t == 0)
 						{
+							SC v_jmin = merge_cost[off + (threads << 1)];
 							for (int ii = 1; ii < threads; ii++)
 							{
-								if (merge_cost[ii] < min_cost)
+								if (merge_cost[off + ii] < min_cost)
 								{
-									min_cost = merge_cost[ii];
-									j_min = merge_idx[ii];
+									min_cost = merge_cost[off + ii];
+									j_min = merge_idx[off + ii];
+									v_jmin = merge_cost[off + ii + (threads << 1)];
 								}
-								min_cost_real = std::min(min_cost_real, merge_cost[ii + threads]);
+								min_cost_real = std::min(min_cost_real, merge_cost[off + ii + threads]);
 							}
 							mod_v[j_min] = SC(0);
-							upper_bound += min_cost + v[j_min];
+							upper_bound += min_cost + v_jmin;
 							// need to use the same v values in total
-							lower_bound += min_cost_real + v[j_min];
+							lower_bound += min_cost_real + v_jmin;
 							picked[i] = j_min;
 						}
-#pragma omp barrier
 					}
 				}
 
@@ -286,20 +276,21 @@ namespace lap
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
+					int threads = omp_get_num_threads();
 					// update v in reverse order
 					for (int i = dim2 - 1; i >= 0; --i)
 					{
-#pragma omp barrier
+						int off = ((i & 1) == 0) ? 0 : (threads << 2);
 						if (perm[i] < dim)
 						{
 							const auto *tt = iterator.getRow(t, perm[i]);
 							if ((picked[i] >= iterator.ws.part[t].first) && (picked[i] < iterator.ws.part[t].second))
 							{
-								merge_cost[0] = (SC)tt[picked[i] - iterator.ws.part[t].first] - v[picked[i]];
+								merge_cost[off] = (SC)tt[picked[i] - iterator.ws.part[t].first] - v[picked[i]];
 								mod_v[picked[i]] = SC(-1);
 							}
 #pragma omp barrier
-							SC min_cost = merge_cost[0];
+							SC min_cost = merge_cost[off];
 							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
 							{
 								if (mod_v[j] >= SC(0))
@@ -313,11 +304,11 @@ namespace lap
 						{
 							if ((picked[i] >= iterator.ws.part[t].first) && (picked[i] < iterator.ws.part[t].second))
 							{
-								merge_cost[0] = -v[picked[i]];
+								merge_cost[off] = -v[picked[i]];
 								mod_v[picked[i]] = SC(-1);
 							}
 #pragma omp barrier
-							SC min_cost = merge_cost[0];
+							SC min_cost = merge_cost[off];
 							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++)
 							{
 								if (mod_v[j] >= SC(0))
@@ -339,13 +330,12 @@ namespace lap
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
-					int threads = omp_get_num_threads();
 					for (int i = 0; i < dim2; i++)
 					{
 						SC min_cost_real;
 						if (perm[i] < dim)
 						{
-							const auto *tt = iterator.getRow(t, perm[i]);
+							const auto* tt = iterator.getRow(t, perm[i]);
 							if ((picked[i] >= iterator.ws.part[t].first) && (picked[i] < iterator.ws.part[t].second))
 							{
 								upper_bound += (SC)tt[picked[i] - iterator.ws.part[t].first];
@@ -363,15 +353,15 @@ namespace lap
 							min_cost_real = std::numeric_limits<SC>::max();
 							for (int j = iterator.ws.part[t].first; j < iterator.ws.part[t].second; j++) min_cost_real = std::min(min_cost_real, -v[j]);
 						}
-						merge_cost[t << 5] = min_cost_real;
-#pragma omp barrier
-						// bounds are relative to v
-						if (t == 0)
-						{
-							for (int ii = 1; ii < threads; ii++) min_cost_real = std::min(min_cost_real, merge_cost[ii << 5]);
-							lower_bound += min_cost_real + v[picked[i]];
-						}
+						merge_cost[i + t * dim2] = min_cost_real;
 					}
+				}
+				for (int i = 0; i < dim2; i++)
+				{
+					int threads = omp_get_max_threads();
+					SC min_cost_real = merge_cost[i];
+					for (int ii = 1; ii < threads; ii++) min_cost_real = std::min(min_cost_real, merge_cost[i + ii * dim2]);
+					lower_bound += min_cost_real + v[picked[i]];
 				}
 				upper_bound = std::min(upper_bound, old_upper_bound);
 				lower_bound = std::max(lower_bound, old_lower_bound);
