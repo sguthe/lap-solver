@@ -407,31 +407,14 @@ namespace lap
 			return std::pair<SC, SC>((SC)upper, (SC)lower);
 		}
 
-		__forceinline void dijkstraCheck(int& endofpath, bool& unassignedfound, int jmin, int** colsol, char** colactive, int tt, std::pair<int, int>* part)
+		__forceinline void dijkstraCheck(int& endofpath, bool& unassignedfound, int jmin, int* colsol, char** colactive, int t, std::pair<int, int>* part)
 		{
-			int t = 0;
-			while (jmin >= part[t].second) t++;
-			int jmin_local = jmin - part[t].first;
-			if (t == tt) colactive[t][jmin_local] = 0;
-			if (colsol[t][jmin_local] < 0)
+			if ((jmin >= part[t].first) && (jmin < part[t].second)) colactive[t][jmin - part[t].first] = 0;
+			if (colsol[jmin] < 0)
 			{
 				endofpath = jmin;
 				unassignedfound = true;
 			}
-		}
-
-		__forceinline void resetRowColumnAssignment(int& endofpath, int f, int** pred, int* rowsol, int** colsol, std::pair<int, int>* part)
-		{
-			int i;
-			do
-			{
-				int t = 0;
-				while (endofpath >= part[t].second) t++;
-				int endofpath_local = endofpath - part[t].first;
-				i = pred[t][endofpath_local];
-				colsol[t][endofpath_local] = i;
-				std::swap(endofpath, rowsol[i]);
-			} while (i != f);
 		}
 
 		template <class SC, class CF, class I>
@@ -472,31 +455,29 @@ namespace lap
 #endif
 #endif
 
-			int  **pred;
-			int  endofpath;
+			int *pred;
+			int endofpath;
 			char **colactive;
 			SC **d;
-			int **colsol;
+			int *colsol;
 			SC epsilon_upper;
 			SC epsilon_lower;
 			SC **v;
 			int *perm;
 			decltype(iterator.getRow(0, 0))* tt;
 
+			SC v_jmin_global;
+			SC tt_jmin_global;
+
 #ifdef LAP_DEBUG
 			std::vector<SC *> v_list;
 			std::vector<SC> eps_list;
 #endif
 
-//			lapAlloc(colactive, dim2, __FILE__, __LINE__);
-//			lapAlloc(d, dim2, __FILE__, __LINE__);
-//			lapAlloc(pred, dim2, __FILE__, __LINE__);
-//			lapAlloc(colsol, dim2, __FILE__, __LINE__);
-//			lapAlloc(v, dim2, __FILE__, __LINE__);
+			lapAlloc(pred, dim2, __FILE__, __LINE__);
+			lapAlloc(colsol, dim2, __FILE__, __LINE__);
 			lapAlloc(colactive, omp_get_max_threads(), __FILE__, __LINE__);
 			lapAlloc(d, omp_get_max_threads(), __FILE__, __LINE__);
-			lapAlloc(pred, omp_get_max_threads(), __FILE__, __LINE__);
-			lapAlloc(colsol, omp_get_max_threads(), __FILE__, __LINE__);
 			lapAlloc(v, omp_get_max_threads(), __FILE__, __LINE__);
 			lapAlloc(perm, dim2, __FILE__, __LINE__);
 			lapAlloc(tt, omp_get_max_threads(), __FILE__, __LINE__);
@@ -511,8 +492,6 @@ namespace lap
 
 				lapAlloc(colactive[t], count, __FILE__, __LINE__);
 				lapAlloc(d[t], count, __FILE__, __LINE__);
-				lapAlloc(pred[t], count, __FILE__, __LINE__);
-				lapAlloc(colsol[t], count, __FILE__, __LINE__);
 				lapAlloc(v[t], count, __FILE__, __LINE__);
 			}
 
@@ -603,18 +582,12 @@ namespace lap
 				// this is to ensure termination of the while statement
 				if (epsilon == SC(0)) epsilon = SC(-1.0);
 				memset(rowsol, -1, dim2 * sizeof(int));
-				//memset(colsol, -1, dim2 * sizeof(int));
-
-				//int jmin;
-				//SC min, min_n;
-				//bool unassignedfound;
 
 #ifndef LAP_QUIET
 				int old_complete = 0;
 #endif
 
 #ifdef LAP_MINIMIZE_V
-				//int dim_limit = ((reverse) || (epsilon < SC(0))) ? dim2 : dim;
 				int dim_limit = dim2;
 #else
 				int dim_limit = dim2;
@@ -627,16 +600,16 @@ namespace lap
 
 #pragma omp parallel
 				{
-					int t = omp_get_thread_num();
-					int start = iterator.ws.part[t].first;
-					int end = iterator.ws.part[t].second;
-					int count = end - start;
+					const int t = omp_get_thread_num();
+					const int start = iterator.ws.part[t].first;
+					const int end = iterator.ws.part[t].second;
+					const int count = end - start;
 
 					char* colactive_private = colactive[t];
 					SC* d_private = d[t];
-					int* pred_private = pred[t];
+					int* pred_private = &(pred[start]);
 					SC* v_private = v[t];
-					int* colsol_private = colsol[t];
+					int* colsol_private = &(colsol[start]);
 
 					memset(colsol_private, -1, count * sizeof(int));
 
@@ -689,7 +662,7 @@ namespace lap
 							}
 						}
 						min_private[t] = min_local;
-						jmin_private[t] = jmin_local;
+						jmin_private[t] = jmin_local + start;
 #pragma omp barrier
 #ifndef LAP_QUIET
 						if (t == 0) { if (f < dim) total_rows++; else total_virtual++; }
@@ -711,12 +684,12 @@ namespace lap
 							{
 								// better than previous
 								min_local = min_private[ii];
-								jmin_local = jmin_private[ii] + start;
-								taken = (colsol[ii][jmin_private[ii]] >= 0);
+								jmin_local = jmin_private[ii];
+								taken = (colsol[jmin_local] >= 0);
 							}
-							else if ((min_private[ii] == min_local) && (taken) && (colsol[ii][jmin_private[ii]] < 0))
+							else if ((min_private[ii] == min_local) && (taken) && (colsol[jmin_private[ii]] < 0))
 							{
-								jmin_local = jmin_private[ii] + start;
+								jmin_local = jmin_private[ii];
 								taken = false;
 							}
 						}
@@ -735,21 +708,24 @@ namespace lap
 								}
 							}
 						}
+						bool fast = unassignedfound_local;
 						while (!unassignedfound_local)
 						{
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
-							int t_jmin = 0;
-							while (jmin_local >= iterator.ws.part[t_jmin].second) t_jmin++;
-							int idx_jmin = jmin_local - iterator.ws.part[t_jmin].first;
-							int i = colsol[t_jmin][idx_jmin];
-							jmin_local = dim2;
+							int i = colsol[jmin_local];
 							SC min_n_local = std::numeric_limits<SC>::max();
 							if (i < dim)
 							{
 								tt[t] = iterator.getRow(t, i);
+								if ((jmin_local >= start) && (jmin_local < end))
+								{
+									v_jmin_global = v[t][jmin_local - start];
+									tt_jmin_global = (SC)tt[t][jmin_local - start];
+								}
+								jmin_local = dim2;
 #pragma omp barrier
-								SC v_jmin = v[t_jmin][idx_jmin];
-								SC tt_jmin = (SC)tt[t_jmin][idx_jmin];
+								SC v_jmin = v_jmin_global;
+								SC tt_jmin = tt_jmin_global;
 								for (int j = 0; j < count; j++)
 								{
 									if (colactive_private[j] != 0)
@@ -775,8 +751,13 @@ namespace lap
 							}
 							else
 							{
+								if ((jmin_local >= start) && (jmin_local < end))
+								{
+									v_jmin_global = v[t][jmin_local - start];
+								}
+								jmin_local = dim2;
 #pragma omp barrier
-								SC v_jmin = v[t_jmin][idx_jmin];
+								SC v_jmin = v_jmin_global;
 								for (int j = 0; j < count; j++)
 								{
 									if (colactive_private[j] != 0)
@@ -805,7 +786,7 @@ namespace lap
 								}
 							}
 							min_private[t] = min_n_local;
-							jmin_private[t] = jmin_local;
+							jmin_private[t] = jmin_local + start;
 #pragma omp barrier
 #ifndef LAP_QUIET
 							if (t == 0) { if (f < dim) total_rows++; else total_virtual++; }
@@ -827,12 +808,12 @@ namespace lap
 								{
 									// better than previous
 									min_n_local = min_private[ii];
-									jmin_local = jmin_private[ii] + start;
-									taken = (colsol[ii][jmin_private[ii]] >= 0);
+									jmin_local = jmin_private[ii];
+									taken = (colsol[jmin_local] >= 0);
 								}
-								else if ((min_private[ii] == min_n_local) && (taken) && (colsol[ii][jmin_private[ii]] < 0))
+								else if ((min_private[ii] == min_n_local) && (taken) && (colsol[jmin_private[ii]] < 0))
 								{
-									jmin_local = jmin_private[ii] + start;
+									jmin_local = jmin_private[ii];
 									taken = false;
 								}
 							}
@@ -871,21 +852,24 @@ namespace lap
 								total_d += min_private[tt + 2 * threads];
 								total_eps += min_private[tt + 3 * threads];
 							}
+						}
 #ifdef LAP_ROWS_SCANNED
+						if (t == 1)
+						{
+							int i;
+							int eop = endofpath;
+							do
 							{
-								int i;
-								int eop = endofpath;
-								do
-								{
-									i = pred[eop];
-									eop = rowsol[i];
-									if (i != f) pathlength[f]++;
-								} while (i != f);
-							}
+								i = pred[eop];
+								eop = rowsol[i];
+								if (i != f) pathlength[f]++;
+							} while (i != f);
+						}
 #endif
-
+						if (t == 1)
+						{
 							// reset row and column assignments along the alternating path.
-							resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol, iterator.ws.part);
+							lap::resetRowColumnAssignment(endofpath, f, pred, rowsol, colsol);
 #ifndef LAP_QUIET
 							int level;
 							if ((level = displayProgress(start_time, elapsed, fc + 1, dim_limit, " rows")) != 0)
@@ -922,7 +906,7 @@ namespace lap
 						{
 							for (int i = 0; i < iterator.ws.part[j].second - iterator.ws.part[j].first; i++)
 							{
-								if (colsol[j][i] < 0) v[j][i] -= SC(2) * epsilon;
+								if (colsol[i + iterator.ws.part[j].first] < 0) v[j][i] -= SC(2) * epsilon;
 							}
 						}
 					}
@@ -1021,8 +1005,6 @@ namespace lap
 			{
 				lapFree(colactive[t]);
 				lapFree(d[t]);
-				lapFree(pred[t]);
-				lapFree(colsol[t]);
 				lapFree(v[t]);
 			}
 			lapFree(pred);
