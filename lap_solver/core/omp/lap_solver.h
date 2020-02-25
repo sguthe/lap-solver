@@ -679,7 +679,6 @@ namespace lap
 						jmin_local = jmin_private[0];
 						for (int ii = 1; ii < omp_get_num_threads(); ii++)
 						{
-							int start = iterator.ws.part[ii].first;
 							if (min_private[ii] < min_local)
 							{
 								// better than previous
@@ -708,7 +707,6 @@ namespace lap
 								}
 							}
 						}
-						bool fast = unassignedfound_local;
 						while (!unassignedfound_local)
 						{
 							// update 'distances' between freerow and all unscanned columns, via next scanned column.
@@ -803,7 +801,6 @@ namespace lap
 							jmin_local = jmin_private[0];
 							for (int ii = 1; ii < omp_get_num_threads(); ii++)
 								{
-								int start = iterator.ws.part[ii].first;
 								if (min_private[ii] < min_n_local)
 								{
 									// better than previous
