@@ -20,7 +20,7 @@ namespace lap
 				TC* rows;
 				CACHE cache;
 			};
-			table_t* table;
+			table_t** table;
 		public:
 			CF &costfunc;
 			Worksharing &ws;
@@ -35,10 +35,11 @@ namespace lap
 				{
 					int t = omp_get_thread_num();
 					int size = ws.part[t].second - ws.part[t].first;
-					table[t].cache.setSize(entries, dim);
-					lapAlloc(table[t].rows, (size_t)entries * (size_t)size, __FILE__, __LINE__);
+					lapAlloc(table[t], 1, __FILE__, __LINE__);
+					table[t]->cache.setSize(entries, dim);
+					lapAlloc(table[t]->rows, (size_t)entries * (size_t)size, __FILE__, __LINE__);
 					// actually allocate memory (fill with 0)
-					std::memset(table[t].rows, 0, sizeof(TC) * (size_t)entries * (size_t)size);
+					std::memset(table[t]->rows, 0, sizeof(TC) * (size_t)entries * (size_t)size);
 				}
 			}
 
@@ -47,23 +48,24 @@ namespace lap
 #pragma omp parallel
 				{
 					int t = omp_get_thread_num();
-					lapFree(table[t].rows);
+					lapFree(table[t]->rows);
+					lapFree(table[t]);
 				}
 				lapFree(table);
 			}
 
-			__forceinline void getHitMiss(long long &hit, long long &miss) { table[0].cache.getHitMiss(hit, miss); }
+			__forceinline void getHitMiss(long long &hit, long long &miss) { table[0]->cache.getHitMiss(hit, miss); }
 
 			__forceinline const TC *getRow(int t, int i)
 			{
 				int size = ws.part[t].second - ws.part[t].first;
 				int idx;
-				bool found = table[t].cache.find(idx, i);
+				bool found = table[t]->cache.find(idx, i);
 				if (!found)
 				{
-					costfunc.getCostRow(table[t].rows + (long long)size * (long long)idx, i, ws.part[t].first, ws.part[t].second);
+					costfunc.getCostRow(table[t]->rows + (long long)size * (long long)idx, i, ws.part[t].first, ws.part[t].second);
 				}
-				return table[t].rows + (long long)size * (long long)idx;
+				return table[t]->rows + (long long)size * (long long)idx;
 			}
 		};
 	}
