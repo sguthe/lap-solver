@@ -19,6 +19,9 @@
 // use a sparse solver for problems that have many (>20%) virtual rows
 //#define LAP_SPARSE
 
+// the LFU cache is very slow due to the hash being used for storing the priority queue
+#define NO_LFU
+
 #include "../lap.h"
 
 #include <random>
@@ -228,7 +231,9 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 	lap::omp::SimpleCostFunction<TC, CF> costFunction(get_cost);
 	lap::omp::Worksharing ws(N2, costFunction.getMultiple());
 
+#ifndef NO_LFU
 	if (4 * entries < N1)
+#endif
 	{
 		lap::omp::CachingIterator<SC, TC, lap::omp::SimpleCostFunction<TC, CF>, lap::CacheSLRU> iterator(N1, N2, entries, costFunction, ws);
 
@@ -237,6 +242,7 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 		// estimating epsilon
 		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 	}
+#ifndef NO_LFU
 	else
 	{
 		lap::omp::CachingIterator<SC, TC, lap::omp::SimpleCostFunction<TC, CF>, lap::CacheLFU> iterator(N1, N2, entries, costFunction, ws);
@@ -246,6 +252,7 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 		// estimating epsilon
 		lap::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 	}
+#endif
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::omp::cost<SC>(N1, N2, costFunction, rowsol);
@@ -262,7 +269,9 @@ void solveSparseCachingOMP(TP &start_time, int N1, int N2, RL &row_length, CF &g
 	lap::sparse::omp::Worksharing ws(N2, costFunction.getMultiple());
 
 	// entries doesn't really work like this here
+#ifndef NO_LFU
 	if (4 * entries < N1)
+#endif
 	{
 		lap::sparse::omp::CachingIterator<SC, TC, lap::sparse::omp::SimpleCostFunction<TC, RL, CF>, lap::sparse::CacheSLRU> iterator(N1, N2, entries, costFunction, ws);
 
@@ -271,6 +280,7 @@ void solveSparseCachingOMP(TP &start_time, int N1, int N2, RL &row_length, CF &g
 		// estimating epsilon
 		lap::sparse::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 	}
+#ifndef NO_LFU
 	else
 	{
 		lap::sparse::omp::CachingIterator<SC, TC, lap::sparse::omp::SimpleCostFunction<TC, RL, CF>, lap::sparse::CacheLFU> iterator(N1, N2, entries, costFunction, ws);
@@ -280,6 +290,7 @@ void solveSparseCachingOMP(TP &start_time, int N1, int N2, RL &row_length, CF &g
 		// estimating epsilon
 		lap::sparse::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 	}
+#endif
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::sparse::omp::cost<SC>(N1, N2, costFunction, rowsol);
@@ -293,7 +304,9 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 {
 	lap::SimpleCostFunction<TC, CF> costFunction(get_cost);
 
+#ifndef NO_LFU
 	if (4 * entries < N1)
+#endif
 	{
 		lap::CachingIterator<SC, TC, lap::SimpleCostFunction<TC, CF>, lap::CacheSLRU> iterator(N1, N2, entries, costFunction);
 
@@ -301,6 +314,7 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 
 		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 	}
+#ifndef NO_LFU
 	else
 	{
 		lap::CachingIterator<SC, TC, lap::SimpleCostFunction<TC, CF>, lap::CacheLFU> iterator(N1, N2, entries, costFunction);
@@ -309,6 +323,7 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 
 		lap::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 	}
+#endif
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costFunction, rowsol);
@@ -321,7 +336,9 @@ void solveSparseCaching(TP &start_time, int N1, int N2, RL &row_length, CF &get_
 {
 	lap::sparse::SimpleCostFunction<TC, RL, CF> costFunction(row_length, get_cost);
 
+#ifndef NO_LFU
 	if (4 * entries < N1)
+#endif
 	{
 		lap::sparse::CachingIterator<SC, TC, lap::sparse::SimpleCostFunction<TC, RL, CF>, lap::sparse::CacheSLRU> iterator(N1, N2, entries, costFunction);
 
@@ -329,6 +346,7 @@ void solveSparseCaching(TP &start_time, int N1, int N2, RL &row_length, CF &get_
 
 		lap::sparse::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 	}
+#ifndef NO_LFU
 	else
 	{
 		lap::sparse::CachingIterator<SC, TC, lap::sparse::SimpleCostFunction<TC, RL, CF>, lap::sparse::CacheLFU> iterator(N1, N2, entries, costFunction);
@@ -337,6 +355,7 @@ void solveSparseCaching(TP &start_time, int N1, int N2, RL &row_length, CF &get_
 
 		lap::sparse::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
 	}
+#endif
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::sparse::cost<SC>(N1, N2, costFunction, rowsol);
