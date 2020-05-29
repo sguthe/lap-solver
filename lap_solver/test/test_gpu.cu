@@ -311,8 +311,8 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 		{
 			int N = (int)floor(sqrt((double)NN));
 
-			std::vector<int> devs_local = devs;
-			while ((devs_local.size() - 1) * max_memory / sizeof(C) >= N * N) devs_local.pop_back();
+			int max_devices = 1;
+			while (max_devices * max_memory / sizeof(C) < N * N) max_devices++;
 
 			std::cout << "Geometric";
 			if (disjoint) std::cout << " Disjoint";
@@ -358,7 +358,7 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 				}
 			}
 
-			lap::cuda::Worksharing ws(N, 256, devs_local, silent);
+			lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 			int num_enabled = (int)ws.device.size();
 
 			typedef GeometricState<C> State;
@@ -433,8 +433,8 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 		{
 			int N = (int)floor(sqrt((double)NN));
 
-			std::vector<int> devs_local = devs;
-			while ((devs_local.size() - 1) * max_memory / sizeof(C) >= N * N) devs_local.pop_back();
+			int max_devices = 1;
+			while (max_devices * max_memory / sizeof(C) < N * N) max_devices++;
 
 			std::cout << "Sanity<" << name_C << "> " << N << "x" << N << " (" << (double)max_memory / 1073741824.0 << "GB / GPU)";
 			if (epsilon) std::cout << " with epsilon scaling";
@@ -454,7 +454,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 
 			for (long long i = 0; i < N << 1; i++) vec[i] = distribution(generator);
 
-			lap::cuda::Worksharing ws(N, 256, devs_local, silent);
+			lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 			int num_enabled = (int)ws.device.size();
 
 			typedef SanityState<C> State;
@@ -539,8 +539,8 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 			{
 				int N = (int)floor(sqrt((double)NN));
 
-				std::vector<int> devs_local = devs;
-				while ((devs_local.size() - 1) * max_memory / sizeof(C) >= N * N) devs_local.pop_back();
+				int max_devices = 1;
+				while (max_devices * max_memory / sizeof(C) < N * N) max_devices++;
 
 				std::cout << "RandomLowRank<" << name_C << "> " << N << "x" << N << " (" << (double)max_memory / 1073741824.0 << "GB / GPU)";
 				if (epsilon) std::cout << " with epsilon scaling";
@@ -563,7 +563,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 					for (long long j = 0; j < N; j++) vec[i * N + j] = distribution(generator);
 				}
 
-				lap::cuda::Worksharing ws(N, 256, devs_local, silent);
+				lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 				int num_enabled = (int)ws.device.size();
 
 				typedef SanityState<C> State;
@@ -626,8 +626,8 @@ void testInteger(long long min_tab, long long max_tab, long long max_memory, int
 			{
 				int N = (int)floor(sqrt((double)NN));
 
-				std::vector<int> devs_local = devs;
-				while ((devs_local.size() - 1) * max_memory / sizeof(C) >= N * N) devs_local.pop_back();
+				int max_devices = 1;
+				while (max_devices * max_memory / sizeof(C) < N * N) max_devices++;
 
 				std::cout << "Integer";
 				std::cout << "<" << name_C << " ";
@@ -657,7 +657,7 @@ void testInteger(long long min_tab, long long max_tab, long long max_memory, int
 					return distribution(generator);
 				};
 
-				lap::cuda::Worksharing ws(N, 256, devs_local, silent);
+				lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 
 				int *rowsol = new int[N];
 
@@ -678,8 +678,8 @@ template <class C> void testRandom(long long min_tab, long long max_tab, long lo
 		{
 			int N = (int)floor(sqrt((double)NN));
 
-			std::vector<int> devs_local = devs;
-			while ((devs_local.size() - 1) * max_memory / sizeof(C) >= N * N) devs_local.pop_back();
+			int max_devices = 1;
+			while (max_devices * max_memory / sizeof(C) < N * N) max_devices++;
 
 			std::cout << "Random";
 			std::cout << "<" << name_C << "> " << N << "x" << N << " table";
@@ -703,7 +703,7 @@ template <class C> void testRandom(long long min_tab, long long max_tab, long lo
 				return distribution(generator);
 			};
 
-			lap::cuda::Worksharing ws(N, 256, devs_local, silent);
+			lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 
 			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true, N < max_tab, silent);
 
@@ -721,8 +721,8 @@ template <class C> void testSanity(long long min_tab, long long max_tab, long lo
 		{
 			int N = (int)floor(sqrt((double)NN));
 
-			std::vector<int> devs_local = devs;
-			while ((devs_local.size() - 1) * max_memory / sizeof(C) >= N * N) devs_local.pop_back();
+			int max_devices = 1;
+			while (max_devices * max_memory / sizeof(C) < N * N) max_devices++;
 
 			std::cout << "Sanity";
 			std::cout << "<" << name_C << "> " << N << "x" << N << " table";
@@ -754,7 +754,7 @@ template <class C> void testSanity(long long min_tab, long long max_tab, long lo
 			};
 
 
-			lap::cuda::Worksharing ws(N, 256, devs_local, silent);
+			lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 
 			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
 
@@ -786,8 +786,8 @@ template <class C> void testGeometric(long long min_tab, long long max_tab, long
 		{
 			int N = (int)floor(sqrt((double)NN));
 
-			std::vector<int> devs_local = devs;
-			while ((devs_local.size() - 1) * max_memory / sizeof(C) >= N * N) devs_local.pop_back();
+			int max_devices = 1;
+			while (max_devices * max_memory / sizeof(C) < N * N) max_devices++;
 
 			std::cout << "Geometric";
 			if (disjoint) std::cout << " Disjoint";
@@ -843,7 +843,7 @@ template <class C> void testGeometric(long long min_tab, long long max_tab, long
 
 			int *rowsol = new int[N];
 
-			lap::cuda::Worksharing ws(N, 256, devs_local, silent);
+			lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 
 			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
 
@@ -865,8 +865,8 @@ template <class C> void testRandomLowRank(long long min_tab, long long max_tab, 
 			{
 				int N = (int)floor(sqrt((double)NN));
 
-				std::vector<int> devs_local = devs;
-				while ((devs_local.size() - 1) * max_memory / sizeof(C) >= N * N) devs_local.pop_back();
+				int max_devices = 1;
+				while (max_devices * max_memory / sizeof(C) < N * N) max_devices++;
 
 				std::cout << "RandomLowRank<" << name_C << "> " << N << "x" << N << " table rank = " << rank;
 				if (epsilon) std::cout << " with epsilon scaling";
@@ -908,7 +908,7 @@ template <class C> void testRandomLowRank(long long min_tab, long long max_tab, 
 
 				int *rowsol = new int[N];
 
-				lap::cuda::Worksharing ws(N, 256, devs_local, silent);
+				lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 
 				solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
 
@@ -951,10 +951,10 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				long long max_memory_local = max_memory - (N1 * 3 + N2 + 3);
 
-				std::vector<int> devs_local = devs;
-				while ((devs_local.size() - 1) * max_memory_local / sizeof(C) >= N1 * N2) devs_local.pop_back();
+				int max_devices = 1;
+				while (max_devices * max_memory / sizeof(C) < (long long)N1 * (long long)N1) max_devices++;
 
-				lap::cuda::Worksharing ws(N2, 256, devs_local, silent);
+				lap::cuda::Worksharing ws(N2, 256, devs, max_devices, silent);
 				int num_devices = (int)ws.device.size();
 				typedef ImagesState State;
 				// make sure img[0] is at most as large as img[1]

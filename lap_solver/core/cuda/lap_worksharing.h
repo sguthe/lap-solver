@@ -19,9 +19,9 @@ namespace lap
 			std::vector<int> threads_per_sm;
 			bool silent;
 		public:
-			Worksharing(int size, int multiple, std::vector<int> &devs, bool silent) : silent(silent)
+			Worksharing(int size, int multiple, std::vector<int> &devs, int max_devices, bool silent) : silent(silent)
 			{
-				int max_devices = (size + multiple - 1) / multiple;
+				max_devices = std::min(max_devices, (size + multiple - 1) / multiple);
 				int device_count;
 
 				cudaDeviceProp deviceProp;
