@@ -19,7 +19,7 @@
 // use a sparse solver for problems that have many (>20%) virtual rows
 //#define LAP_SPARSE
 
-// the LFU cache is very slow due to the hash being used for storing the priority queue
+// the LFU cache is very slow due to the heap being used for storing the priority queue
 #define NO_LFU
 
 #include "../lap.h"
