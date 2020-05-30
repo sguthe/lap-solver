@@ -72,6 +72,13 @@ namespace lap
 				dim3 block_size, grid_size;
 				block_size.x = 256;
 				grid_size.x = ((end - start) + block_size.x - 1) / block_size.x;
+				while (rows > 65535)
+				{
+					grid_size.y = 65535;
+					getCostRow_kernel<<<grid_size, block_size, 0, stream>>>(row, getcost, state[t], x, start, end - start);
+					row += (size_t)65535 * (size_t)(end - start);
+					rows -= 65535;
+				}
 				grid_size.y = rows;
 				getCostRow_kernel<<<grid_size, block_size, 0, stream>>>(row, getcost, state[t], x, start, end - start);
 			}
