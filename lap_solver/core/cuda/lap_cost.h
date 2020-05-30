@@ -124,6 +124,7 @@ namespace lap
 #pragma omp parallel num_threads(devices)
 				{
 					const int t = omp_get_thread_num();
+					checkCudaErrors(cudaSetDevice(ws.devices[t]));
 					stride[t] = ws.part[t].second - ws.part[t].first;
 					if (pinned) lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
 					else
@@ -159,6 +160,8 @@ namespace lap
 #else
 				for (int t = 0; t < devices; t++)
 				{
+					checkCudaErrors(cudaSetDevice(ws.device[t]));
+
 					stride[t] = ws.part[t].second - ws.part[t].first;
 					if (pinned) lapAllocPinned(cc[t], (long long)(stride[t])* (long long)x_size, __FILE__, __LINE__);
 					else
