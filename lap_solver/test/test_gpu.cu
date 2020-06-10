@@ -312,7 +312,7 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			int N = (int)floor(sqrt((double)NN));
 
 			int max_devices = 1;
-			while ((long long)max_devices * max_memory / sizeof(C) < (long long)N * (long long)N) max_devices++;
+			while ((size_t)max_devices * max_memory / sizeof(C) < (size_t)N * (size_t)N) max_devices++;
 
 			std::cout << "Geometric";
 			if (disjoint) std::cout << " Disjoint";
@@ -434,7 +434,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			int N = (int)floor(sqrt((double)NN));
 
 			int max_devices = 1;
-			while ((long long)max_devices * max_memory / sizeof(C) < (long long)N * (long long)N) max_devices++;
+			while ((size_t)max_devices * max_memory / sizeof(C) < (size_t)N * (size_t)N) max_devices++;
 
 			std::cout << "Sanity<" << name_C << "> " << N << "x" << N << " (" << (double)max_memory / 1073741824.0 << "GB / GPU)";
 			if (epsilon) std::cout << " with epsilon scaling";
@@ -540,7 +540,7 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				int N = (int)floor(sqrt((double)NN));
 
 				int max_devices = 1;
-				while ((long long)max_devices * max_memory / sizeof(C) < (long long)N * (long long)N) max_devices++;
+				while ((size_t)max_devices * max_memory / sizeof(C) < (size_t)N * (size_t)N) max_devices++;
 
 				std::cout << "RandomLowRank<" << name_C << "> " << N << "x" << N << " (" << (double)max_memory / 1073741824.0 << "GB / GPU)";
 				if (epsilon) std::cout << " with epsilon scaling";
@@ -627,7 +627,7 @@ void testInteger(long long min_tab, long long max_tab, long long max_memory, int
 				int N = (int)floor(sqrt((double)NN));
 
 				int max_devices = 1;
-				while ((long long)max_devices * max_memory / sizeof(C) < (long long)N * (long long)N) max_devices++;
+				while ((size_t)max_devices * max_memory / sizeof(C) < (size_t)N * (size_t)N) max_devices++;
 
 				std::cout << "Integer";
 				std::cout << "<" << name_C << " ";
@@ -679,7 +679,7 @@ template <class C> void testRandom(long long min_tab, long long max_tab, long lo
 			int N = (int)floor(sqrt((double)NN));
 
 			int max_devices = 1;
-			while ((long long)max_devices * max_memory / sizeof(C) < (long long)N * (long long)N) max_devices++;
+			while ((size_t)max_devices * max_memory / sizeof(C) < (size_t)N * (size_t)N) max_devices++;
 
 			std::cout << "Random";
 			std::cout << "<" << name_C << "> " << N << "x" << N << " table";
@@ -722,7 +722,7 @@ template <class C> void testSanity(long long min_tab, long long max_tab, long lo
 			int N = (int)floor(sqrt((double)NN));
 
 			int max_devices = 1;
-			while ((long long)max_devices * max_memory / sizeof(C) < (long long)N * (long long)N) max_devices++;
+			while ((size_t)max_devices * max_memory / sizeof(C) < (size_t)N * (size_t)N) max_devices++;
 
 			std::cout << "Sanity";
 			std::cout << "<" << name_C << "> " << N << "x" << N << " table";
@@ -787,7 +787,7 @@ template <class C> void testGeometric(long long min_tab, long long max_tab, long
 			int N = (int)floor(sqrt((double)NN));
 
 			int max_devices = 1;
-			while ((long long)max_devices * max_memory / sizeof(C) < (long long)N * (long long)N) max_devices++;
+			while ((size_t)max_devices * max_memory / sizeof(C) < (size_t)N * (size_t)N) max_devices++;
 
 			std::cout << "Geometric";
 			if (disjoint) std::cout << " Disjoint";
@@ -866,7 +866,7 @@ template <class C> void testRandomLowRank(long long min_tab, long long max_tab, 
 				int N = (int)floor(sqrt((double)NN));
 
 				int max_devices = 1;
-				while ((long long)max_devices * max_memory / sizeof(C) < (long long)N * (long long)N) max_devices++;
+				while ((size_t)max_devices * max_memory / sizeof(C) < (size_t)N * (size_t)N) max_devices++;
 
 				std::cout << "RandomLowRank<" << name_C << "> " << N << "x" << N << " table rank = " << rank;
 				if (epsilon) std::cout << " with epsilon scaling";
@@ -952,7 +952,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 				long long max_memory_local = max_memory - (N1 * 3 + N2 + 3);
 
 				int max_devices = 1;
-				while ((long long)max_devices * max_memory / sizeof(C) < (long long)N1 * (long long)N2) max_devices++;
+				while ((size_t)max_devices * max_memory / sizeof(C) < (size_t)N1 * (size_t)N2) max_devices++;
 
 				lap::cuda::Worksharing ws(N2, 256, devs, max_devices, silent);
 				int num_devices = (int)ws.device.size();
