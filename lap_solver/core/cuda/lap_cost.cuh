@@ -10,7 +10,7 @@ namespace lap
 		{
 			int y = threadIdx.x + blockIdx.x * blockDim.x;
 			int x = x0 + blockIdx.y;
-			int off = count * blockIdx.y;
+			size_t off = (size_t)count * (size_t)blockIdx.y;
 			if (y < count) cost[y + off] = getcost(x, y + start, state);
 		}
 
