@@ -16,9 +16,6 @@
 #endif
 #endif
 
-// use a sparse solver for problems that have many (>20%) virtual rows
-//#define LAP_SPARSE
-
 // the LFU cache is very slow due to the heap being used for storing the priority queue
 #define NO_LFU
 
@@ -37,7 +34,7 @@ template <class C> void testGeometric(long long min_tab, long long max_tab, int 
 template <class C> void testGeometricCached(long long min_cached, long long max_cached, long long max_memory, int runs, bool omp, bool epsilon, bool disjoint, std::string name_C);
 template <class C> void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C);
 template <class C> void testRandomLowRankCached(long long min_cached, long long max_cached, long long max_memory, long long min_rank, long long max_rank, int runs, bool omp, bool epsilon, std::string name_C);
-template <class C> void testImages(std::vector<std::string> &images, long long max_memory, int runs, bool omp, bool sparse, bool epsilon, std::string name_C);
+template <class C> void testImages(std::vector<std::string> &images, long long max_memory, int runs, bool omp, bool epsilon, std::string name_C);
 template <class C> void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C);
 
 int main(int argc, char* argv[])
@@ -71,7 +68,7 @@ int main(int argc, char* argv[])
 			if (opt.run_geometric_disjoint) testGeometric<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, true, std::string("double"));
 			if (opt.run_geometric_cached) testGeometricCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, false, false, std::string("double"));
 			if (opt.run_geometric_disjoint_cached) testGeometricCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, false, true, std::string("double"));
-			if (opt.images.size() > 1) testImages<double>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, opt.use_sparse, false, std::string("double"));
+			if (opt.images.size() > 1) testImages<double>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, false, std::string("double"));
 		}
 		if (opt.use_epsilon)
 		{
@@ -84,7 +81,7 @@ int main(int argc, char* argv[])
 			if (opt.run_geometric_disjoint) testGeometric<double>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, true, std::string("double"));
 			if (opt.run_geometric_cached) testGeometricCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, true, false, std::string("double"));
 			if (opt.run_geometric_disjoint_cached) testGeometricCached<double>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, true, true, std::string("double"));
-			if (opt.images.size() > 1) testImages<double>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, opt.use_sparse, true, std::string("double"));
+			if (opt.images.size() > 1) testImages<double>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, true, std::string("double"));
 		}
 	}
 	if (opt.use_float)
@@ -100,7 +97,7 @@ int main(int argc, char* argv[])
 			if (opt.run_geometric_disjoint) testGeometric<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, false, true, std::string("float"));
 			if (opt.run_geometric_cached) testGeometricCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, false, false, std::string("float"));
 			if (opt.run_geometric_disjoint_cached) testGeometricCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, false, true, std::string("float"));
-			if (opt.images.size() > 1) testImages<float>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, opt.use_sparse, false, std::string("float"));
+			if (opt.images.size() > 1) testImages<float>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, false, std::string("float"));
 		}
 		if (opt.use_epsilon)
 		{
@@ -113,7 +110,7 @@ int main(int argc, char* argv[])
 			if (opt.run_geometric_disjoint) testGeometric<float>(opt.lap_min_tab, opt.lap_max_tab, opt.runs, opt.use_omp, true, true, std::string("float"));
 			if (opt.run_geometric_cached) testGeometricCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, true, false, std::string("float"));
 			if (opt.run_geometric_disjoint_cached) testGeometricCached<float>(opt.lap_min_cached, opt.lap_max_cached, opt.lap_max_memory, opt.runs, opt.use_omp, true, true, std::string("float"));
-			if (opt.images.size() > 1) testImages<float>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, opt.use_sparse, true, std::string("float"));
+			if (opt.images.size() > 1) testImages<float>(opt.images, opt.lap_max_memory, opt.runs, opt.use_omp, true, std::string("float"));
 		}
 	}
 	if (opt.run_integer)
@@ -166,28 +163,6 @@ void solveTableOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bo
 }
 #endif
 
-#ifdef LAP_SPARSE
-#ifdef LAP_OPENMP
-template <class SC, class TC, class RL, class CF, class TP>
-void solveSparseTableOMP(TP &start_time, int N1, int N2, RL &row_length, CF &get_cost, int *rowsol, bool epsilon)
-{
-	lap::sparse::omp::SimpleCostFunction<TC, RL, CF> costFunction(row_length, get_cost);
-	lap::sparse::omp::Worksharing ws(N2, 8);
-	lap::sparse::omp::TableCost<TC> costMatrix(N1, N2, costFunction, ws);
-	lap::sparse::omp::DirectIterator<SC, TC, lap::sparse::omp::TableCost<TC>> iterator(N1, N2, costMatrix, ws);
-
-	lap::displayTime(start_time, "setup complete", std::cout);
-
-	// estimating epsilon
-	lap::sparse::omp::solve<SC>(N1, N2, costMatrix, iterator, rowsol, epsilon);
-
-	std::stringstream ss;
-	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::sparse::omp::cost<SC>(N1, N2, costMatrix, rowsol);
-	lap::displayTime(start_time, ss.str().c_str(), std::cout);
-}
-#endif
-#endif
-
 template <class SC, class TC, class CF, class TP>
 void solveTable(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool epsilon)
 {
@@ -204,25 +179,6 @@ void solveTable(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool 
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cost<SC>(N1, N2, costMatrix, rowsol);
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
-
-#ifdef LAP_SPARSE
-template <class SC, class TC, class RL, class CF, class TP>
-void solveSparseTable(TP &start_time, int N1, int N2, RL &row_length, CF &get_cost, int *rowsol, bool epsilon)
-{
-	lap::sparse::SimpleCostFunction<TC, RL, CF> costFunction(row_length, get_cost);
-	lap::sparse::TableCost<TC> costMatrix(N1, N2, costFunction);
-	lap::sparse::DirectIterator<SC, TC, lap::sparse::TableCost<TC>> iterator(N1, N2, costMatrix);
-
-	lap::displayTime(start_time, "setup complete", std::cout);
-
-	// estimating epsilon
-	lap::sparse::solve<SC>(N1, N2, costMatrix, iterator, rowsol, epsilon);
-
-	std::stringstream ss;
-	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::sparse::cost<SC>(N1, N2, costMatrix, rowsol);
-	lap::displayTime(start_time, ss.str().c_str(), std::cout);
-}
-#endif
 
 #ifdef LAP_OPENMP
 template <class SC, class TC, class CF, class TP>
@@ -260,45 +216,6 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 }
 #endif
 
-#ifdef LAP_SPARSE
-#ifdef LAP_OPENMP
-template <class SC, class TC, class RL, class CF, class TP>
-void solveSparseCachingOMP(TP &start_time, int N1, int N2, RL &row_length, CF &get_cost, int *rowsol, int entries, bool epsilon)
-{
-	lap::sparse::omp::SimpleCostFunction<TC, RL, CF> costFunction(row_length, get_cost);
-	lap::sparse::omp::Worksharing ws(N2, costFunction.getMultiple());
-
-	// entries doesn't really work like this here
-#ifndef NO_LFU
-	if (4 * entries < N1)
-#endif
-	{
-		lap::sparse::omp::CachingIterator<SC, TC, lap::sparse::omp::SimpleCostFunction<TC, RL, CF>, lap::sparse::CacheSLRU> iterator(N1, N2, entries, costFunction, ws);
-
-		lap::displayTime(start_time, "setup complete", std::cout);
-
-		// estimating epsilon
-		lap::sparse::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
-	}
-#ifndef NO_LFU
-	else
-	{
-		lap::sparse::omp::CachingIterator<SC, TC, lap::sparse::omp::SimpleCostFunction<TC, RL, CF>, lap::sparse::CacheLFU> iterator(N1, N2, entries, costFunction, ws);
-
-		lap::displayTime(start_time, "setup complete", std::cout);
-
-		// estimating epsilon
-		lap::sparse::omp::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
-	}
-#endif
-
-	std::stringstream ss;
-	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::sparse::omp::cost<SC>(N1, N2, costFunction, rowsol);
-	lap::displayTime(start_time, ss.str().c_str(), std::cout);
-}
-#endif
-#endif
-
 template <class SC, class TC, class CF, class TP>
 void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int entries, bool epsilon)
 {
@@ -330,39 +247,6 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
-#ifdef LAP_SPARSE
-template <class SC, class TC, class RL, class CF, class TP>
-void solveSparseCaching(TP &start_time, int N1, int N2, RL &row_length, CF &get_cost, int *rowsol, int entries, bool epsilon)
-{
-	lap::sparse::SimpleCostFunction<TC, RL, CF> costFunction(row_length, get_cost);
-
-#ifndef NO_LFU
-	if (4 * entries < N1)
-#endif
-	{
-		lap::sparse::CachingIterator<SC, TC, lap::sparse::SimpleCostFunction<TC, RL, CF>, lap::sparse::CacheSLRU> iterator(N1, N2, entries, costFunction);
-
-		lap::displayTime(start_time, "setup complete", std::cout);
-
-		lap::sparse::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
-	}
-#ifndef NO_LFU
-	else
-	{
-		lap::sparse::CachingIterator<SC, TC, lap::sparse::SimpleCostFunction<TC, RL, CF>, lap::sparse::CacheLFU> iterator(N1, N2, entries, costFunction);
-
-		lap::displayTime(start_time, "setup complete", std::cout);
-
-		lap::sparse::solve<SC>(N1, N2, costFunction, iterator, rowsol, epsilon);
-	}
-#endif
-
-	std::stringstream ss;
-	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::sparse::cost<SC>(N1, N2, costFunction, rowsol);
-	lap::displayTime(start_time, ss.str().c_str(), std::cout);
-}
-#endif
-
 #ifdef LAP_OPENMP
 template <class SC, class TC, class CF, class TP>
 void solveAdaptiveOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int entries, bool epsilon)
@@ -380,64 +264,6 @@ void solveAdaptiveOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol,
 }
 #endif
 
-#ifdef LAP_SPARSE
-#ifdef LAP_OPENMP
-template <class SC, class TC, class CF, class TP>
-void solveSparseAdaptiveOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int entries, bool epsilon)
-{
-	// create sparse map (simple version)
-	long long stride = (((long long)N2 + 31) >> 5);
-	unsigned int *active = new unsigned int[(long long)N1 * stride];
-	memset(active, 0, sizeof(unsigned int) * stride * (long long)N1);
-#pragma omp parallel
-	{
-		int *perm = new int[N2];
-		TC *row = new TC[N2];
-#pragma omp for
-		for (int x = 0; x < N1; x++)
-		{
-			for (int y = 0; y < N2; y++)
-			{
-				row[y] = get_cost(x, y);
-				perm[y] = y;
-			}
-			std::partial_sort(perm, perm + N1, perm + N2, [&row](int a, int b) { return (row[a] < row[b]) || ((row[a] == row[b]) && (a < b)); });
-			unsigned int *c_active = active + (size_t)stride * (size_t)x;
-			for (int y = 0; y < N1; y++)
-			{
-				c_active[perm[y] >> 5] |= 1 << (perm[y] & 31);
-			}
-		}
-		delete[] perm;
-		delete[] row;
-	}
-	// use sparse cost function for simplicity
-	auto get_sparse_cost = [&get_cost, &active, &stride](int x, int y) -> TC
-	{
-		if (((active[(size_t)stride * (size_t)x + (y >> 5)] >> (y & 31)) & 1) == 0) return std::numeric_limits<TC>::infinity();
-		return get_cost(x, y);
-	};
-	auto get_row_length = [&active, &stride](int x, int start, int end) -> int
-	{
-		int len = 0;
-		for (int y = start; y < end; y++) if (((active[(size_t)stride * (size_t)x + (y >> 5)] >> (y & 31)) & 1) != 0) len++;
-		return len;
-	};
-	if (N1 * N1 <= entries * N2)
-	{
-		std::cout << "using sparse multithreaded table with " << N1 << " rows." << std::endl;
-		solveSparseTableOMP<SC, TC>(start_time, N1, N2, get_row_length, get_sparse_cost, rowsol, epsilon);
-	}
-	else
-	{
-		std::cout << "using sparse multithreaded caching with " << entries << "/" << N1 << " entries." << std::endl;
-		solveSparseCachingOMP<SC, TC>(start_time, N1, N2, get_row_length, get_sparse_cost, rowsol, entries, epsilon);
-	}
-	delete[] active;
-}
-#endif
-#endif
-
 template <class SC, class TC, class CF, class TP>
 void solveAdaptive(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int entries, bool epsilon)
 {
@@ -452,58 +278,6 @@ void solveAdaptive(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, in
 		solveCaching<SC, TC>(start_time, N1, N2, get_cost, rowsol, entries, epsilon);
 	}
 }
-
-#ifdef LAP_SPARSE
-template <class SC, class TC, class CF, class TP>
-void solveSparseAdaptive(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int entries, bool epsilon)
-{
-	// create sparse map (simple version)
-	long long stride = (((long long)N2 + 31) >> 5);
-	unsigned int *active = new unsigned int[(long long)N1 * stride];
-	memset(active, 0, sizeof(unsigned int) * stride * (long long)N1);
-	int *perm = new int[N2];
-	TC *row = new TC[N2];
-	for (int x = 0; x < N1; x++)
-	{
-		for (int y = 0; y < N2; y++)
-		{
-			row[y] = get_cost(x, y);
-			perm[y] = y;
-		}
-		std::partial_sort(perm, perm + N1, perm + N2, [&row](int a, int b) { return (row[a] < row[b]) || ((row[a] == row[b]) && (a < b)); });
-		unsigned int *c_active = active + (size_t)stride * (size_t)x;
-		for (int y = 0; y < N1; y++)
-		{
-			c_active[perm[y] >> 5] |= 1 << (perm[y] & 31);
-		}
-	}
-	delete[] perm;
-	delete[] row;
-	// use sparse cost function for simplicity
-	auto get_sparse_cost = [&get_cost, &active, &stride](int x, int y) -> TC
-	{
-		if (((active[(size_t)stride * (size_t)x + (y >> 5)] >> (y & 31)) & 1) == 0) return std::numeric_limits<TC>::infinity();
-		return get_cost(x, y);
-	};
-	auto get_row_length = [&active, &stride](int x, int start, int end) -> int
-	{
-		int len = 0;
-		for (int y = start; y < end; y++) if (((active[(size_t)stride * (size_t)x + (y >> 5)] >> (y & 31)) & 1) != 0) len++;
-		return len;
-	};
-	if (N1 * N1 <= entries * N2)
-	{
-		std::cout << "using sparse table with " << N1 << " rows." << std::endl;
-		solveSparseTable<SC, TC>(start_time, N1, N2, get_row_length, get_sparse_cost, rowsol, epsilon);
-	}
-	else
-	{
-		std::cout << "using sparse caching with " << entries << "/" << N1 << " entries." << std::endl;
-		solveSparseCaching<SC, TC>(start_time, N1, N2, get_row_length, get_sparse_cost, rowsol, entries, epsilon);
-	}
-	delete[] active;
-}
-#endif
 
 template <class C>
 void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool epsilon, std::string name_C)
@@ -1087,7 +861,7 @@ void testInteger(long long min_tab, long long max_tab, int runs, bool omp, bool 
 	}
 }
 
-template <class C> void testImages(std::vector<std::string> &images, long long max_memory, int runs, bool omp, bool sparse, bool epsilon, std::string name_C)
+template <class C> void testImages(std::vector<std::string> &images, long long max_memory, int runs, bool omp, bool epsilon, std::string name_C)
 {
 	std::cout << "Comparing images ";
 	if (omp) std::cout << " multithreaded";
@@ -1105,7 +879,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 				auto start_time = std::chrono::high_resolution_clock::now();
 
 				// make sure img[0] is at most as large as img[1]
-				PPMImage *img[2];
+				PPMImage* img[2];
 				if (img_a.width * img_a.height < img_b.width * img_b.height)
 				{
 					img[0] = &img_a;
@@ -1130,40 +904,18 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 					return r * r + g * g + b * b + u * u + v * v;
 				};
 
-				int *rowsol = new int[N2];
+				int* rowsol = new int[N2];
 				int entries = (int)std::min((long long)N1, (long long)(max_memory / (sizeof(C) * N2)));
 
-#ifdef LAP_SPARSE
-				// this needs to be reserved to remember the best N1 columns in each row
-				long long reserved = (long long)N1 * ((((long long)N2 + 31) >> 5) << 2);
-				int sparse_entries = (int)std::min((long long)N1, (long long)((max_memory - reserved) / (long long)((sizeof(C) + sizeof(int)) * N2)));
-				if ((sparse) && ((long long)N1 * 6ll <= (long long)N2 * 5ll))
+				if (omp)
 				{
-					if (omp)
-					{
 #ifdef LAP_OPENMP
-						solveSparseAdaptiveOMP<C, C>(start_time, N1, N2, get_cost, rowsol, sparse_entries, epsilon);
+					solveAdaptiveOMP<C, C>(start_time, N1, N2, get_cost, rowsol, entries, epsilon);
 #endif
-					}
-					else
-					{
-						solveSparseAdaptive<C, C>(start_time, N1, N2, get_cost, rowsol, sparse_entries, epsilon);
-					}
 				}
 				else
-#endif
 				{
-
-					if (omp)
-					{
-#ifdef LAP_OPENMP
-						solveAdaptiveOMP<C, C>(start_time, N1, N2, get_cost, rowsol, entries, epsilon);
-#endif
-					}
-					else
-					{
-						solveAdaptive<C, C>(start_time, N1, N2, get_cost, rowsol, entries, epsilon);
-					}
+					solveAdaptive<C, C>(start_time, N1, N2, get_cost, rowsol, entries, epsilon);
 				}
 				delete[] rowsol;
 			}
