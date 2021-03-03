@@ -346,7 +346,7 @@ namespace lap
 		__global__ void findMaxLarge_kernel(MS *s, SC *max, SC min, int size)
 		{
 			// 1024 threads in 32 warps
-			__shared__ SC b_max[8];
+			__shared__ SC b_max[32];
 
 			int j = threadIdx.x;
 
@@ -419,7 +419,7 @@ namespace lap
 		__global__ void findMaxLarge_kernel(MS *s, SC *max, int *active, SC min, int size)
 		{
 			// 1024 threads in 32 warps
-			__shared__ SC b_max[8];
+			__shared__ SC b_max[32];
 
 			int j = threadIdx.x;
 

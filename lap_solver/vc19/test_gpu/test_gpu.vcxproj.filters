@@ -103,5 +103,11 @@
     <ClInclude Include="..\..\core\cuda\lap_cost.cuh">
       <Filter>core\cuda\kernel</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_cache.h">
+      <Filter>core\cuda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\cuda\lap_cache.cuh">
+      <Filter>core\cuda\kernel</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
