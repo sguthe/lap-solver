@@ -74,26 +74,6 @@ namespace lap
 	template <typename T> void alloc(T * &ptr, unsigned long long width, const char *file, const int line);
 	template <typename T> void free(T *&ptr);
 
-#ifdef LAP_SPARSE
-	namespace sparse
-	{
-		// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
-		template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
-		template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
-		template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
-		template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
-
-		// Cost functions, including tabulated costs
-		template <class TC, typename GETROWLENGTH, typename GETCOST> class SimpleCostFunction;
-		template <class TC, typename GETROWLENGTH, typename GETCOSTROW> class RowCostFunction;
-		template <class TC> class TableCost;
-
-		// Iterator classes used for accessing the cost functions
-		template <class SC, class TC, class CF> class DirectIterator;
-		template <class SC, class TC, class CF, class CACHE> class CachingIterator;
-	}
-#endif
-
 #ifdef LAP_OPENMP
 	namespace omp
 	{
@@ -112,25 +92,6 @@ namespace lap
 		template <class SC, class TC, class CF> class DirectIterator;
 		template <class SC, class TC, class CF, class CACHE> class CachingIterator;
 
-#ifdef LAP_SPARSE
-		namespace sparse
-		{
-			// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
-			template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
-			template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
-			template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
-			template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
-
-			// Cost functions, including tabulated costs
-			template <class TC, typename GETROWLENGTH, typename GETCOST> class SimpleCostFunction;
-			template <class TC, typename GETROWLENGTH, typename GETCOSTROW> class RowCostFunction;
-			template <class TC> class TableCost;
-
-			// Iterator classes used for accessing the cost functions
-			template <class SC, class TC, class CF> class DirectIterator;
-			template <class SC, class TC, class CF, class CACHE> class CachingIterator;
-		}
-#endif
 	}
 #endif
 
@@ -156,27 +117,12 @@ namespace lap
 #include "core/lap_caching_iterator.h"
 #include "core/lap_solver.h"
 
-#ifdef LAP_SPARSE
-#include "core/sparse/lap_cost.h"
-#include "core/sparse/lap_cache.h"
-#include "core/sparse/lap_direct_iterator.h"
-#include "core/sparse/lap_caching_iterator.h"
-#include "core/sparse/lap_solver.h"
-#endif
-
 #ifdef LAP_OPENMP
 #include <omp.h>
 #include "core/omp/lap_cost.h"
 #include "core/omp/lap_direct_iterator.h"
 #include "core/omp/lap_caching_iterator.h"
 #include "core/omp/lap_solver.h"
-
-#ifdef LAP_SPARSE
-#include "core/sparse/omp/lap_cost.h"
-#include "core/sparse/omp/lap_direct_iterator.h"
-#include "core/sparse/omp/lap_caching_iterator.h"
-#include "core/sparse/omp/lap_solver.h"
-#endif
 #endif
 
 #ifdef LAP_CUDA
