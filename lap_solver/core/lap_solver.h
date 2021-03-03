@@ -145,7 +145,7 @@ namespace lap
 	template <typename T>
 	void alloc(T * &ptr, unsigned long long width, const char *file, const int line)
 	{
-		ptr = new T[width]; // this one is allowed
+		ptr = (T*)malloc(sizeof(T) * (size_t) width); // this one is allowed
 #ifndef LAP_QUIET
 		allocationLogger.alloc(0, ptr, width, file, line);
 #endif
@@ -158,7 +158,7 @@ namespace lap
 #ifndef LAP_QUIET
 		allocationLogger.free(0, ptr);
 #endif
-		delete[] ptr; // this one is allowed
+		::free(ptr); // this one is allowed
 		ptr = (T *)NULL;
 	}
 

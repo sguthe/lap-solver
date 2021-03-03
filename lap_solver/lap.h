@@ -63,8 +63,8 @@ namespace lap
 	template <class TC> class TableCost;
 
 	// Iterator classes used for accessing the cost functions
-	template <class SC, class TC, class CF> class DirectIterator;
-	template <class SC, class TC, class CF, class CACHE> class CachingIterator;
+	template <class TC, class CF> class DirectIterator;
+	template <class TC, class CF, class CACHE> class CachingIterator;
 
 	// Caching Schemes to be used for caching iterator
 	class CacheSLRU;
@@ -89,8 +89,8 @@ namespace lap
 		template <class TC> class TableCost;
 
 		// Iterator classes used for accessing the cost functions
-		template <class SC, class TC, class CF> class DirectIterator;
-		template <class SC, class TC, class CF, class CACHE> class CachingIterator;
+		template <class TC, class CF> class DirectIterator;
+		template <class TC, class CF, class CACHE> class CachingIterator;
 
 	}
 #endif
@@ -105,8 +105,8 @@ namespace lap
 		template <class SC, class TC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol, cudaStream_t stream);
 
 		// Iterator classes used for accessing the cost functions
-		template <class SC, class TC, class CF> class DirectIterator;
-		template <class SC, class TC, class CF, class CACHE> class CachingIterator;
+		template <class TC, class CF> class DirectIterator;
+		template <class TC, class CF, class CACHE> class CachingIterator;
 	}
 #endif
 }
@@ -129,6 +129,7 @@ namespace lap
 #include "core/cuda/lap_cuda_helper.h"
 #include "core/cuda/lap_solver.h"
 #include "core/cuda/lap_cost.h"
+#include "core/cuda/lap_cache.h"
 #include "core/cuda/lap_direct_iterator.h"
 #include "core/cuda/lap_caching_iterator.h"
 #endif
