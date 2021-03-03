@@ -166,7 +166,7 @@ namespace lap
 				lapFree(istate);
 			}
 
-			__forceinline void getHitMiss(long long& hit, long long& miss) { istate[0].cache.getHitMiss(hit, miss); }
+			__forceinline void getHitMiss(long long& hit, long long& miss) { istate[0]->cache.getHitMiss(hit, miss); }
 
 			__forceinline auto& getState(int t) { return costfunc.getState(t); }
 
