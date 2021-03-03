@@ -15,6 +15,12 @@
     <Filter Include="core\omp">
       <UniqueIdentifier>{ed124daf-e917-4ca8-a157-b2205806e7c5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="core\sparse">
+      <UniqueIdentifier>{f9260212-e543-42cd-b761-2c201e1d94d1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\sparse\omp">
+      <UniqueIdentifier>{00812677-7958-4f5d-91aa-5eb2f38f5072}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\test\test_cpu.cpp">
@@ -60,6 +66,36 @@
     </ClInclude>
     <ClInclude Include="..\..\test\image.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\sparse\lap_caching_iterator.h">
+      <Filter>core\sparse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\sparse\lap_direct_iterator.h">
+      <Filter>core\sparse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\sparse\lap_cost.h">
+      <Filter>core\sparse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\sparse\lap_solver.h">
+      <Filter>core\sparse</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\sparse\omp\lap_caching_iterator.h">
+      <Filter>core\sparse\omp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\sparse\omp\lap_worksharing.h">
+      <Filter>core\sparse\omp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\sparse\omp\lap_cost.h">
+      <Filter>core\sparse\omp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\sparse\omp\lap_direct_iterator.h">
+      <Filter>core\sparse\omp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\sparse\omp\lap_solver.h">
+      <Filter>core\sparse\omp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\sparse\lap_cache.h">
+      <Filter>core\sparse</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

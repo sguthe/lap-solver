@@ -23,6 +23,7 @@ public:
 	bool use_single;
 	bool use_epsilon;
 	bool use_omp;
+	bool use_sparse;
 
 	bool run_sanity;
 	bool run_sanity_cached;
@@ -46,6 +47,7 @@ public:
 		use_double = use_float = use_int = use_long = use_single = use_epsilon = use_omp = false;
 		run_sanity = run_random = run_geometric = run_geometric_disjoint = run_random_low_rank = run_integer = false;
 		run_sanity_cached = run_geometric_cached = run_geometric_disjoint_cached = run_random_low_rank_cached = false;
+		use_sparse = false;
 		runs = 1;
 		silent = false;
 	}
@@ -140,6 +142,10 @@ public:
 			else if (!strcmp(argv[i], "-epsilon"))
 			{
 				use_epsilon = true;
+			}
+			else if (!strcmp(argv[i], "-sparse"))
+			{
+				use_sparse = true;
 			}
 			else if (!strcmp(argv[i], "-sanity"))
 			{
