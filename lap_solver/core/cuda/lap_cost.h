@@ -79,7 +79,7 @@ namespace lap
 				getCost_kernel<<<grid_size, block_size, 0, stream>>>(row, getcost, state[0], rowsol, dim);
 			}
 			__forceinline STATE& getState(int t) { return state[t]; }
-			__forceinline auto& getCostFunc() { return getcost;  }
+			__forceinline decltype(getcost)& getCostFunc() { return getcost;  }
 		};
 
 		// Costs stored in a host table. Used for conveniency only
