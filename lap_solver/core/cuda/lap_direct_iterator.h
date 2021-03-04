@@ -39,8 +39,6 @@ namespace lap
 
 			~DeviceDirectIteratorObject() { }
 
-			__forceinline auto& getState(int t) { return costfunc.getState(t); }
-
 			template <class ISTATE, class STATE>
 			__forceinline __device__ void openRow(int i, int j, int start, ISTATE& istate, STATE& state, int& idx) { }
 
