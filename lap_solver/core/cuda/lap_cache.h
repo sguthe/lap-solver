@@ -110,96 +110,100 @@ namespace lap
 				lapFreeDevice(buffer);
 			}
 
-			__forceinline __device__  bool find(int& idx, int i)
+			__forceinline __device__ bool open(int& idx, int i)
 			{
-				int laneid;
-				asm volatile("mov.u32 %0, %laneid;" : "=r"(laneid));
-				bool ret;
-				if (laneid == 0)
+				idx = atomicCAS(open_row, -1, -2);
+				if (idx == -1)
 				{
-					idx = atomicCAS(open_row, -1, -2);
-					if (idx == -1)
+					// first to arrive
+					if (map[i] == -1)
 					{
-						// first to arrive
-						semaphore[0] = 0;
-						if (map[i] == -1)
-						{
-							// replace
-							idx = first[0];
-							dirty[0] = 1;
-							__threadfence();
-							atomicCAS(open_row, -2, idx);
+						// replace
+						idx = first[0];
+						dirty[0] = 1;
+						__threadfence();
+						atomicCAS(open_row, -2, idx);
 
-							if (id[idx] != -1) map[id[idx]] = -1;
-							id[idx] = i;
-							map[i] = idx;
-							remove_first(idx);
-							push_last(idx);
-							cmiss++;
-							ret = false;
-						}
-						else
-						{
-							// found
-							idx = map[i];
-							dirty[0] = 0;
-							__threadfence();
-							atomicCAS(open_row, -2, idx);
-
-							if (priv[idx] == -1)
-							{
-								priv[idx] = 0;
-								remove_entry(idx);
-							}
-							else
-							{
-								remove_entry(idx);
-								if (priv[idx] == 0)
-								{
-									priv[idx] = 1;
-									if (priv_avail > 0)
-									{
-										priv_avail--;
-									}
-									else
-									{
-										int idx1 = first[1];
-										remove_first(idx1);
-										priv[idx1] = 0;
-										push_last(idx1);
-									}
-								}
-							}
-							push_last(idx);
-							chit++;
-							ret = true;
-						}
+						if (id[idx] != -1) map[id[idx]] = -1;
+						id[idx] = i;
+						map[i] = idx;
+						remove_first(idx);
+						push_last(idx);
+						cmiss[0]++;
+						return false;
 					}
 					else
 					{
-						while (idx < 0)
-						{
-							idx = atomicCAS(open_row, -1, -2);
-						}
+						// found
+						idx = map[i];
+						dirty[0] = 0;
 						__threadfence();
-						ret = (((volatile int*)dirty)[0] == 0);
+						atomicCAS(open_row, -2, idx);
+
+						if (priv[idx] == -1)
+						{
+							priv[idx] = 0;
+							remove_entry(idx);
+						}
+						else
+						{
+							remove_entry(idx);
+							if (priv[idx] == 0)
+							{
+								priv[idx] = 1;
+								if (priv_avail[0] > 0)
+								{
+									priv_avail[0]--;
+								}
+								else
+								{
+									int idx1 = first[1];
+									remove_first(idx1);
+									priv[idx1] = 0;
+									push_last(idx1);
+								}
+							}
+						}
+						push_last(idx);
+						chit[0]++;
+						return true;
 					}
 				}
+				else
+				{
+					while (idx < 0) idx = atomicCAS(open_row, -1, -2);
+					__threadfence();
+					return (((volatile int*)dirty)[0] == 0);
+				}
+			}
+
+			__forceinline __device__ bool findWarp(int& idx, int i)
+			{
+				bool ret;
+				if (threadIdx.x == 0) ret = open(idx, i);
+
 				idx = __shfl_sync(0xffffffff, idx, 0, 32);
 				ret = __shfl_sync(0xffffffff, ret, 0, 32);
 				return ret;
 			}
 
+			__forceinline __device__ bool findBlock(int& idx, int i)
+			{
+				__shared__ bool b_ret;
+				__shared__ int b_idx;
+				if (threadIdx.x == 0) b_ret = open(b_idx, i);
+				__syncthreads();
+
+				idx = b_idx;
+				return b_ret;
+			}
+
 			__forceinline __device__ void close()
 			{
-				if (threadIdx.x == 0)
+				if (semaphoreOnce(semaphore))
 				{
-					int sem = atomicInc(semaphore, gridDim.x - 1);
-					if (sem == gridDim.x - 1)
-					{
-						open_row[0] = -1;
-						dirty[0] = 0;
-					}
+					open_row[0] = -1;
+					dirty[0] = 0;
 				}
 			}
 
@@ -368,68 +372,75 @@ namespace lap
 
 			__forceinline __device__ bool open(int& idx, int i)
 			{
-				int laneid;
-				asm volatile("mov.u32 %0, %laneid;" : "=r"(laneid));
-				bool ret;
-				if (laneid == 0)
+				idx = atomicCAS(open_row, -1, -2);
+				if (idx == -1)
 				{
-					idx = atomicCAS(open_row, -1, -2);
-					if (idx == -1)
+					// first to arrive
+					if (map[i] == -1)
 					{
-						// first to arrive
-						semaphore[0] = 0;
-						if (map[i] == -1)
-						{
-							// replace
-							idx = order[0];
-							dirty[0] = 1;
-							__threadfence();
-							atomicCAS(open_row, -2, idx);
-							if (id[idx] != -1) map[id[idx]] = -1;
-							id[idx] = i;
-							map[i] = idx;
-							count[i]++;
-							advance(0);
-							cmiss++;
-							ret = false;
-						}
-						else
-						{
-							idx = map[i];
-							dirty[0] = 0;
-							__threadfence();
-							atomicCAS(open_row, -2, idx);
-							count[i]++;
-							advance(pos[idx]);
-							chit++;
-							ret = true;
-						}
+						// replace
+						idx = order[0];
+						dirty[0] = 1;
+						__threadfence();
+						atomicCAS(open_row, -2, idx);
+						if (id[idx] != -1) map[id[idx]] = -1;
+						id[idx] = i;
+						map[i] = idx;
+						count[i]++;
+						advance(0);
+						cmiss[0]++;
+						return false;
 					}
 					else
 					{
-						while (idx < 0)
-						{
-							idx = atomicCAS(open_row, -1, -2);
-						}
+						idx = map[i];
+						dirty[0] = 0;
 						__threadfence();
-						ret = (((volatile int*)dirty)[0] == 0);
+						atomicCAS(open_row, -2, idx);
+						count[i]++;
+						advance(pos[idx]);
+						chit[0]++;
+						return true;
 					}
 				}
+				else
+				{
+					while (idx < 0)
+					{
+						idx = atomicCAS(open_row, -1, -2);
+					}
+					__threadfence();
+					return  (((volatile int*)dirty)[0] == 0);
+				}
+			}
+
+			__forceinline __device__ bool findWarp(int& idx, int i)
+			{
+				bool ret;
+				if (threadIdx.x == 0) ret = open(idx, i);
+
 				idx = __shfl_sync(0xffffffff, idx, 0, 32);
 				ret = __shfl_sync(0xffffffff, ret, 0, 32);
 				return ret;
 			}
 
+			__forceinline __device__ bool findBlock(int& idx, int i)
+			{
+				__shared__ bool b_ret;
+				__shared__ int b_idx;
+				if (threadIdx.x == 0) b_ret = open(b_idx, i);
+				__syncthreads();
+
+				idx = b_idx;
+				return b_ret;
+			}
+
 			__forceinline __device__ void close()
 			{
-				if (threadIdx.x == 0)
+				if (semaphoreOnce(semaphore))
 				{
-					int sem = atomicInc(semaphore, gridDim.x - 1);
-					if (sem == gridDim.x - 1)
-					{
-						open_row[0] = -1;
-						dirty[0] = 0;
-					}
+					open_row[0] = -1;
+					dirty[0] = 0;
 				}
 			}
 

@@ -127,7 +127,7 @@ namespace lap
 			stream = iterator.ws.stream[t];
 
 			bs = getBlockSize(num_items);
-			gs = getMinSize(num_items);
+			gs = (num_items + bs - 1) / bs;
 		}
 
 		template <class SC, class TC, class I>
@@ -231,7 +231,8 @@ namespace lap
 						else if (bs == 256) getMinMaxBestSingleMedium_kernel<<<gs, bs, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], max_cost_private[0], picked_cost_private[0], jmin_private[0], iterator.getIObject(), iterator.getIState(0), iterator.getState(0), picked_private[0], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, num_items, dim2);
 						else getMinMaxBestSingleLarge_kernel<<<gs, bs, 0, stream>>>(&(host_struct_private[i]), semaphore_private[0], min_cost_private[0], max_cost_private[0], picked_cost_private[0], jmin_private[0], iterator.getIObject(), iterator.getIState(0), iterator.getState(0), picked_private[0], std::numeric_limits<SC>::lowest(), std::numeric_limits<SC>::max(), i, num_items, dim2);
 
-						updateEstimatedV_kernel<<<gs, bs, 0, stream>>>(i, v_private[0], mod_v_private[0], iterator.getIObject(), iterator.getIState(0), iterator.getState(0), picked_private[0], min_cost_private[0], jmin_private[0], dim2);
+						if (bs == 32) updateEstimatedVSmall_kernel<<<gs, bs, 0, stream>>>(i, v_private[0], mod_v_private[0], iterator.getIObject(), iterator.getIState(0), iterator.getState(0), picked_private[0], min_cost_private[0], jmin_private[0], dim2);
+						else updateEstimatedVLarge_kernel<<<gs, bs, 0, stream>>>(i, v_private[0], mod_v_private[0], iterator.getIObject(), iterator.getIState(0), iterator.getState(0), picked_private[0], min_cost_private[0], jmin_private[0], dim2);
 					}
 					else
 					{
@@ -275,7 +276,6 @@ namespace lap
 					int start, num_items, bs, gs;
 					cudaStream_t stream;
 					selectDevice(start, num_items, stream, bs, gs, t, iterator);
-
 
 					for (int i = 0; i < dim; i++)
 					{

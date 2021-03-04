@@ -288,6 +288,7 @@ struct GeometricState
 {
 	C *tab_s;
 	C *tab_t;
+	int N;
 };
 
 template <class C>
@@ -357,6 +358,7 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			{
 				d_state[i].tab_s = 0;
 				d_state[i].tab_t = 0;
+				d_state[i].N = N;
 			}
 
 			for (int i = 0; i < num_enabled; i++)
@@ -371,10 +373,10 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			int *rowsol = new int[N];
 
 			// cost function
-			auto get_cost = [N] __device__(int x, int y, State &state)
+			auto get_cost = [] __device__(int x, int y, State &state)
 			{
 				float d0 = state.tab_s[x] - state.tab_t[y];
-				float d1 = state.tab_s[x + N] - state.tab_t[y + N];
+				float d1 = state.tab_s[x + state.N] - state.tab_t[y + state.N];
 				return d0 * d0 + d1 * d1;
 			};
 
@@ -410,6 +412,7 @@ template <class C>
 struct SanityState
 {
 	C *vec;
+	int N;
 };
 
 template <class C>
@@ -451,6 +454,7 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			for (int i = 0; i < num_enabled; i++)
 			{
 				d_state[i].vec = 0;
+				d_state[i].N = N;
 			}
 
 			for (int i = 0; i < num_enabled; i++)
@@ -463,9 +467,9 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			int *rowsol = new int[N];
 
 			// cost function
-			auto get_cost = [N] __device__(int x, int y, State &state)
+			auto get_cost = [] __device__(int x, int y, State &state)
 			{
-				C r = state.vec[x] + state.vec[y + N];
+				C r = state.vec[x] + state.vec[y + state.N];
 				if (x != y) r += C(0.1);
 
 				return r;
@@ -516,6 +520,15 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 	}
 }
 
+// needs to be declared outside of a function
+template <class C>
+struct LowRankState
+{
+	C* vec;
+	long long rank;
+	int N;
+};
+
 template <class C>
 void testRandomLowRankCached(long long min_cached, long long max_cached, long long max_memory, long long min_rank, long long max_rank, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent)
 {
@@ -554,12 +567,14 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 				int num_enabled = (int)ws.device.size();
 
-				typedef SanityState<C> State;
+				typedef LowRankState<C> State;
 				State *d_state = new State[num_enabled];
 
 				for (int i = 0; i < num_enabled; i++)
 				{
 					d_state[i].vec = 0;
+					d_state[i].N = N;
+					d_state[i].rank = rank;
 				}
 
 				for (int i = 0; i < num_enabled; i++)
@@ -572,15 +587,15 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				int *rowsol = new int[N];
 
 				// cost function
-				auto get_cost = [rank, N] __device__(int x, int y, State &state)
+				auto get_cost = [] __device__(int x, int y, State &state)
 				{
 					C sum(0);
 #pragma unroll(8)
-					for (long long k = 0; k < rank; k++)
+					for (long long k = 0; k < state.rank; k++)
 					{
-						sum += state.vec[k * N + x] * state.vec[k * N + y];
+						sum += state.vec[k * state.N + x] * state.vec[k * state.N + y];
 					}
-					sum /= C(rank);
+					sum /= C(state.rank);
 
 					return sum;
 				};
@@ -941,6 +956,8 @@ struct ImagesState
 	unsigned char *c10;
 	unsigned char *c11;
 	unsigned char *c12;
+	int w0, h0, mval0, w1, h1, mval1;
+	int N1, N2;
 };
 
 template <class C> void testImages(std::vector<std::string> &images, long long max_memory, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent)
@@ -1054,15 +1071,23 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 					d_state[t].c10 = img[1][t].raw;
 					d_state[t].c11 = img[1][t].raw + size_1;
 					d_state[t].c12 = img[1][t].raw + 2 * size_1;
+					d_state[t].w0 = w0;
+					d_state[t].h0 = h0;
+					d_state[t].mval0 = mval0;
+					d_state[t].w1 = w1;
+					d_state[t].h1 = h1;
+					d_state[t].mval1 = mval1;
+					d_state[t].N1 = N1;
+					d_state[t].N2 = N2;
 				}
 
-				auto get_cost = [w0, h0, mval0, w1, h1, mval1] __device__(int x, int y, State &state)
+				auto get_cost = [] __device__(int x, int y, State &state)
 				{
-					C r = C(state.c00[x]) / C(mval0) - C(state.c10[y]) / C(mval1);
-					C g = C(state.c01[x]) / C(mval0) - C(state.c11[y]) / C(mval1);
-					C b = C(state.c02[x]) / C(mval0) - C(state.c12[y]) / C(mval1);
-					C u = C(x % w0) / C(w0 - 1) - C(y % w1) / C(w1 - 1);
-					C v = C(x / w0) / C(h0 - 1) - C(y / w1) / C(h1 - 1);
+					C r = C(state.c00[x]) / C(state.mval0) - C(state.c10[y]) / C(state.mval1);
+					C g = C(state.c01[x]) / C(state.mval0) - C(state.c11[y]) / C(state.mval1);
+					C b = C(state.c02[x]) / C(state.mval0) - C(state.c12[y]) / C(state.mval1);
+					C u = C(x % state.w0) / C(state.w0 - 1) - C(y % state.w1) / C(state.w1 - 1);
+					C v = C(x / state.w0) / C(state.h0 - 1) - C(y / state.w1) / C(state.h1 - 1);
 					return r * r + g * g + b * b + u * u + v * v;
 				};
 

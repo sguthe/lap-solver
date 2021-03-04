@@ -267,17 +267,18 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			if (j >= size) return;
-
 			SC min_cost;
 			if (threadIdx.x == 0) min_cost = (SC)tt[picked] - v[picked];
 			min_cost = __shfl_sync(0xffffffff, min_cost, 0, 32);
 
-			if (j == picked) taken[j] = 0;
-			else if (taken[j] != 0)
+			if (j < size)
 			{
-				SC cost_l = (SC)tt[j] - v[j];
-				if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				if (j == picked) taken[j] = 0;
+				else if (taken[j] != 0)
+				{
+					SC cost_l = (SC)tt[j] - v[j];
+					if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				}
 			}
 		}
 
@@ -286,22 +287,25 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			if (j >= size) return;
-
 			int idx;
-			iterator.openRow(i, j, 0, istate, state, idx);
-			SC t = (SC)iterator.getCost(i, j, 0, istate, state, idx);
+			iterator.openRowWarp(i, j, 0, istate, state, idx);
 
 			SC min_cost;
-			if (threadIdx.x == 0)min_cost = (SC)iterator.getCostForced(i, picked, 0, istate, state, idx) - v[picked];
+			if (threadIdx.x == 0) min_cost = (SC)iterator.getCostForced(i, picked, 0, istate, state, idx) - v[picked];
 			min_cost = __shfl_sync(0xffffffff, min_cost, 0, 32);
 
-			if (j == picked) taken[j] = 0;
-			else if (taken[j] != 0)
+			if (j < size)
 			{
-				SC cost_l = t - v[j];
-				if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				SC t = (SC)iterator.getCost(i, j, 0, istate, state, idx);
+
+				if (j == picked) taken[j] = 0;
+				else if (taken[j] != 0)
+				{
+					SC cost_l = t - v[j];
+					if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				}
 			}
+			iterator.closeRow(istate);
 		}
 
 		template <class SC, class TC>
@@ -309,18 +313,18 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			if (j >= size) return;
-
 			__shared__ SC b_min_cost;
 			if (threadIdx.x == 0) b_min_cost = (SC)tt[picked] - v[picked];
 			__syncthreads();
 			SC min_cost = b_min_cost;
 
-			if (j == picked) taken[j] = 0;
-			else if (taken[j] != 0)
-			{
-				SC cost_l = (SC)tt[j] - v[j];
-				if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+			if (j < size) {
+				if (j == picked) taken[j] = 0;
+				else if (taken[j] != 0)
+				{
+					SC cost_l = (SC)tt[j] - v[j];
+					if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				}
 			}
 		}
 
@@ -329,10 +333,9 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			if (j >= size) return;
-
 			int idx;
-			iterator.openRow(i, j, 0, istate, state, idx);
+			iterator.openRowBlock(i, j, 0, istate, state, idx);
+
 			SC t = (SC)iterator.getCost(i, j, 0, istate, state, idx);
 
 			__shared__ SC b_min_cost;
@@ -340,12 +343,16 @@ namespace lap
 			__syncthreads();
 			SC min_cost = b_min_cost;
 
-			if (j == picked) taken[j] = 0;
-			else if (taken[j] != 0)
+			if (j < size)
 			{
-				SC cost_l = t - v[j];
-				if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				if (j == picked) taken[j] = 0;
+				else if (taken[j] != 0)
+				{
+					SC cost_l = t - v[j];
+					if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				}
 			}
+			iterator.closeRow(istate);
 		}
 
 		template <class SC, class TC, class MS>
@@ -381,10 +388,11 @@ namespace lap
 			SC min_cost;
 
 			int idx;
+			iterator.openRowWarp(i, j, start, istate, state, idx);
+
 			SC t;
 			if (j < size)
 			{
-				iterator.openRow(i, j, start, istate, state, idx);
 				t = (SC)iterator.getCost(i, j, start, istate, state, idx);
 			}
 
@@ -404,6 +412,7 @@ namespace lap
 			{
 				if (threadIdx.x == 0) s2->jmin = 0;
 			}
+
 			iterator.closeRow(istate);
 		}
 
@@ -440,10 +449,11 @@ namespace lap
 			SC min_cost;
 
 			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
 			if (j < size)
 			{
-				iterator.openRow(i, j, start, istate, state, idx);
 				t = (SC)iterator.getCost(i, j, start, istate, state, idx);
 			}
 
@@ -463,6 +473,8 @@ namespace lap
 			{
 				if (threadIdx.x == 0) s2->jmin = 0;
 			}
+
+			iterator.closeRow(istate);
 		}
 
 		template <class SC>
@@ -470,17 +482,18 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			if (j >= size) return;
-
 			SC min_cost;
 			if (threadIdx.x == 0) min_cost = -v[picked];
 			min_cost = __shfl_sync(0xffffffff, min_cost, 0, 32);
 
-			if (j == picked) taken[j] = 0;
-			else if (taken[j] != 0)
+			if (j < size)
 			{
-				SC cost_l = -v[j];
-				if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				if (j == picked) taken[j] = 0;
+				else if (taken[j] != 0)
+				{
+					SC cost_l = -v[j];
+					if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				}
 			}
 		}
 
@@ -489,18 +502,19 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			if (j >= size) return;
-
 			__shared__ SC b_min_cost;
 			if (threadIdx.x == 0) b_min_cost = -v[picked];
 			__syncthreads();
 			SC min_cost = b_min_cost;
 
-			if (j == picked) taken[j] = 0;
-			else if (taken[j] != 0)
+			if (j < size)
 			{
-				SC cost_l = -v[j];
-				if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				if (j == picked) taken[j] = 0;
+				else if (taken[j] != 0)
+				{
+					SC cost_l = -v[j];
+					if (cost_l < min_cost) v[j] -= min_cost - cost_l;
+				}
 			}
 		}
 

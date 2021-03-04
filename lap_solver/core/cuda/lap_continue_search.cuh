@@ -154,28 +154,27 @@ namespace lap
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			int idx;
-			SC t;
-			if (j < size)
-			{
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			iterator.openRowWarp(i, j, 0, istate, state, idx);
 
-			__shared__ SC b_tt_jmin, b_v_jmin;
+			SC t;
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
+
+			SC tt_jmin;
+			SC v_jmin;
 			if (threadIdx.x == 0)
 			{
-				b_tt_jmin = (SC)iterator.getCostForced(i, jmin, 0, istate, state, idx);
-				b_v_jmin = v[jmin];
+				tt_jmin = (SC)iterator.getCostForced(i, jmin, 0, istate, state, idx);
+				v_jmin = v[jmin];
 			}
-			__syncthreads();
-			SC tt_jmin = b_tt_jmin;
-			SC v_jmin = b_v_jmin;
+			tt_jmin = __shfl_sync(0xffffffff, tt_jmin, 0, 32);
+			v_jmin = __shfl_sync(0xffffffff, v_jmin, 0, 32);
 
 			SC t_min;
 			int t_jmin, t_colsol;
 
 			continueSearchJMinMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, t, v, min, jmin, tt_jmin, v_jmin, max, size, dim2);
 			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -210,12 +209,10 @@ namespace lap
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			int idx;
+			iterator.openRowBlock(i, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			__shared__ SC b_tt_jmin, b_v_jmin;
 			if (threadIdx.x == 0)
@@ -232,6 +229,7 @@ namespace lap
 
 			continueSearchJMinMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, t, v, min, jmin, tt_jmin, v_jmin, max, size, dim2);
 			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -266,12 +264,10 @@ namespace lap
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
 			int idx;
+			iterator.openRowBlock(i, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			__shared__ SC b_tt_jmin, b_v_jmin;
 			if (threadIdx.x == 0)
@@ -288,6 +284,7 @@ namespace lap
 
 			continueSearchJMinMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, t, v, min, jmin, tt_jmin, v_jmin, max, size, dim2);
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -888,16 +885,16 @@ namespace lap
 			SC tt_jmin, v_jmin;
 
 			int idx;
+			iterator.openRowWarp(i, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			continueSearchMinExchangeSmall(s2, semaphore + 1, data_valid, v, iterator, istate, state, i, start, idx, v2, tt2, tt_jmin, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, t, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchSmall(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
+			iterator.closeRow(istate);
 		}
 
 		template <class MS, class SC, class TC>
@@ -927,16 +924,16 @@ namespace lap
 			SC tt_jmin, v_jmin;
 
 			int idx;
+			iterator.openRowBlock(i, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			continueSearchMinExchange(s2, semaphore + 1, data_valid, v, iterator, istate, state, i, start, idx, v2, tt2, tt_jmin, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, t, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchMedium(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
+			iterator.closeRow(istate);
 		}
 
 		template <class MS, class SC, class TC>
@@ -966,16 +963,16 @@ namespace lap
 			SC tt_jmin, v_jmin;
 
 			int idx;
+			iterator.openRowBlock(i, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			continueSearchMinExchange(s2, semaphore + 1, data_valid, v, iterator, istate, state, i, start, idx, v2, tt2, tt_jmin, v_jmin, jmin, size);
 			continueSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, i, t, v, min, tt_jmin, v_jmin, jmin, max, size, dim2);
 			searchLarge(s, s2, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
+			iterator.closeRow(istate);
 		}
 	}
 }

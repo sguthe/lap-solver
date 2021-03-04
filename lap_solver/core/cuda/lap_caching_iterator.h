@@ -74,21 +74,20 @@ namespace lap
 		};
 
 		template <class TC, class CACHE>
-		class DeviceCachingIteratorState
+		struct DeviceCachingIteratorState
 		{
-		public:
 			TC* rows;
 			CACHE cache;
 			int size;
 
-		public:
-			DeviceCachingIteratorState(int dim, int entries, int size) : size(size)
+			void setSize(int dim, int entries, int size)
 			{
+				this->size = size;
 				cache.setSize(entries, dim);
 				lapAllocDevice(rows, (long long)entries * (long long)size, __FILE__, __LINE__);
 			}
 
-			~DeviceCachingIteratorState()
+			void destroy()
 			{
 				cache.destroy();
 				lapFreeDevice(rows);
@@ -107,10 +106,17 @@ namespace lap
 
 			// once per block, pointer should be in shared memory
 			template <class ISTATE, class STATE>
-			__forceinline __device__ void openRow(int i, int j, int start, ISTATE& istate, STATE& state, int& idx)
+			__forceinline __device__ void openRowWarp(int i, int j, int start, ISTATE& istate, STATE& state, int& idx)
 			{
-				bool found = istate.cache.find(idx, i);
-				if (!found) istate.rows[(size_t)idx * (size_t)istate.size + j] = costfunc(i, j + start, state);
+				bool found = istate.cache.findWarp(idx, i);
+				if ((!found) && (j < istate.size)) istate.rows[(size_t)idx * (size_t)istate.size + j] = costfunc(i, j + start, state);
+			}
+
+			template <class ISTATE, class STATE>
+			__forceinline __device__ void openRowBlock(int i, int j, int start, ISTATE& istate, STATE& state, int& idx)
+			{
+				bool found = istate.cache.findBlock(idx, i);
+				if ((!found) && (j < istate.size)) istate.rows[(size_t)idx * (size_t)istate.size + j] = costfunc(i, j + start, state);
 			}
 
 			// once per grid
@@ -137,7 +143,7 @@ namespace lap
 		class DeviceCachingIterator
 		{
 		protected:
-			DeviceCachingIteratorState<TC, CACHE> **istate;
+			DeviceCachingIteratorState<TC, CACHE> *istate;
 			DeviceCachingIteratorObject<TC, GETCOST> iobject;
 			CF& costfunc;
 		public:
@@ -155,22 +161,22 @@ namespace lap
 					int entries = (int)std::min((long long)dim2, max_memory / size);
 					// entries potentially vary between GPUs
 					cudaSetDevice(ws.device[t]);
-					istate[t] = new DeviceCachingIteratorState<TC, CACHE>(dim, entries, size);
+					istate[t].setSize(dim, entries, size);
 				}
 			}
 
 			~DeviceCachingIterator()
 			{
 				int devices = (int)ws.device.size();
-				for (int t = 0; t < devices; t++) delete istate[t];
+				for (int t = 0; t < devices; t++) istate[t].destroy();
 				lapFree(istate);
 			}
 
-			__forceinline void getHitMiss(long long& hit, long long& miss) { istate[0]->cache.getHitMiss(hit, miss); }
+			__forceinline void getHitMiss(long long& hit, long long& miss) { istate->cache.getHitMiss(hit, miss); }
 
 			__forceinline decltype(costfunc.getState(0))& getState(int t) { return costfunc.getState(t); }
 
-			__forceinline DeviceCachingIteratorState<TC, CACHE>& getIState(int t) { return *(istate[t]); }
+			__forceinline DeviceCachingIteratorState<TC, CACHE>& getIState(int t) { return istate[t]; }
 
 			__forceinline DeviceCachingIteratorObject<TC, GETCOST>& getIObject() { return iobject; }
 		};
