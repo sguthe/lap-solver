@@ -280,14 +280,12 @@ namespace lap
 			SC t_min_cost, t_min_cost_real;
 			int t_jmin;
 
-			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			int idx;
+			iterator.openRowWarp(i, j, start, istate, state, idx);
 
+			SC t;
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
+\
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, max, size, dim2);
 			getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
 			getMinimalCostWriteTemp(o_min_cost, o_jmin, o_min_cost_real, t_min_cost, t_jmin, t_min_cost_real);
@@ -340,13 +338,11 @@ namespace lap
 			SC t_min_cost, t_min_cost_real;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, max, size, dim2);
 			getMinimalCostCombineMedium(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
@@ -400,13 +396,11 @@ namespace lap
 			SC t_min_cost, t_min_cost_real;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, max, size, dim2);
 			getMinimalCostCombineLarge(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
@@ -458,13 +452,11 @@ namespace lap
 
 			int last_picked = getLastPickedSmall(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowWarp(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, last_picked, max, size, dim2);
 			getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
@@ -522,13 +514,11 @@ namespace lap
 
 			int last_picked = getLastPicked(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, last_picked, max, size, dim2);
 			getMinimalCostCombineMedium(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
@@ -586,13 +576,11 @@ namespace lap
 
 			int last_picked = getLastPicked(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, last_picked, max, size, dim2);
 			getMinimalCostCombineLarge(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
@@ -644,13 +632,11 @@ namespace lap
 
 			int last_picked = getLastPickedLarge(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowWarp(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, last_picked, max, size, dim2);
 			getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
@@ -708,13 +694,11 @@ namespace lap
 
 			int last_picked = getLastPickedLarge(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, last_picked, max, size, dim2);
 			getMinimalCostCombineMedium(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
@@ -772,13 +756,11 @@ namespace lap
 
 			int last_picked = getLastPickedLarge(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, last_picked, max, size, dim2);
 			getMinimalCostCombineLarge(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
@@ -826,13 +808,11 @@ namespace lap
 			SC t_min_cost, t_min_cost_real;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowWarp(i, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, max, size, dim2);
 			getMinimalCostCombineSmall(t_min_cost, t_jmin, t_min_cost_real);
@@ -886,13 +866,11 @@ namespace lap
 			SC t_min_cost, t_min_cost_real;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowBlock(i, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, max, size, dim2);
 			getMinimalCostCombineMedium(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);
@@ -946,13 +924,11 @@ namespace lap
 			SC t_min_cost, t_min_cost_real;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowBlock(i, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			getMinimalCostRead(t_min_cost, t_jmin, t_min_cost_real, j, t, v, picked, max, size, dim2);
 			getMinimalCostCombineLarge(t_min_cost, t_jmin, t_min_cost_real, b_min_cost, b_jmin, b_min_cost_real);

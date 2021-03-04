@@ -292,13 +292,11 @@ namespace lap
 			SC t_min_cost, t_second_cost, t_picked_cost;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowWarp(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, max, size, dim2);
 			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
@@ -352,13 +350,11 @@ namespace lap
 			SC t_min_cost, t_second_cost, t_picked_cost;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, max, size, dim2);
 			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
@@ -412,13 +408,11 @@ namespace lap
 			SC t_min_cost, t_second_cost, t_picked_cost;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, max, size, dim2);
 			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
@@ -470,13 +464,11 @@ namespace lap
 
 			int last_picked = getLastPickedSmall(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowWarp(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, last_picked, max, size, dim2);
 			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
@@ -534,13 +526,11 @@ namespace lap
 
 			int last_picked = getLastPicked(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, last_picked, max, size, dim2);
 			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
@@ -598,13 +588,11 @@ namespace lap
 
 			int last_picked = getLastPicked(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, last_picked, max, size, dim2);
 			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
@@ -656,13 +644,11 @@ namespace lap
 
 			int last_picked = getLastPickedLarge(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowWarp(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, last_picked, max, size, dim2);
 			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
@@ -720,13 +706,11 @@ namespace lap
 
 			int last_picked = getLastPickedLarge(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, last_picked, max, size, dim2);
 			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
@@ -784,13 +768,11 @@ namespace lap
 
 			int last_picked = getLastPickedLarge(s2, s_old, semaphore + 1, max, start, size, dim2, devices);
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, last_picked, max, size, dim2);
 			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
@@ -838,13 +820,11 @@ namespace lap
 			SC t_min_cost, t_second_cost, t_picked_cost;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowWarp(i, j, 0, istate, state, idx);
+			
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, max, size, dim2);
 			getMinSecondBestCombineSmall(t_min_cost, t_second_cost, t_picked_cost, t_jmin);
@@ -857,6 +837,7 @@ namespace lap
 				getMinSecondBestWrite(s, t_min_cost, t_second_cost, t_picked_cost, t_jmin, 0, v, max, dim2);
 				if (threadIdx.x == 0) picked[t_jmin] = 1;
 			}
+
 			iterator.closeRow(istate);
 		}
 
@@ -898,13 +879,11 @@ namespace lap
 			SC t_min_cost, t_second_cost, t_picked_cost;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowBlock(i, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, max, size, dim2);
 			getMinSecondBestCombineMedium(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
@@ -958,13 +937,11 @@ namespace lap
 			SC t_min_cost, t_second_cost, t_picked_cost;
 			int t_jmin;
 
+			int idx;
+			iterator.openRowBlock(i, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, 0, istate, state, idx);
-				t = iterator.getCost(i, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
 
 			getMinSecondBestRead(t_min_cost, t_second_cost, t_picked_cost, t_jmin, i, j, t, v, picked, max, size, dim2);
 			getMinSecondBestCombineLarge(t_min_cost, t_second_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);

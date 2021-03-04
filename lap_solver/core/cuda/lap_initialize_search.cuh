@@ -101,16 +101,15 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowWarp(f, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, 0, istate, state, idx);
-				t = iterator.getCost(f, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, 0, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, t, v, max, size, dim2);
 			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -137,16 +136,15 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowBlock(f, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, 0, istate, state, idx);
-				t = iterator.getCost(f, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, 0, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, t, v, max, size, dim2);
 			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -173,16 +171,18 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowBlock(f, j, 0, istate, state, idx);
+
 			SC t;
 			if (j < size)
 			{
-				int idx;
-				iterator.openRow(f, j, 0, istate, state, idx);
 				t = iterator.getCost(f, j, 0, istate, state, idx);
 			}
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, t, v, max, size, dim2);
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -210,16 +210,15 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowWarp(f, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, 0, istate, state, idx);
-				t = iterator.getCost(f, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, 0, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, t, v, max, size, dim2);
 			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -246,16 +245,15 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowBlock(f, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, 0, istate, state, idx);
-				t = iterator.getCost(f, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, 0, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, t, v, max, size, dim2);
 			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -282,16 +280,15 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowBlock(f, j, 0, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, 0, istate, state, idx);
-				t = iterator.getCost(f, j, 0, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, 0, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, t, v, max, size, dim2);
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -397,16 +394,15 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowWarp(f, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, start, istate, state, idx);
-				t = iterator.getCost(f, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, start, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, t, v, max, size, dim2);
 			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -437,16 +433,15 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowBlock(f, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, start, istate, state, idx);
-				t = iterator.getCost(f, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, start, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, t, v, max, size, dim2);
 			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -477,16 +472,15 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowBlock(f, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, start, istate, state, idx);
-				t = iterator.getCost(f, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, start, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, pred, d, j, f, t, v, max, size, dim2);
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -518,16 +512,15 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowWarp(f, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, start, istate, state, idx);
-				t = iterator.getCost(f, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, start, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, t, v, max, size, dim2);
 			searchSmall(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -558,16 +551,15 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowBlock(f, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, start, istate, state, idx);
-				t = iterator.getCost(f, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, start, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, t, v, max, size, dim2);
 			searchMedium(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);
+
 			iterator.closeRow(istate);
 		}
 
@@ -599,13 +591,11 @@ namespace lap
 			SC t_min;
 			int t_jmin, t_colsol;
 
+			int idx;
+			iterator.openRowBlock(f, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(f, j, start, istate, state, idx);
-				t = iterator.getCost(f, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(f, j, start, istate, state, idx);
 
 			initializeSearchMinRead(t_min, t_jmin, t_colsol, colactive, colsol, colsol_in, pred, d, j, f, t, v, max, size, dim2);
 			searchLarge(s, semaphore, o_min, o_jmin, o_colsol, t_min, t_jmin, t_colsol, max, size, dim2);

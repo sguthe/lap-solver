@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lap_worksharing.h"
+#include <variant>
 
 namespace lap
 {
@@ -23,11 +24,8 @@ namespace lap
 			__forceinline const TC* getRow(int t, int i, bool async) { return costfunc.getRow(t, i); }
 		};
 
-		class DeviceDirectIteratorState
-		{
-		public:
-			int dummy;
-		};
+		// empty state
+		typedef std::monostate DeviceDirectIteratorState;
 
 		template <class TC, class CF>
 		class DeviceDirectIteratorObject
@@ -40,7 +38,10 @@ namespace lap
 			~DeviceDirectIteratorObject() { }
 
 			template <class ISTATE, class STATE>
-			__forceinline __device__ void openRow(int i, int j, int start, ISTATE& istate, STATE& state, int& idx) { }
+			__forceinline __device__ void openRowWarp(int i, int j, int start, ISTATE& istate, STATE& state, int& idx) { }
+
+			template <class ISTATE, class STATE>
+			__forceinline __device__ void openRowBlock(int i, int j, int start, ISTATE& istate, STATE& state, int& idx) { }
 
 			template <class ISTATE>
 			__forceinline __device__ void closeRow(ISTATE& istate) { }

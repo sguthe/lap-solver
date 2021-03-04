@@ -202,13 +202,11 @@ namespace lap
 
 			SC t_min_cost, t_picked_cost, t_picked_v;
 
+			int idx;
+			iterator.openRowWarp(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, t, v, j_picked, max, size);
 			getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
@@ -257,13 +255,11 @@ namespace lap
 
 			SC t_min_cost, t_picked_cost, t_picked_v;
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, t, v, j_picked, max, size);
 			getFinalCostCombineMedium(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
@@ -312,13 +308,11 @@ namespace lap
 
 			SC t_min_cost, t_picked_cost, t_picked_v;
 
+			int idx;
+			iterator.openRowBlock(i, j, start, istate, state, idx);
+
 			SC t;
-			if (j < size)
-			{
-				int idx;
-				iterator.openRow(i, j, start, istate, state, idx);
-				t = iterator.getCost(i, j, start, istate, state, idx);
-			}
+			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
 
 			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, t, v, j_picked, max, size);
 			getFinalCostCombineLarge(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
