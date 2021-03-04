@@ -168,11 +168,11 @@ namespace lap
 
 			__forceinline void getHitMiss(long long& hit, long long& miss) { istate[0]->cache.getHitMiss(hit, miss); }
 
-			__forceinline auto& getState(int t) { return costfunc.getState(t); }
+			__forceinline decltype(costfunc.getState(0))& getState(int t) { return costfunc.getState(t); }
 
-			__forceinline auto& getIState(int t) { return *istate[t]; }
+			__forceinline DeviceCachingIteratorState<TC, CACHE>& getIState(int t) { return *(istate[t]); }
 
-			__forceinline auto& getIObject() { return iobject; }
+			__forceinline DeviceCachingIteratorObject<TC, GETCOST>& getIObject() { return iobject; }
 		};
 	}
 }
