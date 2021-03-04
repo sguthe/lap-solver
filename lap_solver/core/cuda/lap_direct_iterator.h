@@ -77,11 +77,11 @@ namespace lap
 
 			void getHitMiss(long long& hit, long long& miss) { hit = miss = 0; }
 
-			__forceinline auto& getState(int t) { return costfunc.getState(t); }
+			__forceinline decltype(costfunc.getState(0))& getState(int t) { return costfunc.getState(t); }
 
-			__forceinline auto& getIState(int t) { return istate; }
+			__forceinline DeviceDirectIteratorState& getIState(int t) { return istate; }
 
-			__forceinline auto& getIObject() { return iobject; }
+			__forceinline DeviceDirectIteratorObject<TC, GETCOST>& getIObject() { return iobject; }
 		};
 	}
 }
