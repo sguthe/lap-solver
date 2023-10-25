@@ -270,5 +270,5 @@ The GPU version of the interface is as follows:
       }
     }
 
-Please refer to the same for for additional helper classes that can be
+Please refer to the same file for additional helper classes that can be
 used for the low-level interface.
