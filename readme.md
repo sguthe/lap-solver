@@ -1,30 +1,16 @@
 ---
-abstract: |
+abstract:
   This document contains the instructions for building and testing the
   software bundle as well as instructions on how to use the software in
   your own project.
 author:
-- Stefan Guthe
-- Daniel Thuerck
-title: "Algorithm XXX: A Fast Scalable Solver for the Dense Linear (Sum)
+  Stefan Guthe, Daniel Thuerck
+title: "Algorithm 1015: A Fast Scalable Solver for the Dense Linear (Sum)
   Assignment Problem"
+doi: https://dl.acm.org/doi/abs/10.1145/3442348
 ---
 
-::: CCSXML
-\<ccs2012\> \<concept\>
-\<concept_id\>10002950.10003624.10003625.10003628\</concept_id\>
-\<concept_desc\>Mathematics of computing Combinatorial
-algorithms\</concept_desc\>
-\<concept_significance\>500\</concept_significance\> \</concept\>
-\<concept\>
-\<concept_id\>10002950.10003624.10003625.10003630\</concept_id\>
-\<concept_desc\>Mathematics of computing Combinatorial
-optimization\</concept_desc\>
-\<concept_significance\>500\</concept_significance\> \</concept\>
-\</ccs2012\>
-:::
-
-# Linux {#sec:linux}
+# Linux
 
 This section contains the instructions for building and running under
 Linux. For Windows, refer to Section
@@ -59,7 +45,7 @@ Since the makefile is set up to compile the same code with multiple sets
 of defines, it is not possible to use the parallel build, e.g.
 `make -j4`, as this will cause the build to fail.
 
-# Windows {#sec:windows}
+# Windows
 
 ## Requirements
 
