@@ -151,7 +151,7 @@ void solveTableOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bo
 	lap::omp::SimpleCostFunction<TC, CF> costFunction(get_cost, sequential);
 	lap::omp::Worksharing ws(N2, 8);
 	lap::omp::TableCost<TC> costMatrix(N1, N2, costFunction, ws);
-	lap::omp::DirectIterator<SC, TC, lap::omp::TableCost<TC>> iterator(N1, N2, costMatrix, ws);
+	lap::omp::DirectIterator<TC, lap::omp::TableCost<TC>> iterator(costMatrix, ws);
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -168,7 +168,7 @@ void solveTable(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, bool 
 {
 	lap::SimpleCostFunction<TC, CF> costFunction(get_cost);
 	lap::TableCost<TC> costMatrix(N1, N2, costFunction);
-	lap::DirectIterator<SC, TC, lap::TableCost<TC>> iterator(N1, N2, costMatrix);
+	lap::DirectIterator<TC, lap::TableCost<TC>> iterator(costMatrix);
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -191,7 +191,7 @@ void solveCachingOMP(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, 
 	if (4 * entries < N1)
 #endif
 	{
-		lap::omp::CachingIterator<SC, TC, lap::omp::SimpleCostFunction<TC, CF>, lap::CacheSLRU> iterator(N1, N2, entries, costFunction, ws);
+		lap::omp::CachingIterator<TC, lap::omp::SimpleCostFunction<TC, CF>, lap::CacheSLRU> iterator(N1, N2, entries, costFunction, ws);
 
 		lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -225,7 +225,7 @@ void solveCaching(TP &start_time, int N1, int N2, CF &get_cost, int *rowsol, int
 	if (4 * entries < N1)
 #endif
 	{
-		lap::CachingIterator<SC, TC, lap::SimpleCostFunction<TC, CF>, lap::CacheSLRU> iterator(N1, N2, entries, costFunction);
+		lap::CachingIterator<TC, lap::SimpleCostFunction<TC, CF>, lap::CacheSLRU> iterator(N1, N2, entries, costFunction);
 
 		lap::displayTime(start_time, "setup complete", std::cout);
 

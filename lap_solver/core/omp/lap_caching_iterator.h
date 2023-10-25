@@ -9,12 +9,10 @@ namespace lap
 {
 	namespace omp
 	{
-		template <class SC, class TC, class CF, class CACHE>
+		template <class TC, class CF, class CACHE>
 		class CachingIterator
 		{
 		protected:
-			int dim, dim2;
-			int entries;
 			struct table_t
 			{
 				TC* rows;
@@ -27,7 +25,7 @@ namespace lap
 
 		public:
 			CachingIterator(int dim, int dim2, int entries, CF &costfunc, Worksharing &ws)
-				: dim(dim), dim2(dim2), entries(entries), costfunc(costfunc), ws(ws)
+				: costfunc(costfunc), ws(ws)
 			{
 				int max_threads = omp_get_max_threads();
 				lapAlloc(table, max_threads, __FILE__, __LINE__);
