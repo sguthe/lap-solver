@@ -131,6 +131,11 @@ namespace lap
 			}
 		}
 
+		__forceinline bool present(int i)
+		{
+			return (map[i] >= 0);
+		}
+
 		__forceinline void restart()
 		{
 			int entries = (int)list.size();
@@ -280,6 +285,11 @@ namespace lap
 				chit++;
 				return true;
 			}
+		}
+
+		__forceinline bool present(int i)
+		{
+			return (map[i] >= 0);
 		}
 
 		__forceinline void restart()

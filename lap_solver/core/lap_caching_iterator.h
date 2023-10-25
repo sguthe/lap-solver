@@ -4,18 +4,19 @@
 
 namespace lap
 {
-	template <class TC, class CF, class CACHE>
+	template <class SC, class TC, class CF, class CACHE>
 	class CachingIterator
 	{
 	protected:
+		int dim, dim2;
+		int entries;
 		TC* rows;
 		CACHE cache;
 	public:
-		int dim2;
 		CF &costfunc;
 	public:
 		CachingIterator(int dim, int dim2, int entries, CF &costfunc)
-			: dim2(dim2), costfunc(costfunc)
+			: dim(dim), dim2(dim2), entries(entries), costfunc(costfunc)
 		{
 			cache.setSize(entries, dim);
 			lapAlloc(rows, (long long)entries * (long long)dim2, __FILE__, __LINE__);

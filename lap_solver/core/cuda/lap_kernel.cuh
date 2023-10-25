@@ -120,18 +120,6 @@ namespace lap
 			old = __shfl_sync(0xff, old, first, 32);
 		}
 
-		__device__ __forceinline__ bool semaphoreOnce(unsigned int* semaphore)
-		{
-			__threadfence();
-			if (threadIdx.x == 0)
-			{
-				int sem;
-				sem = atomicInc(semaphore, gridDim.x - 1);
-				return (sem == gridDim.x - 1);
-			}
-			else return false;
-		}
-
 		__device__ __forceinline__ bool semaphoreWarp(unsigned int *semaphore)
 		{
 			__threadfence();
@@ -358,7 +346,7 @@ namespace lap
 		__global__ void findMaxLarge_kernel(MS *s, SC *max, SC min, int size)
 		{
 			// 1024 threads in 32 warps
-			__shared__ SC b_max[32];
+			__shared__ SC b_max[8];
 
 			int j = threadIdx.x;
 
@@ -431,7 +419,7 @@ namespace lap
 		__global__ void findMaxLarge_kernel(MS *s, SC *max, int *active, SC min, int size)
 		{
 			// 1024 threads in 32 warps
-			__shared__ SC b_max[32];
+			__shared__ SC b_max[8];
 
 			int j = threadIdx.x;
 

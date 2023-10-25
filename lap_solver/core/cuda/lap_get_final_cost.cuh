@@ -4,8 +4,8 @@ namespace lap
 {
 	namespace cuda
 	{
-		template <class SC>
-		__device__ __forceinline__ void getFinalCostRead(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v, int j, SC t, SC *v, int j_picked, SC max, int size)
+		template <class SC, class TC>
+		__device__ __forceinline__ void getFinalCostRead(SC &t_min_cost, SC &t_picked_cost, SC &t_picked_v, int j, TC *tt, SC *v, int j_picked, SC max, int size)
 		{
 			t_min_cost = max;
 			t_picked_cost = max;
@@ -13,11 +13,11 @@ namespace lap
 
 			if (j < size)
 			{
-				SC t_cost = t - v[j];
+				SC t_cost = (SC)tt[j] - v[j];
 				t_min_cost = t_cost;
 				if (j == j_picked)
 				{
-					t_picked_cost = t;
+					t_picked_cost = (SC)tt[j];
 					t_picked_v = v[j];
 				}
 			}
@@ -180,10 +180,7 @@ namespace lap
 
 			SC t_min_cost, t_picked_cost, t_picked_v;
 
-			SC t;
-			if (j < size) t = (SC)tt[j];
-
-			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, t, v, j_picked, max, size);
+			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, tt, v, j_picked, max, size);
 			getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
 			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
 
@@ -193,33 +190,6 @@ namespace lap
 				getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
 				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
 			}
-		}
-
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void getFinalCostSmall_kernel(MS* s, unsigned int* semaphore, volatile SC* o_min_cost, volatile SC* o_picked_cost, volatile SC* o_picked_v, I iterator, ISTATE istate, STATE state, int i, int start, SC* v, SC max, int j_picked, int size)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			SC t_min_cost, t_picked_cost, t_picked_v;
-
-			int idx;
-			iterator.openRowWarp(i, j, start, istate, state, idx);
-
-			SC t;
-			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
-
-			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, t, v, j_picked, max, size);
-			getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
-			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
-
-			if (semaphoreWarp(semaphore))
-			{
-				getFinalCostReadTemp(t_min_cost, t_picked_cost, t_picked_v, o_min_cost, o_picked_cost, o_picked_v, max);
-				getFinalCostCombineSmall(t_min_cost, t_picked_cost, t_picked_v);
-				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
-			}
-
-			iterator.closeRow(istate);
 		}
 
 		template <class MS, class SC, class TC>
@@ -231,10 +201,7 @@ namespace lap
 
 			SC t_min_cost, t_picked_cost, t_picked_v;
 
-			SC t;
-			if (j < size) t = (SC)tt[j];
-
-			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, t, v, j_picked, max, size);
+			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, tt, v, j_picked, max, size);
 			getFinalCostCombineMedium(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
 			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
 
@@ -244,35 +211,6 @@ namespace lap
 				getFinalCostCombineMedium(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
 				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
 			}
-		}
-
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void getFinalCostMedium_kernel(MS* s, unsigned int* semaphore, volatile SC* o_min_cost, volatile SC* o_picked_cost, volatile SC* o_picked_v, I iterator, ISTATE istate, STATE state, int i, int start, SC* v, SC max, int j_picked, int size)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			__shared__ SC b_min_cost[8], b_picked_cost[8], b_picked_v[8];
-
-			SC t_min_cost, t_picked_cost, t_picked_v;
-
-			int idx;
-			iterator.openRowBlock(i, j, start, istate, state, idx);
-
-			SC t;
-			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
-
-			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, t, v, j_picked, max, size);
-			getFinalCostCombineMedium(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
-			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
-
-			if (semaphoreBlock(semaphore))
-			{
-				getFinalCostReadTemp(t_min_cost, t_picked_cost, t_picked_v, o_min_cost, o_picked_cost, o_picked_v, max);
-				getFinalCostCombineMedium(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
-				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
-			}
-
-			iterator.closeRow(istate);
 		}
 
 		template <class MS, class SC, class TC>
@@ -284,10 +222,7 @@ namespace lap
 
 			SC t_min_cost, t_picked_cost, t_picked_v;
 
-			SC t;
-			if (j < size) t = (SC)tt[j];
-
-			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, t, v, j_picked, max, size);
+			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, tt, v, j_picked, max, size);
 			getFinalCostCombineLarge(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
 			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
 
@@ -297,35 +232,6 @@ namespace lap
 				getFinalCostCombineLarge(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
 				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
 			}
-		}
-
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void getFinalCostLarge_kernel(MS* s, unsigned int* semaphore, volatile SC* o_min_cost, volatile SC* o_picked_cost, volatile SC* o_picked_v, I iterator, ISTATE istate, STATE state, int i, int start, SC* v, SC max, int j_picked, int size)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			__shared__ SC b_min_cost[32], b_picked_cost[32], b_picked_v[32];
-
-			SC t_min_cost, t_picked_cost, t_picked_v;
-
-			int idx;
-			iterator.openRowBlock(i, j, start, istate, state, idx);
-
-			SC t;
-			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
-
-			getFinalCostRead(t_min_cost, t_picked_cost, t_picked_v, j, t, v, j_picked, max, size);
-			getFinalCostCombineLarge(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
-			getFinalCostWriteTemp(o_min_cost, o_picked_cost, o_picked_v, t_min_cost, t_picked_cost, t_picked_v);
-
-			if (semaphoreBlock(semaphore))
-			{
-				getFinalCostReadTempLarge(t_min_cost, t_picked_cost, t_picked_v, o_min_cost, o_picked_cost, o_picked_v, max);
-				getFinalCostCombineLarge(t_min_cost, t_picked_cost, t_picked_v, b_min_cost, b_picked_cost, b_picked_v);
-				getFinalCostWrite(s, t_min_cost, t_picked_cost, t_picked_v);
-			}
-
-			iterator.closeRow(istate);
 		}
 
 		template <class MS, class SC>

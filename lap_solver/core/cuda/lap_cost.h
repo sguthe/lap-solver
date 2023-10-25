@@ -17,7 +17,6 @@ namespace lap
 		public:
 			CpuCostFunction(GETCOST& getcost, bool sequential = false) : lap::SimpleCostFunction<TC, GETCOST>(getcost), sequential(sequential) {}
 			~CpuCostFunction() {}
-			static const bool GPU = false;
 		public:
 			__forceinline bool isSequential() const { return sequential; }
 		};
@@ -30,11 +29,16 @@ namespace lap
 		protected:
 			GETCOSTROW getcostrow;
 			GETCOST getcost;
+			TC initialEpsilon;
+			TC lowerEpsilon;
 		public:
-			RowCostFunction(GETCOSTROW &getcostrow, GETCOST &getcost) : getcostrow(getcostrow), getcost(getcost) {}
+			RowCostFunction(GETCOSTROW &getcostrow, GETCOST &getcost) : getcostrow(getcostrow), getcost(getcost), initialEpsilon(0), lowerEpsilon(0) {}
 			~RowCostFunction() {}
-			static const bool GPU = false;
 		public:
+			__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
+			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
+			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
+			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
 			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async) const { getcostrow(row, t, stream, x, start, end, rows, async); }
 			__forceinline void getCost(TC *row, cudaStream_t stream, int *rowsol, int dim) const { getcost(row, stream, rowsol, dim); }
 		};
@@ -46,15 +50,23 @@ namespace lap
 		protected:
 			GETCOST getcost;
 			STATE *state;
-			static const bool GPU = true;
+			TC initialEpsilon;
+			TC lowerEpsilon;
+
+			int devices;
+
 		public:
-			SimpleCostFunction(GETCOST &getcost, STATE *state) : getcost(getcost), state(state)
+			SimpleCostFunction(GETCOST &getcost, STATE *state, int devices) : getcost(getcost), state(state), initialEpsilon(0), lowerEpsilon(0), devices(devices)
 			{
 			}
 			~SimpleCostFunction()
 			{
 			}
 		public:
+			__forceinline const TC getInitialEpsilon() const { return initialEpsilon; }
+			__forceinline void setInitialEpsilon(TC eps) { initialEpsilon = eps; }
+			__forceinline const TC getLowerEpsilon() const { return lowerEpsilon; }
+			__forceinline void setLowerEpsilon(TC eps) { lowerEpsilon = eps; }
 			__forceinline void getCostRow(TC *row, int t, cudaStream_t stream, int x, int start, int end, int rows, bool async) const
 			{
 				dim3 block_size, grid_size;
@@ -78,8 +90,6 @@ namespace lap
 				grid_size.x = (dim + block_size.x - 1) / block_size.x;
 				getCost_kernel<<<grid_size, block_size, 0, stream>>>(row, getcost, state[0], rowsol, dim);
 			}
-			__forceinline STATE& getState(int t) { return state[t]; }
-			__forceinline decltype(getcost)& getCostFunc() { return getcost;  }
 		};
 
 		// Costs stored in a host table. Used for conveniency only
@@ -122,7 +132,7 @@ namespace lap
 #pragma omp parallel num_threads(devices)
 				{
 					const int t = omp_get_thread_num();
-					checkCudaErrors(cudaSetDevice(ws.device[t]));
+					checkCudaErrors(cudaSetDevice(ws.devices[t]));
 					stride[t] = ws.part[t].second - ws.part[t].first;
 					if (pinned) lapAllocPinned(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
 					else
@@ -210,7 +220,6 @@ namespace lap
 					lapFree(idx);
 				}
 			}
-			static const bool GPU = false;
 		public:
 			__forceinline const TC* getRow(int t, int x) const { return cc[t] + (long long)x * (long long)stride[t]; }
 			__forceinline const TC getCost(int x, int y) const
@@ -264,13 +273,6 @@ namespace lap
 			}
 		};
 
-		template <class TC>
-		struct GPUTableCostState
-		{
-			TC* cc;
-			int stride;
-		};
-
 		// Costs stored in a device table. Used for conveniency only
 		// This can be constructed using a host matrix or simple cost function.
 		template <class TC>
@@ -279,14 +281,16 @@ namespace lap
 		protected:
 			int x_size;
 			int y_size;
-			GPUTableCostState<TC>* state;
+			TC** cc;
+			int* stride;
 			Worksharing& ws;
 		protected:
 			template <class DirectCost>
 			void initTable(DirectCost& cost)
 			{
 				int devices = (int)ws.device.size();
-				lapAlloc(state, devices, __FILE__, __LINE__);
+				lapAlloc(cc, devices, __FILE__, __LINE__);
+				lapAlloc(stride, devices, __FILE__, __LINE__);
 #ifdef LAP_OPENMP
 				// create and initialize in parallel
 #pragma omp parallel num_threads(devices)
@@ -297,9 +301,9 @@ namespace lap
 				{
 #endif
 					cudaSetDevice(ws.device[t]);
-					state[t].stride = ws.part[t].second - ws.part[t].first;
-					lapAllocDevice(state[t].cc, (long long)(state[t].stride) * (long long)x_size, __FILE__, __LINE__);
-					cost.getCostRow(state[t].cc, t, ws.stream[t], 0, ws.part[t].first, ws.part[t].second, x_size, false);
+					stride[t] = ws.part[t].second - ws.part[t].first;
+					lapAllocDevice(cc[t], (long long)(stride[t]) * (long long)x_size, __FILE__, __LINE__);
+					cost.getCostRow(cc[t], t, ws.stream[t], 0, ws.part[t].first, ws.part[t].second, x_size, false);
 					cudaStreamSynchronize(ws.stream[t]);
 				}
 			}
@@ -319,14 +323,13 @@ namespace lap
 				for (int t = 0; t < devices; t++)
 				{
 					cudaSetDevice(ws.device[t]);
-					lapFreeDevice(state[t].cc);
+					lapFreeDevice(cc[t]);
 				}
-				lapFree(state);
+				lapFree(cc);
+				lapFree(stride);
 			}
-			static const bool GPU = true;
 		public:
-			__forceinline const TC* getRow(int t, int i) { return state[t].cc + (long long)i * (long long)state[t].stride; }
-			__forceinline const GPUTableCostState<TC>& getState(int t) { return state[t]; }
+			__forceinline const TC* getRow(int t, int i) { return cc[t] + (long long)i * (long long)stride[t]; }
 		};
 	}
 }

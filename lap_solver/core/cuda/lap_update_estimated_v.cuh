@@ -4,17 +4,25 @@ namespace lap
 {
 	namespace cuda
 	{
-		template <class SC>
-		__device__ __forceinline__ void updateEstimatedVFirst(SC *min_v, SC t, int *picked, SC min_cost, int j, int jmin, int size)
+		template <class SC, class TC>
+		__device__ __forceinline__ void updateEstimatedVFirst(SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
 		{
-			min_v[j] = t - min_cost;
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			min_v[j] = (SC)tt[j] - min_cost;
 			if (jmin == j) picked[j] = 1;
 		}
 
-		template <class SC>
-		__device__ __forceinline__ void updateEstimatedVSecond(SC *v, SC *min_v, SC t, int *picked, SC min_cost, int j, int jmin, int size)
+		template <class SC, class TC>
+		__device__ __forceinline__ void updateEstimatedVSecond(SC *v, SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
 		{
-			SC tmp = t - min_cost;
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			SC tmp = (SC)tt[j] - min_cost;
 			if (tmp < min_v[j])
 			{
 				v[j] = min_v[j];
@@ -24,10 +32,14 @@ namespace lap
 			if (jmin == j) picked[j] = 1;
 		}
 
-		template <class SC>
-		__device__ __forceinline__ void updateEstimatedV(SC *v, SC *min_v, SC t, int *picked, SC min_cost, int j, int jmin, int size)
+		template <class SC, class TC>
+		__device__ __forceinline__ void updateEstimatedV(SC *v, SC *min_v, TC *tt, int *picked, SC min_cost, int jmin, int size)
 		{
-			SC tmp = t - min_cost;
+			int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+			if (j >= size) return;
+
+			SC tmp = (SC)tt[j] - min_cost;
 			if (tmp < min_v[j])
 			{
 				v[j] = min_v[j];
@@ -42,11 +54,10 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			if (j < size)
-			{
-				min_v[j] = -min_cost;
-				if (jmin == j) picked[j] = 1;
-			}
+			if (j >= size) return;
+
+			min_v[j] = -min_cost;
+			if (jmin == j) picked[j] = 1;
 		}
 
 		template <class SC>
@@ -54,17 +65,16 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			if (j < size)
+			if (j >= size) return;
+
+			SC tmp = -min_cost;
+			if (tmp < min_v[j])
 			{
-				SC tmp = -min_cost;
-				if (tmp < min_v[j])
-				{
-					v[j] = min_v[j];
-					min_v[j] = tmp;
-				}
-				else v[j] = tmp;
-				if (jmin == j) picked[j] = 1;
+				v[j] = min_v[j];
+				min_v[j] = tmp;
 			}
+			else v[j] = tmp;
+			if (jmin == j) picked[j] = 1;
 		}
 
 		template <class SC>
@@ -72,17 +82,16 @@ namespace lap
 		{
 			int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-			if (j < size)
+			if (j >= size) return;
+
+			SC tmp = -min_cost;
+			if (tmp < min_v[j])
 			{
-				SC tmp = -min_cost;
-				if (tmp < min_v[j])
-				{
-					v[j] = min_v[j];
-					min_v[j] = tmp;
-				}
-				else if (tmp < v[j]) v[j] = tmp;
-				if (jmin == j) picked[j] = 1;
+				v[j] = min_v[j];
+				min_v[j] = tmp;
 			}
+			else if (tmp < v[j]) v[j] = tmp;
+			if (jmin == j) picked[j] = 1;
 		}
 
 		template <class MS, class SC>
@@ -212,139 +221,31 @@ namespace lap
 		template <class SC, class TC>
 		__global__ void updateEstimatedV_kernel(int i, SC* v, SC* min_v, TC* tt, int* picked, SC* min_cost, int* jmin, int size)
 		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			if (j < size)
-			{
-				SC t = (SC)tt[j];
-
-				if (i == 0) updateEstimatedVFirst(min_v, t, picked, *min_cost, j, *jmin, size);
-				else if (i == 1) updateEstimatedVSecond(v, min_v, t, picked, *min_cost, j, *jmin, size);
-				else updateEstimatedV(v, min_v, t, picked, *min_cost, j, *jmin, size);
-			}
-		}
-
-		// 32 threads per block
-		template <class SC, class I, class ISTATE, class STATE>
-		__global__ void updateEstimatedVSmall_kernel(int i, SC* v, SC* min_v, I iterator, ISTATE istate, STATE state, int* picked, SC* min_cost, int* jmin, int size)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			int idx;
-			iterator.openRowWarp(i, j, 0, istate, state, idx);
-
-			if (j < size)
-			{
-				SC t = iterator.getCost(i, j, 0, istate, state, idx);
-
-				if (i == 0) updateEstimatedVFirst(min_v, t, picked, *min_cost, j, *jmin, size);
-				else if (i == 1) updateEstimatedVSecond(v, min_v, t, picked, *min_cost, j, *jmin, size);
-				else updateEstimatedV(v, min_v, t, picked, *min_cost, j, *jmin, size);
-			}
-
-			iterator.closeRow(istate);
-		}
-
-		template <class SC, class I, class ISTATE, class STATE>
-		__global__ void updateEstimatedVLarge_kernel(int i, SC* v, SC* min_v, I iterator, ISTATE istate, STATE state, int* picked, SC* min_cost, int* jmin, int size)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			int idx;
-			iterator.openRowBlock(i, j, 0, istate, state, idx);
-
-			if (j < size)
-			{
-				SC t = iterator.getCost(i, j, 0, istate, state, idx);
-
-				if (i == 0) updateEstimatedVFirst(min_v, t, picked, *min_cost, j, *jmin, size);
-				else if (i == 1) updateEstimatedVSecond(v, min_v, t, picked, *min_cost, j, *jmin, size);
-				else updateEstimatedV(v, min_v, t, picked, *min_cost, j, *jmin, size);
-			}
-
-			iterator.closeRow(istate);
+			if (i == 0) updateEstimatedVFirst(min_v, tt, picked, *min_cost, *jmin, size);
+			else if (i == 1) updateEstimatedVSecond(v, min_v, tt, picked, *min_cost, *jmin, size);
+			else updateEstimatedV(v, min_v, tt, picked, *min_cost, *jmin, size);
 		}
 
 		template <class MS, class SC, class TC>
 		__global__ void updateEstimatedVSmall_kernel(int i, SC* v, SC* min_v, volatile MS* s2, unsigned int* semaphore, TC* tt, int* picked, volatile int* data_valid, MS* s, int start, int size, int dim2, SC max, int devices)
 		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			if (j < size)
-			{
-				int jmin;
-				SC min_cost;
-				SC t = (SC)tt[j];
-
-				updateEstimateVGetMin(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
-				if (i == 0) updateEstimatedVFirst(min_v, t, picked, min_cost, j, jmin, size);
-				else if (i == 1) updateEstimatedVSecond(v, min_v, t, picked, min_cost, j, jmin, size);
-				else updateEstimatedV(v, min_v, t, picked, min_cost, j, jmin, size);
-			}
-		}
-
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void updateEstimatedVSmall_kernel(int i, SC* v, SC* min_v, volatile MS* s2, unsigned int* semaphore, I iterator, ISTATE istate, STATE state, int* picked, volatile int* data_valid, MS* s, int start, int size, int dim2, SC max, int devices)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			int idx;
-			iterator.openRowWarp(i, j, start, istate, state, idx);
-
-			if (j < size)
-			{
-				int jmin;
-				SC min_cost;
-				SC t = iterator.getCost(i, j, start, istate, state, idx);
-
-				updateEstimateVGetMin(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
-				if (i == 0) updateEstimatedVFirst(min_v, t, picked, min_cost, j, jmin, size);
-				else if (i == 1) updateEstimatedVSecond(v, min_v, t, picked, min_cost, j, jmin, size);
-				else updateEstimatedV(v, min_v, t, picked, min_cost, j, jmin, size);
-			}
-
-			iterator.closeRow(istate);
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMin(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
+			if (i == 0) updateEstimatedVFirst(min_v, tt, picked, min_cost, jmin, size);
+			else if (i == 1) updateEstimatedVSecond(v, min_v, tt, picked, min_cost, jmin, size);
+			else updateEstimatedV(v, min_v, tt, picked, min_cost, jmin, size);
 		}
 
 		template <class MS, class SC, class TC>
 		__global__ void updateEstimatedVLarge_kernel(int i, SC* v, SC* min_v, volatile MS* s2, unsigned int* semaphore, TC* tt, int* picked, volatile int* data_valid, MS* s, int start, int size, int dim2, SC max, int devices)
 		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			if (j < size)
-			{
-				int jmin;
-				SC min_cost;
-				SC t = (SC)tt[j];
-
-				updateEstimateVGetMinLarge(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
-				if (i == 0) updateEstimatedVFirst(min_v, t, picked, min_cost, j, jmin, size);
-				else if (i == 1) updateEstimatedVSecond(v, min_v, t, picked, min_cost, j, jmin, size);
-				else updateEstimatedV(v, min_v, t, picked, min_cost, j, jmin, size);
-			}
-		}
-
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void updateEstimatedVLarge_kernel(int i, SC* v, SC* min_v, volatile MS* s2, unsigned int* semaphore, I iterator, ISTATE istate, STATE state, int* picked, volatile int* data_valid, MS* s, int start, int size, int dim2, SC max, int devices)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			int idx;
-			iterator.openRowBlock(i, j, start, istate, state, idx);
-
-			if (j < size)
-			{
-				int jmin;
-				SC min_cost;
-				SC t = iterator.getCost(i, j, 0, istate, state, idx);
-
-				updateEstimateVGetMinLarge(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
-				if (i == 0) updateEstimatedVFirst(min_v, t, picked, min_cost, j, jmin, size);
-				else if (i == 1) updateEstimatedVSecond(v, min_v, t, picked, min_cost, j, jmin, size);
-				else updateEstimatedV(v, min_v, t, picked, min_cost, j, jmin, size);
-			}
-
-			iterator.closeRow(istate);
+			int jmin;
+			SC min_cost;
+			updateEstimateVGetMinLarge(jmin, min_cost, s2, semaphore, data_valid, s, start, dim2, max, devices);
+			if (i == 0) updateEstimatedVFirst(min_v, tt, picked, min_cost, jmin, size);
+			else if (i == 1) updateEstimatedVSecond(v, min_v, tt, picked, min_cost, jmin, size);
+			else updateEstimatedV(v, min_v, tt, picked, min_cost, jmin, size);
 		}
 
 		template <class SC>

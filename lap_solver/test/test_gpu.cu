@@ -41,6 +41,7 @@ int main(int argc, char* argv[])
 	Options opt;
 	int r = opt.parseOptions(argc, argv);
 	if (r != 0) return r;
+
 	if (opt.use_double)
 	{
 		if (opt.use_single)
@@ -132,14 +133,32 @@ int main(int argc, char* argv[])
 }
 
 template <class SC, class TC, class CF, class STATE, class TP>
-void solveCachingCUDA(TP& start_time, int N1, int N2, CF& get_cost, STATE* state, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon)
+void solveCachingCUDA(TP &start_time, int N1, int N2, CF &get_cost, STATE *state, lap::cuda::Worksharing &ws, long long max_memory, int *rowsol, bool epsilon)
 {
 	int devices = (int)ws.device.size();
 
-	lap::cuda::SimpleCostFunction<TC, CF, STATE> costFunction(get_cost, state);
+	lap::cuda::SimpleCostFunction<TC, CF, STATE> costFunction(get_cost, state, devices);
 
 	// different cache size, so always use SLRU
-	lap::cuda::DeviceCachingIterator<TC, decltype(costFunction), CF, lap::cuda::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costFunction, get_cost, ws);
+	lap::cuda::CachingIterator<SC, TC, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costFunction, ws);
+
+	// pre-load cache
+	for (int t = 0; t < devices; t++)
+	{
+		int rows = std::min(N1, iterator.getCache(t).getEntries());
+		for (int i = 0; i < rows; i++)
+		{
+			int idx;
+			iterator.getCache(t).find(idx, i);
+		}
+		checkCudaErrors(cudaSetDevice(ws.device[t]));
+		iterator.fillRows(t, rows);
+	}
+	for (int t = 0; t < devices; t++)
+	{
+		checkCudaErrors(cudaSetDevice(ws.device[t]));
+		checkCudaErrors(cudaDeviceSynchronize());
+	}
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -147,24 +166,18 @@ void solveCachingCUDA(TP& start_time, int N1, int N2, CF& get_cost, STATE* state
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cuda::cost<SC, TC>(N1, N2, costFunction, rowsol, ws.stream[0]);
-
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
 template <class SC, class TC, class CF, class STATE, class TP>
 void solveDirectCUDA(TP& start_time, int N1, int N2, CF& get_cost, STATE* state, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon)
 {
-	auto get_cost_table = [] __device__(int x, int y, const lap::cuda::GPUTableCostState<TC> & istate) -> TC
-	{
-		return (istate.cc + (long long)x * (long long)istate.stride)[y];
-	};
-
 	int devices = (int)ws.device.size();
 
-	lap::cuda::SimpleCostFunction<TC, CF, STATE> costFunction(get_cost, state);
+	lap::cuda::SimpleCostFunction<TC, CF, STATE> costFunction(get_cost, state, devices);
 	lap::cuda::GPUTableCost<TC> costMatrix(N1, N2, costFunction, ws);
 
-	lap::cuda::DeviceDirectIterator<TC, decltype(costMatrix), decltype(get_cost_table)> iterator(costMatrix, get_cost_table, ws);
+	lap::cuda::DirectIterator<SC, TC, decltype(costMatrix)> iterator(N1, N2, costMatrix, ws);
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -172,7 +185,6 @@ void solveDirectCUDA(TP& start_time, int N1, int N2, CF& get_cost, STATE* state,
 
 	std::stringstream ss;
 	ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << lap::cuda::cost<SC, TC>(N1, N2, costFunction, rowsol, ws.stream[0]);
-
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
@@ -185,7 +197,7 @@ void solveCachingTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap
 	int devices = (int)ws.device.size();
 
 	// different cache size, so always use SLRU
-	lap::cuda::CachingIterator<TC, decltype(costMatrix), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costMatrix, ws);
+	lap::cuda::CachingIterator<SC, TC, decltype(costMatrix), lap::CacheSLRU> iterator(N1, N2, max_memory / sizeof(TC), costMatrix, ws);
 
 	// pre-load cache
 	for (int t = 0; t < devices; t++)
@@ -214,8 +226,8 @@ void solveCachingTableCUDA(TP &start_time, int N1, int N2, CF &get_cost_cpu, lap
 	lap::displayTime(start_time, ss.str().c_str(), std::cout);
 }
 
-template <class SC, class TC, class CF, class CFT, class TP>
-void solveDirectTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, CFT& get_cost_table, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool sequential, bool pinned)
+template <class SC, class TC, class CF, class TP>
+void solveDirectTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool sequential, bool pinned)
 {
 	lap::cuda::CpuCostFunction<TC, decltype(get_cost_cpu)> cpuCostFunction(get_cost_cpu, sequential);
 	lap::cuda::CPUTableCost<TC> hostMatrix(N1, N2, cpuCostFunction, ws, pinned);
@@ -223,7 +235,7 @@ void solveDirectTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, CFT&
 
 	int devices = (int)ws.device.size();
 
-	lap::cuda::DeviceDirectIterator<TC, decltype(costMatrix), decltype(get_cost_table)> iterator(costMatrix, get_cost_table, ws);
+	lap::cuda::DirectIterator<SC, TC, decltype(costMatrix)> iterator(N1, N2, costMatrix, ws);
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -235,7 +247,7 @@ void solveDirectTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, CFT&
 }
 
 template <class SC, class TC, class CF, class STATE, class TP>
-void solveCUDA(TP& start_time, int N1, int N2, CF& get_cost, STATE* state, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool silent)
+void solveCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, STATE* state, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool silent)
 {
 	bool useTable = true;
 	int devices = (int)ws.device.size();
@@ -247,17 +259,17 @@ void solveCUDA(TP& start_time, int N1, int N2, CF& get_cost, STATE* state, lap::
 	if (useTable)
 	{
 		if (!silent) lap::displayTime(start_time, "Solver using GPU table", std::cout);
-		solveDirectCUDA<SC, TC, CF, STATE, TP>(start_time, N1, N2, get_cost, state, ws, max_memory, rowsol, epsilon);
+		solveDirectCUDA<SC, TC, CF, STATE, TP>(start_time, N1, N2, get_cost_cpu, state, ws, max_memory, rowsol, epsilon);
 	}
 	else
 	{
 		if (!silent) lap::displayTime(start_time, "Solver using GPU caching", std::cout);
-		solveCachingCUDA<SC, TC, CF, STATE, TP>(start_time, N1, N2, get_cost, state, ws, max_memory, rowsol, epsilon);
+		solveCachingCUDA<SC, TC, CF, STATE, TP>(start_time, N1, N2, get_cost_cpu, state, ws, max_memory, rowsol, epsilon);
 	}
 }
 
-template <class SC, class TC, class CF, class CFT, class TP>
-void solveTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, CFT& get_cost_table, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool sequential, bool pinned, bool silent)
+template <class SC, class TC, class CF, class TP>
+void solveTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, lap::cuda::Worksharing& ws, long long max_memory, int* rowsol, bool epsilon, bool sequential, bool pinned, bool silent)
 {
 	bool useTable = true;
 	int devices = (int)ws.device.size();
@@ -269,7 +281,7 @@ void solveTableCUDA(TP& start_time, int N1, int N2, CF& get_cost_cpu, CFT& get_c
 	if (useTable)
 	{
 		if (!silent) lap::displayTime(start_time, "Solver using GPU table", std::cout);
-		solveDirectTableCUDA<SC, TC, CF, CFT, TP>(start_time, N1, N2, get_cost_cpu, get_cost_table, ws, max_memory, rowsol, epsilon, sequential, pinned);
+		solveDirectTableCUDA<SC, TC, CF, TP>(start_time, N1, N2, get_cost_cpu, ws, max_memory, rowsol, epsilon, sequential, pinned);
 	}
 	else
 	{
@@ -288,7 +300,6 @@ struct GeometricState
 {
 	C *tab_s;
 	C *tab_t;
-	int N;
 };
 
 template <class C>
@@ -358,7 +369,6 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			{
 				d_state[i].tab_s = 0;
 				d_state[i].tab_t = 0;
-				d_state[i].N = N;
 			}
 
 			for (int i = 0; i < num_enabled; i++)
@@ -373,10 +383,10 @@ void testGeometricCached(long long min_cached, long long max_cached, long long m
 			int *rowsol = new int[N];
 
 			// cost function
-			auto get_cost = [] __device__(int x, int y, State &state)
+			auto get_cost = [N] __device__(int x, int y, State &state)
 			{
 				float d0 = state.tab_s[x] - state.tab_t[y];
-				float d1 = state.tab_s[x + state.N] - state.tab_t[y + state.N];
+				float d1 = state.tab_s[x + N] - state.tab_t[y + N];
 				return d0 * d0 + d1 * d1;
 			};
 
@@ -412,7 +422,6 @@ template <class C>
 struct SanityState
 {
 	C *vec;
-	int N;
 };
 
 template <class C>
@@ -454,7 +463,6 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			for (int i = 0; i < num_enabled; i++)
 			{
 				d_state[i].vec = 0;
-				d_state[i].N = N;
 			}
 
 			for (int i = 0; i < num_enabled; i++)
@@ -467,9 +475,9 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 			int *rowsol = new int[N];
 
 			// cost function
-			auto get_cost = [] __device__(int x, int y, State &state)
+			auto get_cost = [N] __device__(int x, int y, State &state)
 			{
-				C r = state.vec[x] + state.vec[y + state.N];
+				C r = state.vec[x] + state.vec[y + N];
 				if (x != y) r += C(0.1);
 
 				return r;
@@ -520,15 +528,6 @@ void testSanityCached(long long min_cached, long long max_cached, long long max_
 	}
 }
 
-// needs to be declared outside of a function
-template <class C>
-struct LowRankState
-{
-	C* vec;
-	long long rank;
-	int N;
-};
-
 template <class C>
 void testRandomLowRankCached(long long min_cached, long long max_cached, long long max_memory, long long min_rank, long long max_rank, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent)
 {
@@ -567,14 +566,12 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 				int num_enabled = (int)ws.device.size();
 
-				typedef LowRankState<C> State;
+				typedef SanityState<C> State;
 				State *d_state = new State[num_enabled];
 
 				for (int i = 0; i < num_enabled; i++)
 				{
 					d_state[i].vec = 0;
-					d_state[i].N = N;
-					d_state[i].rank = rank;
 				}
 
 				for (int i = 0; i < num_enabled; i++)
@@ -587,15 +584,15 @@ void testRandomLowRankCached(long long min_cached, long long max_cached, long lo
 				int *rowsol = new int[N];
 
 				// cost function
-				auto get_cost = [] __device__(int x, int y, State &state)
+				auto get_cost = [rank, N] __device__(int x, int y, State &state)
 				{
 					C sum(0);
 #pragma unroll(8)
-					for (long long k = 0; k < state.rank; k++)
+					for (long long k = 0; k < rank; k++)
 					{
-						sum += state.vec[k * state.N + x] * state.vec[k * state.N + y];
+						sum += state.vec[k * N + x] * state.vec[k * N + y];
 					}
-					sum /= C(state.rank);
+					sum /= C(rank);
 
 					return sum;
 				};
@@ -660,16 +657,11 @@ void testInteger(long long min_tab, long long max_tab, long long max_memory, int
 					return distribution(generator);
 				};
 
-				auto get_cost_table = [] __device__(int x, int y, const lap::cuda::GPUTableCostState<int> & state) -> int
-				{
-					return (state.cc + (long long)x * (long long)state.stride)[y];
-				};
-
 				lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 
 				int *rowsol = new int[N];
 
-				solveTableCUDA<C, int>(start_time, N, N, get_cost, get_cost_table, ws, max_memory, rowsol, epsilon, true, N < max_tab, silent);
+				solveTableCUDA<C, int>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true, N < max_tab, silent);
 
 				delete[] rowsol;
 			}
@@ -713,12 +705,7 @@ template <class C> void testRandom(long long min_tab, long long max_tab, long lo
 
 			lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 
-			auto get_cost_table = [] __device__(int x, int y, const lap::cuda::GPUTableCostState<C> & state) -> C
-			{
-				return (state.cc + (long long)x * (long long)state.stride)[y];
-			};
-
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, get_cost_table, ws, max_memory, rowsol, epsilon, true, N < max_tab, silent);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, true, N < max_tab, silent);
 
 			delete[] rowsol;
 		}
@@ -769,12 +756,7 @@ template <class C> void testSanity(long long min_tab, long long max_tab, long lo
 
 			lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 
-			auto get_cost_table = [] __device__(int x, int y, const lap::cuda::GPUTableCostState<C> & state) -> C
-			{
-				return (state.cc + (long long)x * (long long)state.stride)[y];
-			};
-
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, get_cost_table, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
 
 			bool passed = true;
 			for (long long i = 0; (passed) && (i < N); i++)
@@ -863,12 +845,7 @@ template <class C> void testGeometric(long long min_tab, long long max_tab, long
 
 			lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 
-			auto get_cost_table = [] __device__(int x, int y, const lap::cuda::GPUTableCostState<C> & state) -> C
-			{
-				return (state.cc + (long long)x * (long long)state.stride)[y];
-			};
-
-			solveTableCUDA<C, C>(start_time, N, N, get_cost, get_cost_table, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
+			solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
 
 			delete[] tab_s;
 			delete[] tab_t;
@@ -933,12 +910,7 @@ template <class C> void testRandomLowRank(long long min_tab, long long max_tab, 
 
 				lap::cuda::Worksharing ws(N, 256, devs, max_devices, silent);
 
-				auto get_cost_table = [] __device__(int x, int y, const lap::cuda::GPUTableCostState<C> & state) -> C
-				{
-					return (state.cc + (long long)x * (long long)state.stride)[y];
-				};
-
-				solveTableCUDA<C, C>(start_time, N, N, get_cost, get_cost_table, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
+				solveTableCUDA<C, C>(start_time, N, N, get_cost, ws, max_memory, rowsol, epsilon, false, N < max_tab, silent);
 
 				delete[] vec;
 				delete[] rowsol;
@@ -956,8 +928,6 @@ struct ImagesState
 	unsigned char *c10;
 	unsigned char *c11;
 	unsigned char *c12;
-	int w0, h0, mval0, w1, h1, mval1;
-	int N1, N2;
 };
 
 template <class C> void testImages(std::vector<std::string> &images, long long max_memory, int runs, bool epsilon, std::string name_C, std::vector<int> &devs, bool silent)
@@ -1071,23 +1041,15 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 					d_state[t].c10 = img[1][t].raw;
 					d_state[t].c11 = img[1][t].raw + size_1;
 					d_state[t].c12 = img[1][t].raw + 2 * size_1;
-					d_state[t].w0 = w0;
-					d_state[t].h0 = h0;
-					d_state[t].mval0 = mval0;
-					d_state[t].w1 = w1;
-					d_state[t].h1 = h1;
-					d_state[t].mval1 = mval1;
-					d_state[t].N1 = N1;
-					d_state[t].N2 = N2;
 				}
 
-				auto get_cost = [] __device__(int x, int y, State &state)
+				auto get_cost = [w0, h0, mval0, w1, h1, mval1] __device__(int x, int y, State &state)
 				{
-					C r = C(state.c00[x]) / C(state.mval0) - C(state.c10[y]) / C(state.mval1);
-					C g = C(state.c01[x]) / C(state.mval0) - C(state.c11[y]) / C(state.mval1);
-					C b = C(state.c02[x]) / C(state.mval0) - C(state.c12[y]) / C(state.mval1);
-					C u = C(x % state.w0) / C(state.w0 - 1) - C(y % state.w1) / C(state.w1 - 1);
-					C v = C(x / state.w0) / C(state.h0 - 1) - C(y / state.w1) / C(state.h1 - 1);
+					C r = C(state.c00[x]) / C(mval0) - C(state.c10[y]) / C(mval1);
+					C g = C(state.c01[x]) / C(mval0) - C(state.c11[y]) / C(mval1);
+					C b = C(state.c02[x]) / C(mval0) - C(state.c12[y]) / C(mval1);
+					C u = C(x % w0) / C(w0 - 1) - C(y % w1) / C(w1 - 1);
+					C v = C(x / w0) / C(h0 - 1) - C(y / w1) / C(h1 - 1);
 					return r * r + g * g + b * b + u * u + v * v;
 				};
 

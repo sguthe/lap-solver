@@ -6,15 +6,17 @@ namespace lap
 {
 	namespace omp
 	{
-		template <class TC, class CF>
+		template <class SC, class TC, class CF>
 		class DirectIterator
 		{
+		protected:
+			int dim, dim2;
 		public:
 			CF &costfunc;
 			Worksharing &ws;
 
 		public:
-			DirectIterator(CF &costfunc, Worksharing &ws) : costfunc(costfunc), ws(ws) {}
+			DirectIterator(int dim, int dim2, CF &costfunc, Worksharing &ws) : dim(dim), dim2(dim2), costfunc(costfunc), ws(ws) {}
 			~DirectIterator() {}
 
 			void getHitMiss(long long &hit, long long &miss) { hit = miss = 0; }

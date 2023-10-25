@@ -4,8 +4,8 @@ namespace lap
 {
 	namespace cuda
 	{
-		template <class SC>
-		__device__ __forceinline__ void getMinMaxBestRead(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, int i, int j, SC &t_cost, int *picked, SC min, SC max, int size, int dim2)
+		template <class SC, class TC>
+		__device__ __forceinline__ void getMinMaxBestRead(SC &t_min_cost, SC &t_max_cost, SC &t_picked_cost, int &t_jmin, int i, int j, TC *tt, int *picked, SC min, SC max, int size, int dim2)
 		{
 			t_min_cost = max;
 			t_max_cost = min;
@@ -14,6 +14,7 @@ namespace lap
 
 			if (j < size)
 			{
+				SC t_cost = (SC)tt[j];
 				t_min_cost = t_cost;
 				if (i == j) t_max_cost = t_cost;
 				if (picked[j] == 0)
@@ -216,10 +217,7 @@ namespace lap
 			SC t_min_cost, t_max_cost, t_picked_cost;
 			int t_jmin;
 
-			SC t;
-			if (j < size) t = (SC)tt[j];
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, t, picked, min, max, size, dim2);
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, tt, picked, min, max, size, dim2);
 			getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
@@ -230,36 +228,6 @@ namespace lap
 				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin + start, data_valid);
 				if (threadIdx.x == 0)  s2->jmin = -1;
 			}
-		}
-
-		// 32 threads per block, up to 32 blocks, requires no shared memory and no thread synchronization
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void getMinMaxBestSmall_kernel(MS* s, MS* s2, unsigned int* semaphore, int* data_valid, volatile SC* o_min_cost, volatile SC* o_max_cost, volatile SC* o_picked_cost, volatile int* o_jmin, I iterator, ISTATE istate, STATE state, int* picked, SC min, SC max, int i, int start, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			SC t_min_cost, t_max_cost, t_picked_cost;
-			int t_jmin;
-
-			int idx;
-			iterator.openRowWarp(i, j, start, istate, state, idx);
-
-			SC t;
-			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, t, picked, min, max, size, dim2);
-			getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-
-			if (semaphoreWarp(semaphore))
-			{
-				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
-				getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin + start, data_valid);
-				if (threadIdx.x == 0)  s2->jmin = -1;
-			}
-
-			iterator.closeRow(istate);
 		}
 
 		// 256 threads per block, up to 256 blocks
@@ -274,10 +242,7 @@ namespace lap
 			SC t_min_cost, t_max_cost, t_picked_cost;
 			int t_jmin;
 
-			SC t;
-			if (j < size) t = (SC)tt[j];
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, t, picked, min, max, size, dim2);
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, tt, picked, min, max, size, dim2);
 			getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
@@ -288,39 +253,6 @@ namespace lap
 				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin + start, data_valid);
 				if (threadIdx.x == 0)  s2->jmin = -1;
 			}
-		}
-
-		// 256 threads per block, up to 256 blocks
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void getMinMaxBestMedium_kernel(MS* s, MS* s2, unsigned int* semaphore, int* data_valid, volatile SC* o_min_cost, volatile SC* o_max_cost, volatile SC* o_picked_cost, volatile int* o_jmin, I iterator, ISTATE istate, STATE state, int* picked, SC min, SC max, int i, int start, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			__shared__ SC b_min_cost[8], b_max_cost[8], b_picked_cost[8];
-			__shared__ int b_jmin[8];
-
-			SC t_min_cost, t_max_cost, t_picked_cost;
-			int t_jmin;
-
-			int idx;
-			iterator.openRowBlock(i, j, start, istate, state, idx);
-
-			SC t;
-			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, t, picked, min, max, size, dim2);
-			getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
-			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-
-			if (semaphoreBlock(semaphore))
-			{
-				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
-				getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
-				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin + start, data_valid);
-				if (threadIdx.x == 0)  s2->jmin = -1;
-			}
-
-			iterator.closeRow(istate);
 		}
 
 		// 1024 threads per block, can be more than 1024 blocks
@@ -335,10 +267,7 @@ namespace lap
 			SC t_min_cost, t_max_cost, t_picked_cost;
 			int t_jmin;
 
-			SC t;
-			if (j < size) t = (SC)tt[j];
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, t, picked, min, max, size, dim2);
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, tt, picked, min, max, size, dim2);
 			getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
@@ -349,39 +278,6 @@ namespace lap
 				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin + start, data_valid);
 				if (threadIdx.x == 0)  s2->jmin = -1;
 			}
-		}
-
-		// 1024 threads per block, can be more than 1024 blocks
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void getMinMaxBestLarge_kernel(MS* s, MS* s2, unsigned int* semaphore, int* data_valid, volatile SC* o_min_cost, volatile SC* o_max_cost, volatile SC* o_picked_cost, volatile int* o_jmin, I iterator, ISTATE istate, STATE state, int* picked, SC min, SC max, int i, int start, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			__shared__ SC b_min_cost[32], b_max_cost[32], b_picked_cost[32];
-			__shared__ int b_jmin[32];
-
-			SC t_min_cost, t_max_cost, t_picked_cost;
-			int t_jmin;
-
-			int idx;
-			iterator.openRowBlock(i, j, start, istate, state, idx);
-
-			SC t;
-			if (j < size) t = iterator.getCost(i, j, start, istate, state, idx);
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i - start, j, t, picked, min, max, size, dim2);
-			getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
-			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-
-			if (semaphoreBlock(semaphore))
-			{
-				getMinMaxBestReadTempLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
-				getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
-				getMinMaxBestWrite(s, t_min_cost, t_max_cost, t_picked_cost, t_jmin + start, data_valid);
-				if (threadIdx.x == 0)  s2->jmin = -1;
-			}
-
-			iterator.closeRow(istate);
 		}
 
 		// 32 threads per block, up to 32 blocks, requires no shared memory and no thread synchronization
@@ -393,10 +289,7 @@ namespace lap
 			SC t_min_cost, t_max_cost, t_picked_cost;
 			int t_jmin;
 
-			SC t;
-			if (j < size) t = (SC)tt[j];
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, t, picked, min, max, size, dim2);
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, tt, picked, min, max, size, dim2);
 			getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
@@ -406,35 +299,6 @@ namespace lap
 				getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 				getMinMaxBestSingleWrite(s, o_min_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin, i);
 			}
-		}
-
-		// 32 threads per block, up to 32 blocks, requires no shared memory and no thread synchronization
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void getMinMaxBestSingleSmall_kernel(MS* s, unsigned int* semaphore, volatile SC* o_min_cost, volatile SC* o_max_cost, volatile SC* o_picked_cost, volatile int* o_jmin, I iterator, ISTATE istate, STATE state, int* picked, SC min, SC max, int i, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			SC t_min_cost, t_max_cost, t_picked_cost;
-			int t_jmin;
-
-			int idx;
-			iterator.openRowWarp(i, j, 0, istate, state, idx);
-
-			SC t;
-			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, t, picked, min, max, size, dim2);
-			getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-
-			if (semaphoreWarp(semaphore))
-			{
-				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
-				getMinMaxBestCombineSmall(t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-				getMinMaxBestSingleWrite(s, o_min_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin, i);
-			}
-
-			iterator.closeRow(istate);
 		}
 
 		// 256 threads per block, up to 256 blocks
@@ -449,10 +313,7 @@ namespace lap
 			SC t_min_cost, t_max_cost, t_picked_cost;
 			int t_jmin;
 
-			SC t;
-			if (j < size) t = (SC)tt[j];
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, t, picked, min, max, size, dim2);
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, tt, picked, min, max, size, dim2);
 			getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
@@ -462,38 +323,6 @@ namespace lap
 				getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 				getMinMaxBestSingleWrite(s, o_min_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin, i);
 			}
-		}
-
-		// 256 threads per block, up to 256 blocks
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void getMinMaxBestSingleMedium_kernel(MS* s, unsigned int* semaphore, volatile SC* o_min_cost, volatile SC* o_max_cost, volatile SC* o_picked_cost, volatile int* o_jmin, I iterator, ISTATE istate, STATE state, int* picked, SC min, SC max, int i, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			__shared__ SC b_min_cost[8], b_max_cost[8], b_picked_cost[8];
-			__shared__ int b_jmin[8];
-
-			SC t_min_cost, t_max_cost, t_picked_cost;
-			int t_jmin;
-
-			int idx;
-			iterator.openRowBlock(i, j, 0, istate, state, idx);
-
-			SC t;
-			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, t, picked, min, max, size, dim2);
-			getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
-			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-
-			if (semaphoreBlock(semaphore))
-			{
-				getMinMaxBestReadTemp(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
-				getMinMaxBestCombineMedium(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
-				getMinMaxBestSingleWrite(s, o_min_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin, i);
-			}
-
-			iterator.closeRow(istate);
 		}
 
 		// 1024 threads per block, can be more than 1024 blocks
@@ -508,10 +337,7 @@ namespace lap
 			SC t_min_cost, t_max_cost, t_picked_cost;
 			int t_jmin;
 
-			SC t;
-			if (j < size) t = (SC)tt[j];
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, t, picked, min, max, size, dim2);
+			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, tt, picked, min, max, size, dim2);
 			getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
 
@@ -521,38 +347,6 @@ namespace lap
 				getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
 				getMinMaxBestSingleWrite(s, o_min_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin, i);
 			}
-		}
-
-		// 1024 threads per block, can be more than 1024 blocks
-		template <class MS, class SC, class I, class ISTATE, class STATE>
-		__global__ void getMinMaxBestSingleLarge_kernel(MS* s, unsigned int* semaphore, volatile SC* o_min_cost, volatile SC* o_max_cost, volatile SC* o_picked_cost, volatile int* o_jmin, I iterator, ISTATE istate, STATE state, int* picked, SC min, SC max, int i, int size, int dim2)
-		{
-			int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-			__shared__ SC b_min_cost[32], b_max_cost[32], b_picked_cost[32];
-			__shared__ int b_jmin[32];
-
-			SC t_min_cost, t_max_cost, t_picked_cost;
-			int t_jmin;
-
-			int idx;
-			iterator.openRowBlock(i, j, 0, istate, state, idx);
-
-			SC t;
-			if (j < size) t = iterator.getCost(i, j, 0, istate, state, idx);
-
-			getMinMaxBestRead(t_min_cost, t_max_cost, t_picked_cost, t_jmin, i, j, t, picked, min, max, size, dim2);
-			getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
-			getMinMaxBestWriteTemp(o_min_cost, o_max_cost, o_picked_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin);
-
-			if (semaphoreBlock(semaphore))
-			{
-				getMinMaxBestReadTempLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, o_min_cost, o_max_cost, o_picked_cost, o_jmin, min, max, dim2);
-				getMinMaxBestCombineLarge(t_min_cost, t_max_cost, t_picked_cost, t_jmin, b_min_cost, b_max_cost, b_picked_cost, b_jmin);
-				getMinMaxBestSingleWrite(s, o_min_cost, o_jmin, t_min_cost, t_max_cost, t_picked_cost, t_jmin, i);
-			}
-
-			iterator.closeRow(istate);
 		}
 
 		// 32 threads per block, up to 32 blocks, requires no shared memory and no thread synchronization

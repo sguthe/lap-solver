@@ -4,13 +4,15 @@
 
 namespace lap
 {
-	template <class TC, class CF>
+	template <class SC, class TC, class CF>
 	class DirectIterator
 	{
+	protected:
+		int dim, dim2;
 	public:
 		CF &costfunc;
 	public:
-		DirectIterator(CF &costfunc) : costfunc(costfunc) {}
+		DirectIterator(int dim, int dim2, CF &costfunc) : dim(dim), dim2(dim2), costfunc(costfunc) {}
 		~DirectIterator() {}
 
 		void getHitMiss(long long &hit, long long &miss) { hit = miss = 0; }
