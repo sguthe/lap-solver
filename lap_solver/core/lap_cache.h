@@ -21,7 +21,7 @@ namespace lap
 		std::vector<char> priv;
 		int priv_avail;
 		long long chit, cmiss;
-		std::vector<int> map;
+    std::vector<int> map;
 
 		__forceinline void remove_entry(int i)
 		{
@@ -68,7 +68,11 @@ namespace lap
 
 		__forceinline void setSize(int entries, int dim)
 		{
-			map.resize(dim);
+      // calling map.resize() leads to a warning in gcc here so use this code instead
+      {
+        std::vector<int> tmp(dim);
+        map.swap(tmp);
+      }
 			list.resize(entries);
 			id.resize(entries);
 			priv.resize(entries);
