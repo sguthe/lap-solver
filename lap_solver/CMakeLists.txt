@@ -1,5 +1,5 @@
 # Check requirements
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.24)
 
 # Name the project you can choose any name you want here
 project(lap)
@@ -13,13 +13,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (CMAKE_CUDA_COMPILER)
   enable_language(CUDA)
+  if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES auto)
+  endif()
 endif (CMAKE_CUDA_COMPILER)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-O3;-Wfatal-errors;-fstrict-aliasing;-m64;-qopenmp-link=static;-ipo;-marchcore-avx-i>")
 
   if (CMAKE_CUDA_COMPILER)
-    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_52;--ptxas-options=-v;SHELL:-Xcompiler -Wall;-O3;SHELL:-Xcompiler -fopenmp;SHELL:-Xcompiler -ipo;SHELL:-Xcompiler -marchcore-avx-i;--expt-extended-lambda>")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-v;SHELL:-Xcompiler -Wall;-O3;SHELL:-Xcompiler -fopenmp;SHELL:-Xcompiler -ipo;SHELL:-Xcompiler -marchcore-avx-i;--expt-extended-lambda>")
   endif (CMAKE_CUDA_COMPILER)
 endif (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
 
@@ -27,7 +30,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-O3;-Wfatal-errors;-fstrict-aliasing;-m64;-flto;-march=native;-mfpmath=sse>")
 
   if (CMAKE_CUDA_COMPILER)
-    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_52;--ptxas-options=-v;SHELL:-Xcompiler -Wall;-O3;SHELL:-Xcompiler -fopenmp;SHELL:-Xcompiler -march=native;SHELL:-Xcompiler -mfpmath=sse;--expt-extended-lambda>")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-v;SHELL:-Xcompiler -Wall;-O3;SHELL:-Xcompiler -fopenmp;SHELL:-Xcompiler -march=native;SHELL:-Xcompiler -mfpmath=sse;--expt-extended-lambda>")
   endif (CMAKE_CUDA_COMPILER)
 endif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 
