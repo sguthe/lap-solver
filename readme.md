@@ -20,11 +20,13 @@ Linux. For Windows, see below.
 The following software is required to build the source code that comes
 with this publication:
 
--   CMake 3.5
+-   CMake 3.24
 
 -   GCC
 
 -   CUDA 10 (or later, optional for the GPU build)
+
+-   OpenMP (optional for parallel implementation)
 
 ## Build Instructions
 
@@ -32,17 +34,17 @@ To build the test package that was used to generate all the performance
 measurements in the main publication, run the following commands inside
 the `lap_solver` directory:
 
+-   `cd lap_solver`
+
 -   `mkdir build`
 
 -   `cd build`
 
--   `cmake ../gcc`
+-   `cmake ..`
 
--   `make`
+-   `cmake --build .`
 
-Since the makefile is set up to compile the same code with multiple sets
-of defines, it is not possible to use the parallel build, e.g.
-`make -j4`, as this will cause the build to fail.
+-   `ctest`
 
 # Windows
 
@@ -64,6 +66,8 @@ measurements in the main publication, the following steps are required:
 -   load solution from `vc14`, `vc17` or `vc19`
 
 -   press `Ctrl+Shift+B`
+
+-   alternatively use cmake (see above)
 
 # Running Tests
 
