@@ -4,12 +4,14 @@
 #include <chrono>
 #include <sstream>
 #include <iostream>
+#include <iomanip>
 #include <cstring>
 #ifndef LAP_QUIET
 #include <deque>
 #include <mutex>
 #endif
 #include <math.h>
+#include <algorithm>
 
 namespace lap
 {
@@ -428,7 +430,7 @@ namespace lap
 			int j_min;
 			if (i < dim)
 			{
-				const auto *tt = iterator.getRow(i);
+				const auto tt = iterator.getRow(i);
 				auto cost = [&tt](int j) -> SC { return (SC)tt[j]; };
 				getMinMaxBest(i, min_cost_l, max_cost_l, picked_cost_l, j_min, cost, picked, dim2);
 				picked[j_min] = 1;
@@ -481,7 +483,7 @@ namespace lap
 			int j_min;
 			if (i < dim)
 			{
-				const auto *tt = iterator.getRow(i);
+				const auto tt = iterator.getRow(i);
 				auto cost = [&tt, &v](int j) -> SC { return (SC)tt[j] - v[j]; };
 				getMinSecondBest(min_cost_l, second_cost_l, picked_cost_l, j_min, cost, picked, dim2);
 			}
@@ -526,7 +528,7 @@ namespace lap
 				SC min_cost, min_cost_real;
 				if (i < dim)
 				{
-					const auto *tt = iterator.getRow(perm[i]);
+					const auto tt = iterator.getRow(perm[i]);
 					auto cost = [&tt, &v](int j) -> SC { return (SC)tt[j] - v[j]; };
 					getMinimalCost(j_min, min_cost, min_cost_real, cost, mod_v, dim2);
 				}
@@ -556,7 +558,7 @@ namespace lap
 			{
 				if (perm[i] < dim)
 				{
-					const auto *tt = iterator.getRow(perm[i]);
+					const auto tt = iterator.getRow(perm[i]);
 					SC min_cost = (SC)tt[picked[i]] - v[picked[i]];
 					mod_v[picked[i]] = SC(-1);
 					for (int j = 0; j < dim2; j++)
@@ -594,7 +596,7 @@ namespace lap
 				SC min_cost, min_cost_real;
 				if (perm[i] < dim)
 				{
-					const auto *tt = iterator.getRow(perm[i]);
+					const auto tt = iterator.getRow(perm[i]);
 					min_cost = (SC)tt[picked[i]];
 					min_cost_real = std::numeric_limits<SC>::max();
 					for (int j = 0; j < dim2; j++)
@@ -899,7 +901,7 @@ namespace lap
 				jmin = dim2;
 				if (f < dim)
 				{
-					auto tt = iterator.getRow(f);
+					const auto tt = iterator.getRow(f);
 					for (int j = 0; j < dim2; j++)
 					{
 						colactive[j] = 1;
@@ -981,7 +983,7 @@ namespace lap
 					min_n = std::numeric_limits<SC>::max();
 					if (i < dim)
 					{
-						auto tt = iterator.getRow(i);
+						const auto tt = iterator.getRow(i);
 						SC tt_jmin = (SC)tt[jmin];
 						SC v_jmin = v[jmin];
 						for (int j = 0; j < dim2; j++)
@@ -1193,7 +1195,7 @@ namespace lap
 		bool correct = true;
 		for (int f = 0; f < dim2; f++)
 		{
-			auto tt = iterator.getRow(f);
+			const auto tt = iterator.getRow(f);
 			int jmin = rowsol[f];
 			SC ref_min = tt[jmin] - v[jmin];
 			SC min = ref_min;
@@ -1252,4 +1254,97 @@ namespace lap
 	{
 		return cost<SC, CF>(dim, dim, costfunc, rowsol);
 	}
+  // high-level interface
+  template <class SC, class TC, class CF>
+  SC solveDirect(int dim, int dim2, CF &get_cost, int *rowsol, bool epsilon)
+  {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    lap::SimpleCostFunction<TC, CF> costFunction(get_cost);
+    lap::NoIterator<TC, lap::SimpleCostFunction<TC, CF>> iterator(costFunction);
+
+    lap::displayTime(start_time, "setup complete", std::cout);
+
+    lap::solve<SC>(dim, dim2, costFunction, iterator, rowsol, epsilon);
+
+    std::stringstream ss;
+    SC cost = lap::cost<SC>(dim, dim2, costFunction, rowsol);
+    ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << cost;
+    lap::displayTime(start_time, ss.str().c_str(), std::cout);
+    return cost;
+  }
+
+  template <class SC, class TC, class CF>
+  SC solveTable(int dim, int dim2, CF &get_cost, int *rowsol, bool epsilon)
+  {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    lap::SimpleCostFunction<TC, CF> costFunction(get_cost);
+    lap::TableCost<TC> costMatrix(dim, dim2, costFunction);
+    lap::DirectIterator<TC, lap::TableCost<TC>> iterator(costMatrix);
+
+    lap::displayTime(start_time, "setup complete", std::cout);
+
+    lap::solve<SC>(dim, dim2, costMatrix, iterator, rowsol, epsilon);
+
+    std::stringstream ss;
+    SC cost = lap::cost<SC>(dim, dim2, costMatrix, rowsol);
+    ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << cost;
+    lap::displayTime(start_time, ss.str().c_str(), std::cout);
+    return cost;
+  }
+
+  template <class SC, class TC, class CF>
+  SC solveCaching(int dim, int dim2, CF &get_cost, int *rowsol, int entries, bool epsilon)
+  {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    lap::SimpleCostFunction<TC, CF> costFunction(get_cost);
+
+#ifndef NO_LFU
+    if (4 * entries < dim)
+#endif
+    {
+      lap::CachingIterator<TC, lap::SimpleCostFunction<TC, CF>, lap::CacheSLRU> iterator(dim, dim2, entries, costFunction);
+
+      lap::displayTime(start_time, "setup complete", std::cout);
+
+      // estimating epsilon
+      lap::solve<SC>(dim, dim2, costFunction, iterator, rowsol, epsilon);
+    }
+#ifndef NO_LFU
+    else
+    {
+      lap::CachingIterator<SC, TC, lap::SimpleCostFunction<TC, CF>, lap::CacheLFU> iterator(dim, dim, entries, costFunction);
+
+      lap::displayTime(start_time, "setup complete", std::cout);
+
+      // estimating epsilon
+      lap::solve<SC>(dim, dim2, costFunction, iterator, rowsol, epsilon);
+    }
+#endif
+
+    std::stringstream ss;
+    SC cost = lap::cost<SC>(dim, dim2, costFunction, rowsol);
+    ss << "cost = " << std::setprecision(std::numeric_limits<SC>::max_digits10) << cost ;
+    lap::displayTime(start_time, ss.str().c_str(), std::cout);
+    return cost;
+  }
+
+  template <class SC, class TC, class CF>
+  SC solve(int dim, int dim2, CF &get_cost, int *rowsol, int entries, bool epsilon)
+  {
+    if (entries == 0)
+    {
+      std::cout << "using singlethreaded direct access." << std::endl;
+      return lap::solveDirect<SC, TC, CF>(dim, dim2, get_cost, rowsol, epsilon);
+    }
+    else if (dim <= entries)
+    {
+      std::cout << "using singlethreaded table with " << dim << " rows." << std::endl;
+      return lap::solveTable<SC, TC, CF>(dim, dim2, get_cost, rowsol, epsilon);
+    }
+    else
+    {
+      std::cout << "using singlethreaded caching with " << entries << "/" << dim << " entries." << std::endl;
+      return lap::solveCaching<SC, TC, CF>(dim, dim2, get_cost, rowsol, entries, epsilon);
+    }
+  }
 }

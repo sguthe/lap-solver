@@ -1,7 +1,5 @@
 #pragma once
 
-#include <algorithm>
-
 namespace lap
 {
 	template <class TC, class CF>

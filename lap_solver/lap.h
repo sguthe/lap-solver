@@ -51,6 +51,13 @@
 
 namespace lap
 {
+  // high-level interface
+  template <class SC, class TC, class CF> SC solveDirect(int dim, int dim2, CF &get_cost, int *rowsol, bool epsilon = true);
+  template <class SC, class TC, class CF> SC solveTable(int dim, int dim2, CF &get_cost, int *rowsol, bool epsilon = true);
+  template <class SC, class TC, class CF> SC solveCaching(int dim, int dim2, CF &get_cost, int *rowsol, int entries, bool epsilon = true);
+  template <class SC, class TC, class CF> SC solve(int dim, int dim2, CF &get_cost, int *rowsol, int entries = 0, bool epsilon = true);
+
+  // low-level interface
 	// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
 	template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
 	template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
@@ -77,6 +84,13 @@ namespace lap
 #ifdef LAP_OPENMP
 	namespace omp
 	{
+    // high-level interface
+    template <class SC, class TC, class CF> SC solveDirect(int dim, int dim2, CF &get_cost, int *rowsol, bool epsilon = true, bool sequential = false);
+    template <class SC, class TC, class CF> SC solveTable(int dim, int dim2, CF &get_cost, int *rowsol, bool epsilon = true, bool sequential = false);
+    template <class SC, class TC, class CF> SC solveCaching(int dim, int dim2, CF &get_cost, int *rowsol, int entries, bool epsilon = true, bool sequential = false);
+    template <class SC, class TC, class CF> SC solve(int dim, int dim2, CF &get_cost, int *rowsol, int entries = 0, bool epsilon = true, bool sequential = false);
+
+    // low-level interface
 		// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
 		template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
 		template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
@@ -114,6 +128,7 @@ namespace lap
 #include "core/lap_cost.h"
 #include "core/lap_cache.h"
 #include "core/lap_direct_iterator.h"
+#include "core/lap_no_iterator.h"
 #include "core/lap_caching_iterator.h"
 #include "core/lap_solver.h"
 
@@ -121,6 +136,7 @@ namespace lap
 #include <omp.h>
 #include "core/omp/lap_cost.h"
 #include "core/omp/lap_direct_iterator.h"
+#include "core/omp/lap_no_iterator.h"
 #include "core/omp/lap_caching_iterator.h"
 #include "core/omp/lap_solver.h"
 #endif
