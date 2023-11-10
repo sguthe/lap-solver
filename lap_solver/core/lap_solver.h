@@ -1312,7 +1312,7 @@ namespace lap
 #ifndef NO_LFU
     else
     {
-      lap::CachingIterator<SC, TC, lap::SimpleCostFunction<TC, CF>, lap::CacheLFU> iterator(dim, dim, entries, costFunction);
+      lap::CachingIterator<TC, lap::SimpleCostFunction<TC, CF>, lap::CacheLFU> iterator(dim, dim, entries, costFunction);
 
       lap::displayTime(start_time, "setup complete", std::cout);
 

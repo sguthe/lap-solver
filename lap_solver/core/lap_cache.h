@@ -14,14 +14,14 @@ namespace lap
 	class CacheSLRU
 	{
 	protected:
+    long long chit, cmiss;
 		std::vector<CacheListNode<int>> list;
-		int first[2];
-		int last[2];
 		std::vector<int> id;
 		std::vector<char> priv;
-		int priv_avail;
-		long long chit, cmiss;
     std::vector<int> map;
+    int first[2];
+    int last[2];
+		int priv_avail;
 
 		__forceinline void remove_entry(int i)
 		{
