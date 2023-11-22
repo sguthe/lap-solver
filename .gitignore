@@ -1,1 +1,6 @@
 lap_solver/build
+*.xcworkspace
+*.xcworkspacedata
+*.plist
+*.xcuserstate
+
