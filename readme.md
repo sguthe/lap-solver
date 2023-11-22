@@ -10,6 +10,14 @@ title: "Algorithm 1015: A Fast Scalable Solver for the Dense Linear (Sum)
 doi: https://dl.acm.org/doi/abs/10.1145/3442348
 ---
 
+# Status
+
+## main
+[![build & test](https://github.com/sguthe/lap-solver/actions/workflows/cmake-multi-platform.yml/badge.svg?branch=main)](https://github.com/sguthe/lap-solver/actions/workflows/cmake-multi-platform.yml)
+
+## dev
+[![build & test](https://github.com/sguthe/lap-solver/actions/workflows/cmake-multi-platform.yml/badge.svg?branch=dev)](https://github.com/sguthe/lap-solver/actions/workflows/cmake-multi-platform.yml)
+
 # Linux
 
 This section contains the instructions for building and running under
